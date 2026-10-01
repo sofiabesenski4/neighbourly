@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_01_033553) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -77,31 +77,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_033553) do
   end
 
   create_table "messages", force: :cascade do |t|
-    t.integer "cache_creation_tokens"
     t.boolean "cache_until_here", default: false, null: false
-    t.integer "cached_tokens"
     t.bigint "chat_id", null: false
     t.jsonb "citations"
     t.text "content"
-    t.json "content_raw"
     t.datetime "created_at", null: false
     t.string "finish_reason"
-    t.integer "input_tokens"
-    t.bigint "model_id"
-    t.integer "output_tokens"
     t.jsonb "raw_content"
     t.jsonb "raw_reasoning"
     t.string "role", null: false
     t.jsonb "server_tool_calls"
     t.text "thinking_signature"
     t.text "thinking_text"
-    t.integer "thinking_tokens"
-    t.bigint "tool_call_id"
     t.datetime "updated_at", null: false
     t.index ["chat_id"], name: "index_messages_on_chat_id"
-    t.index ["model_id"], name: "index_messages_on_model_id"
-    t.index ["role"], name: "index_messages_on_role"
-    t.index ["tool_call_id"], name: "index_messages_on_tool_call_id"
   end
 
   create_table "reports", force: :cascade do |t|
@@ -205,13 +194,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_033553) do
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])"
   end
 
-  create_table "ruby_llm_v2_backfills", id: false, force: :cascade do |t|
-    t.boolean "completed", default: false, null: false
-    t.bigint "last_id"
-    t.string "task", null: false
-    t.index ["task"], name: "index_ruby_llm_v2_backfills_on_task", unique: true
-  end
-
   create_table "sources", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.string "css_selector"
@@ -244,8 +226,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_033553) do
   add_foreign_key "document_messages", "messages"
   add_foreign_key "documents", "sources", on_delete: :cascade
   add_foreign_key "messages", "chats"
-  add_foreign_key "messages", "ruby_llm_models", column: "model_id"
-  add_foreign_key "messages", "ruby_llm_tool_calls", column: "tool_call_id"
   add_foreign_key "reports", "documents"
   add_foreign_key "reports", "users"
 end
