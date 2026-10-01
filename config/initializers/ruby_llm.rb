@@ -11,8 +11,5 @@ RubyLLM.configure do |config|
   config.default_model = "claude-haiku-4-5"
   config.default_embedding_model = "text-embedding-3-small"
 
-  # Use the new association-based acts_as API (recommended)
-  config.use_new_acts_as = true
-
   config.model_registry_file = "models.json"
 end
