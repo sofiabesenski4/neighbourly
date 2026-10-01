@@ -8,13 +8,13 @@ class ModelsController < ApplicationController
   end
 
   def show
-    @model = Model.find(params[:id])
-    authorize @model
+    authorize :model, :show?
+    @model = RubyLLM.models.find(params[:id], provider: params[:provider].presence)
   end
 
   def refresh
     authorize :model, :refresh?
-    Model.refresh!
+    RubyLLM.models.refresh
     redirect_to models_path, notice: "Models refreshed successfully"
   end
 end
