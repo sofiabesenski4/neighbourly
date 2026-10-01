@@ -1,0 +1,18 @@
+# Audit all gems listed in the Gemfile for known security problems by running bin/bundler-audit.
+# CVEs that are not relevant to the application can be enumerated on the ignore list below.
+
+ignore:
+  - CVE-THAT-DOES-NOT-APPLY
+
+  # ruby_llm ReDoS (GHSA-42r3-x6vx-x49x), High.
+  #
+  # Temporarily suppressed because there is no stable release to upgrade to.
+  # The only fixed versions are the 2.0.0.rc prereleases, and 2.0 moves the
+  # model registry into a new ruby_llm_models table, so taking it means a
+  # schema migration plus changes to Model, ModelsController, ModelPolicy and
+  # the model views. Shipping a prerelease of our core LLM dependency on top of
+  # that is not a trade we should make quietly.
+  #
+  # Revisit when 2.0 ships stable and do the migration properly. Until then
+  # this is an accepted, tracked risk rather than a resolved one.
+  - CVE-2026-67991

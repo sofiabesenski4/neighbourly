@@ -1,0 +1,26 @@
+{
+  "name": "app",
+  "private": true,
+  "packageManager": "yarn@1.22.22",
+  "type": "module",
+  "devDependencies": {
+    "esbuild": "^0.28.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsonc": "^3.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.0.5",
+    "prettier": "^3.8.3"
+  },
+  "scripts": {
+    "build": "esbuild app/javascript/*.* --bundle --sourcemap --format=esm --outdir=app/assets/builds --public-path=/assets",
+    "prepare": "husky",
+    "lint-javascript": "eslint"
+  },
+  "dependencies": {
+    "@hotwired/stimulus": "^3.2.2",
+    "@hotwired/turbo-rails": "^8.0.23",
+    "eslint": "^10.4.0",
+    "eslint-plugin-prettier": "^5.5.5",
+    "globals": "^17.6.0"
+  }
+}
