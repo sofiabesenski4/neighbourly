@@ -31,7 +31,7 @@ RSpec.describe "Models", type: :request do
       before { sign_in admin }
       before do
         chat_models = double(all: [])
-        allow(RubyLLM).to receive(:models).and_return(double(chat_models: chat_models, refresh!: nil))
+        allow(RubyLLM).to receive(:models).and_return(double(chat_models: chat_models, refresh: nil))
       end
 
       it "allows access" do
@@ -43,11 +43,20 @@ RSpec.describe "Models", type: :request do
   end
 
   describe "GET /models/:id" do
-    let(:model_record) { Model.create!(model_id: "test-model", name: "Test Model", provider: "test") }
+    let(:model_info) do
+      instance_double(RubyLLM::Model, id: "test-model", name: "Test Model", provider: "test",
+        provider_class: nil, context_window: nil, max_output_tokens: nil, capabilities: [])
+    end
+
+    before do
+      catalogue = instance_double(RubyLLM::Models)
+      allow(catalogue).to receive(:find).with("test-model", provider: nil).and_return(model_info)
+      allow(RubyLLM).to receive(:models).and_return(catalogue)
+    end
 
     context "when not signed in" do
       it "redirects to sign in" do
-        get model_path(model_record)
+        get model_path("test-model")
 
         expect(response).to redirect_to(new_user_session_path)
       end
@@ -57,7 +66,7 @@ RSpec.describe "Models", type: :request do
       before { sign_in regular_user }
 
       it "denies access" do
-        get model_path(model_record)
+        get model_path("test-model")
 
         expect(response).to have_http_status(:redirect)
         follow_redirect!
@@ -69,7 +78,7 @@ RSpec.describe "Models", type: :request do
       before { sign_in admin }
 
       it "allows access" do
-        get model_path(model_record)
+        get model_path("test-model")
 
         expect(response).to have_http_status(:ok)
       end
@@ -77,7 +86,9 @@ RSpec.describe "Models", type: :request do
   end
 
   describe "POST /models/refresh" do
-    before { allow(Model).to receive(:refresh!) }
+    let(:catalogue) { instance_double(RubyLLM::Models, refresh: nil) }
+
+    before { allow(RubyLLM).to receive(:models).and_return(catalogue) }
 
     context "when not signed in" do
       it "redirects to sign in" do
@@ -103,12 +114,10 @@ RSpec.describe "Models", type: :request do
       before { sign_in admin }
 
       it "allows refreshing models" do
-        allow(Model).to receive(:refresh!)
-
         post refresh_models_path
 
         expect(response).to redirect_to(models_path)
-        expect(Model).to have_received(:refresh!)
+        expect(catalogue).to have_received(:refresh)
       end
     end
   end

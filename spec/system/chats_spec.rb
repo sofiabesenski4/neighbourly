@@ -7,24 +7,12 @@ RSpec.describe "Chats", type: :system do
 
   let(:user) { User.create!(email: "chatuser@example.com", password: "password123") }
 
-  # Build lightweight stand-ins for the RubyLLM model catalogue so we
-  # never hit the real API just to render a <select>.
-  let(:default_model) do
-    instance_double(RubyLLM::Model::Info, id: "claude-haiku-4-5", label: "Claude Haiku", provider: "anthropic", name: "claude-haiku-4-5")
-  end
-
-  let(:alternate_model) do
-    instance_double(RubyLLM::Model::Info, id: "claude-sonnet-4-5", label: "Claude Sonnet", provider: "anthropic", name: "claude-sonnet-4-5")
-  end
-
-  let(:model_catalogue) do
-    catalogue = instance_double(RubyLLM::Models)
-    chat_scope = instance_double(RubyLLM::Models, all: [default_model, alternate_model])
-    allow(catalogue).to receive(:refresh!)
-    allow(catalogue).to receive(:chat_models).and_return(chat_scope)
-    allow(catalogue).to receive(:find).with("claude-haiku-4-5").and_return(default_model)
-    catalogue
-  end
+  # A real registry holding only these two models, so we never hit the
+  # real API just to render a <select>. Saving a chat copies its model into
+  # ruby_llm_models, so a bare double is not enough.
+  let(:default_model) { RubyLLM::Model.new(id: "claude-haiku-4-5", name: "Claude Haiku", provider: "anthropic") }
+  let(:alternate_model) { RubyLLM::Model.new(id: "claude-sonnet-4-5", name: "Claude Sonnet", provider: "anthropic") }
+  let(:model_catalogue) { RubyLLM::Models.new([default_model, alternate_model]) }
 
   before do
     allow(RubyLLM).to receive(:models).and_return(model_catalogue)
@@ -97,9 +85,9 @@ RSpec.describe "Chats", type: :system do
     it "allows selecting an AI model for the chat" do
       visit new_chat_path
 
-      expect(page).to have_select("chat_model", options: ["Default: Claude Haiku", "Claude Haiku", "Claude Sonnet"])
+      expect(page).to have_select("chat_model", options: ["Default: Anthropic - Claude Haiku", "Anthropic - Claude Haiku", "Anthropic - Claude Sonnet"])
 
-      select "Claude Sonnet", from: "chat_model"
+      select "Anthropic - Claude Sonnet", from: "chat_model"
       fill_in "Prompt", with: "Tell me about Rails"
       click_button "Start new chat"
 
