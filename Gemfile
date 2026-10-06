@@ -76,6 +76,10 @@ group :staging, :production do
   gem "sentry-rails"
 end
 
+group :staging, :production, :test do
+  gem "sidekiq"
+end
+
 gem "devise", "~> 5.0"
 
 gem "pundit", "~> 2.5"
