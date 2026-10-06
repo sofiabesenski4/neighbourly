@@ -10,6 +10,7 @@ class Report < ApplicationRecord
 
   scope :pending, -> { where(status: "pending") }
   scope :most_recent, -> { order(created_at: :desc) }
+  scope :awaiting_digest, -> { where(digest_sent: false) }
 
   def pending?
     status == "pending"

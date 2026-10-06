@@ -93,6 +93,35 @@ RSpec.describe Report, type: :model do
       expect(Report.most_recent.first).to eq(new_report)
       expect(Report.most_recent.last).to eq(old_report)
     end
+
+    describe ".awaiting_digest" do
+      it "returns only reports that have not been sent in a digest" do
+        report_sent = Report.create!(document: document, user: user, reason: "out of date", digest_sent: true)
+        report_awaiting = Report.create!(document: document, user: user, reason: "offensive", digest_sent: false)
+
+        expect(Report.awaiting_digest).to include(report_awaiting)
+        expect(Report.awaiting_digest).not_to include(report_sent)
+      end
+
+      it "excludes reports where digest_sent is true" do
+        Report.create!(document: document, user: user, reason: "out of date", digest_sent: true)
+        Report.create!(document: document, user: user, reason: "offensive", digest_sent: false)
+
+        expect(Report.awaiting_digest.count).to eq(1)
+      end
+    end
+  end
+
+  describe "digest_sent attribute" do
+    it "defaults to false" do
+      report = build_report
+      expect(report.digest_sent).to be false
+    end
+
+    it "can be set to true" do
+      report = build_report(digest_sent: true)
+      expect(report.digest_sent).to be true
+    end
   end
 
   describe "status predicates" do
