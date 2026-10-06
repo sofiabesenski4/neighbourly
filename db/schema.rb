@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_06_035721) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -96,11 +96,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
   create_table "reports", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "details"
+    t.boolean "digest_sent", default: false, null: false
     t.bigint "document_id", null: false
     t.string "reason", null: false
     t.string "status", default: "pending", null: false
     t.datetime "updated_at", null: false
     t.bigint "user_id"
+    t.index ["digest_sent"], name: "index_reports_on_digest_sent"
     t.index ["document_id"], name: "index_reports_on_document_id"
     t.index ["status"], name: "index_reports_on_status"
     t.index ["user_id"], name: "index_reports_on_user_id"
@@ -190,8 +192,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
     t.index ["chat_type", "chat_id"], name: "index_ruby_llm_usages_on_chat_type_and_chat_id"
     t.index ["message_type", "message_id"], name: "index_ruby_llm_usages_on_message_type_and_message_id"
     t.index ["status"], name: "index_ruby_llm_usages_on_status"
-    t.check_constraint "operation::text = ANY (ARRAY['chat'::character varying, 'embedding'::character varying, 'moderation'::character varying, 'image'::character varying, 'speech'::character varying, 'transcription'::character varying, 'ocr'::character varying, 'rerank'::character varying]::text[])"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])"
+    t.check_constraint "operation::text = ANY (ARRAY['chat'::character varying::text, 'embedding'::character varying::text, 'moderation'::character varying::text, 'image'::character varying::text, 'speech'::character varying::text, 'transcription'::character varying::text, 'ocr'::character varying::text, 'rerank'::character varying::text])"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])"
   end
 
   create_table "sources", force: :cascade do |t|
