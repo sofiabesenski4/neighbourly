@@ -54,7 +54,7 @@
                   </span>
                 <% end %>
               </span>
-              <%= button_to "Sign Out", destroy_user_session_path, method: :delete, data: { turbo: false }, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-stone-700 hover:bg-stone-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-500 transition-colors" %>
+              <%= button_to "Sign Out", destroy_user_session_path, method: :delete, data: { turbo: false }, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-colors" %>
             <% else %>
               <%= link_to "Sign In", new_user_session_path, class: "inline-flex items-center px-4 py-2 border border-stone-300 text-sm font-medium rounded-md text-stone-700 bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-colors" %>
               <%= link_to "Sign Up", new_user_registration_path, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-colors" %>
@@ -89,7 +89,7 @@
               <% end %>
             </div>
             <div class="mt-2 px-3">
-              <%= button_to "Sign Out", destroy_user_session_path, method: :delete, data: { turbo: false }, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-stone-700 hover:bg-stone-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-stone-500 transition-colors" %>
+              <%= button_to "Sign Out", destroy_user_session_path, method: :delete, data: { turbo: false }, class: "inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-colors" %>
             </div>
           </div>
         <% else %>
