@@ -11,7 +11,6 @@ class ApplicationController < ActionController::Base
   private
 
   def enforce_basic_auth
-    return if Rails.env.test?
     return if ENV["BASIC_AUTH_ENABLED"] == "false"
 
     authenticate_or_request_with_http_basic do |username, password|

@@ -1,8 +1,13 @@
 require "rails_helper"
 
 RSpec.describe "Users", type: :system do
-  before do
+  around do |example|
+    original = ENV["BASIC_AUTH_ENABLED"]
+    ENV["BASIC_AUTH_ENABLED"] = "false"
     driven_by(:rack_test)
+    example.run
+  ensure
+    ENV["BASIC_AUTH_ENABLED"] = original
   end
 
   let(:admin_user) { User.create!(email: "admin@example.com", password: "password123", password_confirmation: "password123", admin: true) }
