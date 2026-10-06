@@ -1,6 +1,9 @@
 require "rails_helper"
 require "rake"
 
+# Trigger autoloading before rake tasks are loaded
+_ = ReportDigestJob
+
 RSpec.describe "reports rake tasks" do
   before(:all) do
     Rails.application.load_tasks
