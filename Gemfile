@@ -84,7 +84,7 @@ gem "rspec-rails", "~> 8.0"
 
 gem "tailwindcss-rails", "~> 4.4"
 
-gem "ruby_llm", "~> 2.0"
+gem "ruby_llm", "~> 2.1"
 
 gem "neighbor", "~> 1.1"
 
