@@ -1,0 +1,46 @@
+{
+  "schema_version": "0.1-draft",
+  "title": "Victoria service guide",
+  "printed_at": null,
+  "resources": [
+    {
+      "resource_id": "sample-resource-001",
+      "categories": [
+        "Food support"
+      ],
+      "name": "Example meal service",
+      "description": "A short description of what the service offers.",
+      "image_url": null,
+      "language_services": null,
+      "eligibility": "Eligibility stated in the resource record.",
+      "location": "Address and useful location details from the resource record.",
+      "hours": null,
+      "intake_times": null,
+      "seasonal_dates": null,
+      "contact": {
+        "phones": [],
+        "email": null,
+        "website": null
+      },
+      "access_instructions": "Steps from the resource record, such as walk in, call, book, or request a referral.",
+      "cost": null,
+      "required_documents": null,
+      "accessibility_notes": null,
+      "pet_policy": null,
+      "other_access_notes": null,
+      "sources": [
+        {
+          "title": "Example source - SAMPLE ONLY",
+          "url": null,
+          "edition": null,
+          "page_reference": null
+        }
+      ],
+      "entry_method": null,
+      "last_checked_at": null,
+      "check_method": null,
+      "last_updated_at": null,
+      "needs_recheck": true
+    }
+  ]
+}
