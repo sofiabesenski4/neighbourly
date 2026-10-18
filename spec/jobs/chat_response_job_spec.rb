@@ -74,4 +74,19 @@ RSpec.describe ChatResponseJob, type: :job do
       described_class.perform_now(chat.id, "Hello")
     end
   end
+
+  context "when the model cannot reply" do
+    let(:use_rag) { false }
+
+    [RubyLLM::BadRequestError.new("Bad request"), Faraday::ConnectionFailed.new("Connection refused")].each do |error|
+      it "tells the chat after a #{error.class}" do
+        allow_any_instance_of(Chat).to receive(:ask).and_raise(error)
+
+        expect {
+          described_class.perform_now(chat.id, "Hello")
+        }.to raise_error(error.class)
+          .and have_broadcasted_to("chat_#{chat.id}").with(a_string_including("the assistant couldn't reply"))
+      end
+    end
+  end
 end
