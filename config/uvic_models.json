@@ -1,0 +1,36 @@
+[
+  {
+    "id": "qwen3-6-35b-a3b-vllm",
+    "name": "Qwen3.6 35B (UVic)",
+    "provider": "openai",
+    "family": "qwen",
+    "created_at": null,
+    "context_window": 87500,
+    "max_output_tokens": 10304,
+    "knowledge_cutoff": null,
+    "modalities": {
+      "input": ["text", "image"],
+      "output": ["text"]
+    },
+    "capabilities": ["function_calling", "vision"],
+    "pricing": {},
+    "metadata": {}
+  },
+  {
+    "id": "nomic-embed-text-cpu",
+    "name": "Nomic Embed Text (UVic)",
+    "provider": "openai",
+    "family": "nomic-embed",
+    "created_at": null,
+    "context_window": 8192,
+    "max_output_tokens": 768,
+    "knowledge_cutoff": null,
+    "modalities": {
+      "input": ["text"],
+      "output": ["embeddings"]
+    },
+    "capabilities": [],
+    "pricing": {},
+    "metadata": {}
+  }
+]
