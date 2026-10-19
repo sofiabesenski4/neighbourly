@@ -28,7 +28,7 @@ RSpec.describe "Chats", type: :system do
     fill_in "Prompt", with: "Hello, how are you?"
     click_button "Start new chat"
 
-    expect(page).to have_content("Chat was successfully created.", count: 1)
+    gi expect(page).to have_content("Chat was successfully created.", count: 1)
     expect(Chat.last.user).to eq(user)
   end
 
