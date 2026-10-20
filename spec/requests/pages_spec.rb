@@ -11,7 +11,13 @@ RSpec.describe "Pages", type: :request do
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(new_user_registration_path)
         expect(response.body).to include(new_user_session_path)
-        expect(response.body).not_to include("What do you need, neighbour?")
+        expect(response.body).not_to include("Ask anything")
+      end
+
+      it "links to the flyer generator" do
+        get root_path
+
+        expect(response.body).to include(%(href="#{new_flyer_path}"))
       end
     end
 
@@ -24,9 +30,15 @@ RSpec.describe "Pages", type: :request do
         get root_path
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("What do you need, neighbour?")
+        expect(response.body).to include("Ask anything")
         expect(response.body).to include(%(href="#{new_chat_path}"))
         expect(response.body).not_to include("Get started")
+      end
+
+      it "links to the flyer generator" do
+        get root_path
+
+        expect(response.body).to include(%(href="#{new_flyer_path}"))
       end
     end
   end
