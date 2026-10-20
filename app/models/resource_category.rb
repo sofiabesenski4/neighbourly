@@ -39,11 +39,12 @@ class ResourceCategory < Data.define(:key, :name, :labels)
   end
 
   # Returns the keys of the categories the given labels belong to, in the
-  # order of ALL. Matching ignores case and surrounding whitespace, and
-  # labels that belong to no category are skipped.
+  # order of ALL. A category's own name counts as one of its labels, since
+  # the resource form stores names. Matching ignores case and surrounding
+  # whitespace, and labels that belong to no category are skipped.
   def self.keys_for(labels)
     wanted = Array(labels).map { |label| normalize(label) }
-    all.select { |category| category.labels.any? { |label| wanted.include?(normalize(label)) } }.map(&:key)
+    all.select { |category| category.terms.any? { |term| wanted.include?(normalize(term)) } }.map(&:key)
   end
 
   # Returns the categories with the given keys, in the order of ALL.
@@ -57,4 +58,9 @@ class ResourceCategory < Data.define(:key, :name, :labels)
     label.to_s.strip.downcase
   end
   private_class_method :normalize
+
+  # The name and labels that place a resource in this category.
+  def terms
+    [name, *labels]
+  end
 end

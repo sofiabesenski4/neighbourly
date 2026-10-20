@@ -14,6 +14,10 @@ RSpec.describe ResourceCategory do
       expect(described_class.keys_for(["Showers", "Food bank", "Meals"])).to eq(["food", "hygiene"])
     end
 
+    it "matches a category's own name" do
+      expect(described_class.keys_for(["Food", "Shelter & housing"])).to eq(["food", "shelter"])
+    end
+
     it "skips labels that belong to no category" do
       expect(described_class.keys_for(["Pet Friendly", "Meals"])).to eq(["food"])
     end
@@ -39,9 +43,9 @@ RSpec.describe ResourceCategory do
     expect(keys).to eq(keys.uniq)
   end
 
-  it "puts each label in only one category" do
-    labels = described_class.all.flat_map { |category| category.labels.map(&:downcase) }
+  it "puts each name and label in only one category" do
+    terms = described_class.all.flat_map { |category| category.terms.map(&:downcase).uniq }
 
-    expect(labels).to eq(labels.uniq)
+    expect(terms).to eq(terms.uniq)
   end
 end
