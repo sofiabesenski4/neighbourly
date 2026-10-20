@@ -56,6 +56,19 @@ RSpec.describe ContentPipeline::Parsers::Api do
       expect(chunk[:metadata][:categories]).to eq(["24 Hour", "Pet Friendly"])
     end
 
+    it "groups taxonomies into resource categories" do
+      json = [{
+        "id" => 1,
+        "post_title" => "Drop-in Centre",
+        "taxonomies" => [{"name" => "Meals"}, {"name" => "Showers"}, {"name" => "Pet Friendly"}]
+      }].to_json
+
+      chunk = parser.parse(json).first
+
+      expect(chunk[:metadata][:resource_categories]).to eq(["food", "hygiene"])
+      expect(chunk[:metadata][:categories]).to eq(["Meals", "Showers", "Pet Friendly"])
+    end
+
     it "skips records without a post_title" do
       json = [{"id" => 1, "post_title" => nil}].to_json
       expect(parser.parse(json)).to be_empty

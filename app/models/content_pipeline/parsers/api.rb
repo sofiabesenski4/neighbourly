@@ -72,6 +72,7 @@ module ContentPipeline
         geo = location ? hash_field(location, "location") : nil
         beds = hash_field(record, "beds")
         age_range = hash_field(record, "age_range")
+        categories = Array(record["taxonomies"]).map { |t| t["name"] }.compact
 
         {
           city: location&.dig("city", "value"),
@@ -83,7 +84,8 @@ module ContentPipeline
           full: beds&.dig("full"),
           age_range: age_range,
           gender: Array(record["gender"]).map { |g| g["value"] }.compact,
-          categories: Array(record["taxonomies"]).map { |t| t["name"] }.compact,
+          categories: categories,
+          resource_categories: ResourceCategory.keys_for(categories),
           closed: record["closed"]
         }.compact
       end
