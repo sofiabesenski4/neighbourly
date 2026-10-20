@@ -46,6 +46,13 @@ class ResourceCategory < Data.define(:key, :name, :labels)
     all.select { |category| category.labels.any? { |label| wanted.include?(normalize(label)) } }.map(&:key)
   end
 
+  # Returns the categories with the given keys, in the order of ALL.
+  # Unknown keys are skipped.
+  def self.with_keys(keys)
+    keys = Array(keys).map(&:to_s)
+    all.select { |category| keys.include?(category.key) }
+  end
+
   def self.normalize(label)
     label.to_s.strip.downcase
   end

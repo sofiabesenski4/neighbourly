@@ -65,8 +65,12 @@ class DocumentsController < ApplicationController
   def document_params
     params.require(:document).permit(
       :title, :description, :city, :address, :phone, :email,
-      :website, :hours, :categories, :age_min, :age_max, :gender, :notes
+      :website, :hours, :age_min, :age_max, :gender, :notes, resource_categories: []
     )
+  end
+
+  def selected_categories
+    @selected_categories ||= ResourceCategory.with_keys(document_params[:resource_categories])
   end
 
   def build_content
@@ -84,7 +88,7 @@ class DocumentsController < ApplicationController
       parts << "Age range: #{age_text}"
     end
     parts << "Gender: #{p[:gender]}" if p[:gender].present?
-    parts << "Categories: #{p[:categories]}" if p[:categories].present?
+    parts << "Categories: #{selected_categories.map(&:name).join(", ")}" if selected_categories.any?
     parts << "Description: #{p[:description]}" if p[:description].present?
     parts << "Notes: #{p[:notes]}" if p[:notes].present?
     parts.join("\n")
@@ -106,7 +110,10 @@ class DocumentsController < ApplicationController
       }.compact
     end
     meta[:gender] = p[:gender].split(",").map(&:strip).reject(&:blank?) if p[:gender].present?
-    meta[:categories] = p[:categories].split(",").map(&:strip).reject(&:blank?) if p[:categories].present?
+    if selected_categories.any?
+      meta[:categories] = selected_categories.map(&:name)
+      meta[:resource_categories] = selected_categories.map(&:key)
+    end
     meta[:description] = p[:description] if p[:description].present?
     meta[:notes] = p[:notes] if p[:notes].present?
     meta

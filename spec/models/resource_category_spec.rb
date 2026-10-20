@@ -23,6 +23,16 @@ RSpec.describe ResourceCategory do
     end
   end
 
+  describe ".with_keys" do
+    it "returns the categories with those keys, in the order of .all" do
+      expect(described_class.with_keys(["hygiene", "food"]).map(&:name)).to eq(["Food", "Hygiene & essentials"])
+    end
+
+    it "skips unknown and blank keys" do
+      expect(described_class.with_keys(["", "made-up", "legal"]).map(&:key)).to eq(["legal"])
+    end
+  end
+
   it "gives every category a unique key" do
     keys = described_class.all.map(&:key)
 

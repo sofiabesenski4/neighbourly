@@ -37,7 +37,8 @@ RSpec.describe "Documents", type: :system do
         fill_in "Email", with: "info@example.org"
         fill_in "Website", with: "https://example.org"
         fill_in "Hours of operation", with: "Mon-Sun 7am-11pm"
-        fill_in "Categories", with: "shelter, meals"
+        check "Shelter & housing"
+        check "Food"
         fill_in "Minimum age", with: "19"
         fill_in "Maximum age", with: "65"
         fill_in "Gender", with: "all"
@@ -48,7 +49,8 @@ RSpec.describe "Documents", type: :system do
         expect(page).to have_content("Resource 'Harbour Street Society' was created.")
         expect(Document.last.title).to eq("Harbour Street Society")
         expect(Document.last.metadata["city"]).to eq("Victoria")
-        expect(Document.last.metadata["categories"]).to eq(["shelter", "meals"])
+        expect(Document.last.metadata["categories"]).to eq(["Food", "Shelter & housing"])
+        expect(Document.last.metadata["resource_categories"]).to eq(["food", "shelter"])
         expect(Document.last.metadata["age_range"]).to eq({"min" => 19, "max" => 65})
       end
 
@@ -121,6 +123,19 @@ RSpec.describe "Documents", type: :system do
         doc.reload
         expect(doc.title).to eq("New Name")
         expect(doc.metadata["city"]).to eq("Nanaimo")
+      end
+
+      it "shows the resource's categories as checked" do
+        doc = Source.form_entry_source.documents.create!(
+          title: "Drop-in Centre",
+          content: "Drop-in Centre",
+          metadata: {resource_categories: ["food"]}
+        )
+
+        visit edit_document_path(doc)
+
+        expect(page).to have_checked_field("Food")
+        expect(page).to have_unchecked_field("Legal")
       end
     end
   end

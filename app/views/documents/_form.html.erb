@@ -69,13 +69,19 @@
         class: "block shadow-sm rounded-md border border-gray-400 focus:outline-blue-600 px-3 py-2 mt-2 w-full" %>
   </div>
 
-  <div class="my-5">
-    <%= form.label :categories, "Categories" %>
-    <span class="text-sm text-gray-500">Comma-separated, e.g. shelter, food, counselling</span>
-    <%= form.text_field :categories, value: Array(@document.metadata&.dig("categories")).join(", "),
-        placeholder: "e.g. shelter, meals, clothing",
-        class: "block shadow-sm rounded-md border border-gray-400 focus:outline-blue-600 px-3 py-2 mt-2 w-full" %>
-  </div>
+  <fieldset class="my-5">
+    <legend>Categories</legend>
+    <span class="text-sm text-gray-500">Used to group resources, e.g. on print-outs</span>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+      <%= form.collection_check_boxes :resource_categories, ResourceCategory.all, :key, :name,
+          { checked: Array(@document.metadata&.dig("resource_categories")) } do |b| %>
+        <%= b.label(class: "flex items-center gap-2 cursor-pointer") do %>
+          <%= b.check_box(class: "h-4 w-4 accent-sage-600 cursor-pointer") %>
+          <%= b.text %>
+        <% end %>
+      <% end %>
+    </div>
+  </fieldset>
 
   <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 my-5">
     <div>
