@@ -63,6 +63,27 @@ RSpec.describe Document, type: :model do
     end
   end
 
+  describe ".in_category" do
+    before do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+    end
+
+    it "returns the documents tagged with that category" do
+      meals = source.documents.create!(content: "Meals", external_id: "1", metadata: {resource_categories: ["food"]})
+      drop_in = source.documents.create!(content: "Drop-in", external_id: "2", metadata: {resource_categories: ["food", "hygiene"]})
+      source.documents.create!(content: "Legal clinic", external_id: "3", metadata: {resource_categories: ["legal"]})
+      source.documents.create!(content: "Untagged", external_id: "4", metadata: {categories: ["food"]})
+
+      expect(Document.in_category("food")).to contain_exactly(meals, drop_in)
+    end
+
+    it "matches whole keys only" do
+      source.documents.create!(content: "Meals", external_id: "1", metadata: {resource_categories: ["food"]})
+
+      expect(Document.in_category("foo")).to be_empty
+    end
+  end
+
   describe ".search_by_similarity" do
     it "returns documents ordered by cosine similarity" do
       vec_a = Array.new(1536, 0.0)

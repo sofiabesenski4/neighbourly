@@ -12,6 +12,9 @@ class Document < ApplicationRecord
 
   scope :with_embeddings, -> { where.not(embedding: nil) }
 
+  # Documents tagged with a ResourceCategory key, e.g. in_category("food").
+  scope :in_category, ->(key) { where("metadata @> ?", {resource_categories: [key]}.to_json) }
+
   scope :search_by_similarity, ->(query_text, limit: 5) {
     query_embedding = ContentPipeline::Embedder.embed(query_text)
     nearest_neighbors(:embedding, query_embedding, distance: :cosine)
