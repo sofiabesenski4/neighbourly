@@ -26,6 +26,10 @@ RubyLLM.configure do |config|
   # MODEL_REGISTRY_FILE=config/uvic_models.json. Unset, these fall back to
   # OpenAI, Claude Haiku, and the bundled model registry.
   config.openai_api_base = ENV["OPENAI_API_BASE"].presence
+  # OpenAI-compatible APIs reliably share Chat Completions, not OpenAI's newer
+  # Responses API. UVic's proxy accepts a first turn over Responses but rejects
+  # the earlier assistant turns that every follow-up message replays.
+  config.openai_protocol = :chat_completions if config.openai_api_base
   config.default_model = ENV["DEFAULT_MODEL"].presence || "claude-haiku-4-5"
   config.default_embedding_model = ENV["EMBEDDING_MODEL"].presence || "text-embedding-3-small"
 
