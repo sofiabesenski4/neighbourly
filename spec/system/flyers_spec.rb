@@ -12,15 +12,18 @@ RSpec.describe "Flyers", type: :system do
     click_link "Make a printable flyer"
 
     check "Food"
+    uncheck "Shelter & housing"
     check "Harm reduction"
-    click_button "Generate flyer"
+    click_button "Generate printout"
 
-    expect(page).to have_content("Flyer generation is coming soon")
+    expect(page).to have_content("No resources matched those categories")
   end
 
   it "asks the visitor to choose something when nothing is selected" do
     visit new_flyer_path
-    click_button "Generate flyer"
+    uncheck "Food"
+    uncheck "Shelter & housing"
+    click_button "Generate printout"
 
     expect(page).to have_content("must include at least one type of information")
   end

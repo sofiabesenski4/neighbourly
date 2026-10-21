@@ -1,4 +1,11 @@
 class FlyersController < ApplicationController
+  # Only this screen embeds locally generated PDF blobs for the print dialog.
+  # The application's default policy continues to disallow embedded content.
+  content_security_policy do |policy|
+    policy.frame_src :blob
+    policy.object_src :blob
+  end
+
   # Flyers are open to anonymous users so outreach workers and neighbours can
   # print one without an account. Building a PDF will not be cheap, so keep a
   # per-IP ceiling that a shared library or shelter connection won't hit.
@@ -8,14 +15,51 @@ class FlyersController < ApplicationController
     only: :create
 
   def new
-    @flyer = Flyer.new
+    @flyer = Flyer.new(params.key?(:flyer) ? flyer_params : {categories: %w[food shelter]})
+  end
+
+  def preview
+    @flyer = Flyer.new(flyer_params)
+    unless @flyer.valid?
+      respond_to do |format|
+        format.html { render :new, status: :unprocessable_content }
+        format.json { render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content }
+      end
+      return
+    end
+
+    @sections = ResourceCategorySearch.call(categories: @flyer.categories)
+    respond_to do |format|
+      format.html
+      format.json do
+        render json: {categories: @sections.map { |section|
+          {key: section.category.key, name: section.category.name,
+           resources: section.resources.map { |resource| ResourceCard.new(resource).as_json }}
+        }}
+      end
+    end
+  rescue => error
+    Rails.error.report(error, context: {feature: "category_preview", categories: @flyer&.categories})
+    message = "We couldn't load those resources. Please try again."
+    respond_to do |format|
+      format.html do
+        @flyer ||= Flyer.new
+        @flyer.errors.add(:base, message)
+        render :new, status: :service_unavailable
+      end
+      format.json { render json: {errors: [message]}, status: :service_unavailable }
+    end
   end
 
   def create
     @flyer = Flyer.new(flyer_params)
 
     unless @flyer.valid?
-      render :new, status: :unprocessable_content
+      if request.format.pdf?
+        render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
+      else
+        render :new, status: :unprocessable_content
+      end
       return
     end
 
@@ -24,7 +68,20 @@ class FlyersController < ApplicationController
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
     else
-      redirect_to new_flyer_path, notice: "Flyer generation is coming soon. Your selection was received."
+      message = "No resources matched those categories. Try another selection."
+      if request.format.pdf?
+        render json: {errors: [message]}, status: :not_found
+      else
+        redirect_to new_flyer_path, notice: message
+      end
+    end
+  rescue => error
+    Rails.error.report(error, context: {feature: "category_flyer", categories: @flyer&.categories})
+    message = "We couldn't create the flyer. Please try again."
+    if request.format.pdf?
+      render json: {errors: [message]}, status: :service_unavailable
+    else
+      redirect_to new_flyer_path, alert: message
     end
   end
 
