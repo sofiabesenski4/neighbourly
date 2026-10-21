@@ -6,13 +6,13 @@ RSpec.describe "Flyers", type: :system do
   end
 
   it "lets a visitor choose categories and request a flyer from the home page" do
-    expect(FlyerGenerator).to receive(:call).with(categories: ["food", "substance_use"]).and_return(nil)
+    expect(FlyerGenerator).to receive(:call).with(categories: ["food", "harm_reduction"]).and_return(nil)
 
     visit root_path
     click_link "Make a printable flyer"
 
     check "Food"
-    check "Substance use support"
+    check "Harm reduction"
     click_button "Generate flyer"
 
     expect(page).to have_content("Flyer generation is coming soon")

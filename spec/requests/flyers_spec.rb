@@ -14,9 +14,9 @@ RSpec.describe "Flyers", type: :request do
 
   describe "POST /flyers" do
     it "hands the selected categories to the generator" do
-      expect(FlyerGenerator).to receive(:call).with(categories: ["food", "employment"]).and_return(nil)
+      expect(FlyerGenerator).to receive(:call).with(categories: ["food", "harm_reduction"]).and_return(nil)
 
-      post flyers_path, params: {flyer: {categories: ["", "food", "employment"]}}
+      post flyers_path, params: {flyer: {categories: ["", "food", "harm_reduction"]}}
 
       expect(response).to redirect_to(new_flyer_path)
       follow_redirect!

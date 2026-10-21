@@ -27,7 +27,8 @@ RSpec.describe Flyer, type: :model do
     expect(flyer.categories).to eq(["food"])
   end
 
-  it "offers every category through available_categories" do
-    expect(Flyer.available_categories).to include("food" => "Food", "employment" => "Employment")
+  it "offers every resource category through available_categories" do
+    expect(Flyer.available_categories.keys).to eq(ResourceCategory.all.map(&:key))
+    expect(Flyer.available_categories).to include("food" => "Food", "harm_reduction" => "Harm reduction")
   end
 end

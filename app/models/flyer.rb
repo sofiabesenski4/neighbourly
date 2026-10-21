@@ -5,26 +5,15 @@ class Flyer
   include ActiveModel::Model
   include ActiveModel::Attributes
 
-  CATEGORIES = {
-    "food" => "Food",
-    "shelter" => "Shelter & housing",
-    "substance_use" => "Substance use support",
-    "employment" => "Employment",
-    "health" => "Health care",
-    "mental_health" => "Mental health",
-    "legal" => "Legal aid",
-    "clothing_hygiene" => "Clothing & hygiene"
-  }.freeze
-
   attribute :categories, default: -> { [] }
 
   validate :categories_are_available
 
-  # Category key => label for every option offered on the flyer form. This is
-  # the one place to change if the list should come from what's in the
-  # database instead of being hardcoded.
+  # Category key => label for every option offered on the flyer form. These
+  # are ResourceCategory keys, so each one matches the resources tagged with
+  # it (see Document.in_category).
   def self.available_categories
-    CATEGORIES
+    ResourceCategory.all.to_h { |category| [category.key, category.name] }
   end
 
   def categories=(value)
