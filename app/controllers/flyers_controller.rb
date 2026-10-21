@@ -30,7 +30,10 @@ class FlyersController < ApplicationController
 
   private
 
+  # A hand-crafted request can send `flyer` as a string or array; treat that
+  # like an empty selection so it fails validation instead of raising.
   def flyer_params
-    params.fetch(:flyer, {}).permit(categories: [])
+    flyer = params.fetch(:flyer, {})
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(categories: []) : {}
   end
 end
