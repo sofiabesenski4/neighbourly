@@ -28,7 +28,7 @@ RSpec.describe "Chats", type: :system do
     fill_in "Prompt", with: "Hello, how are you?"
     click_button "Start new chat"
 
-    expect(page).to have_content("Chat was successfully created.")
+    expect(page).to have_content("Chat was successfully created.", count: 1)
     expect(Chat.last.user).to eq(user)
   end
 
@@ -61,6 +61,12 @@ RSpec.describe "Chats", type: :system do
       expect(page).to have_content(chat.created_at.strftime("%B %d, %Y"))
     end
 
+    it "hides the admin-only Models link" do
+      visit chats_path
+
+      expect(page).not_to have_link("Models")
+    end
+
     it "shows a chat and its messages" do
       chat = user.chats.create!
       chat.messages.create!(role: "user", content: "Hi there")
@@ -78,7 +84,7 @@ RSpec.describe "Chats", type: :system do
       visit chats_path
       click_button "Destroy"
 
-      expect(page).to have_content("Chat was successfully destroyed.")
+      expect(page).to have_content("Chat was successfully destroyed.", count: 1)
       expect(Chat.count).to eq(0)
     end
 
@@ -122,6 +128,19 @@ RSpec.describe "Chats", type: :system do
       click_button "Start new chat"
 
       expect(Chat.last.use_rag).to be false
+    end
+  end
+
+  context "when logged in as an admin" do
+    let(:admin) { User.create!(email: "chatadmin@example.com", password: "password123", admin: true) }
+
+    before { login_as(admin, scope: :user) }
+
+    it "links to the Models page" do
+      visit chats_path
+      click_link "Models"
+
+      expect(page).to have_current_path(models_path)
     end
   end
 end
