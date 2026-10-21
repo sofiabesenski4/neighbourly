@@ -48,6 +48,16 @@ RSpec.describe "Flyers", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
     end
 
+    it "re-renders the form when the flyer param is not a hash" do
+      expect(FlyerGenerator).not_to receive(:call)
+
+      post flyers_path, params: {flyer: "foo"}
+      expect(response).to have_http_status(:unprocessable_content)
+
+      post flyers_path, params: {flyer: ["x"]}
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
     it "rejects unknown categories" do
       expect(FlyerGenerator).not_to receive(:call)
 
