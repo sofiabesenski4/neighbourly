@@ -1,0 +1,11 @@
+<p><%= pluralize(@new_count, "new report") %> since the last digest.</p>
+
+<ul>
+  <% @reports_by_document.each do |document, reports| %>
+    <li><strong><%= document.title || "Untitled" %></strong>: <%= pluralize(reports.size, "report") %> (<%= reports.map(&:reason).uniq.sort.map(&:capitalize).to_sentence %>)</li>
+  <% end %>
+</ul>
+
+<p><%= pluralize(@pending_count, "report") %> pending in total.</p>
+
+<p><%= link_to "Review reports", reports_url %></p>
