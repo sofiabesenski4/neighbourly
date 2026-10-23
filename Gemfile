@@ -89,3 +89,5 @@ gem "ruby_llm", "~> 2.0"
 gem "neighbor", "~> 1.1"
 
 gem "dotenv-rails", groups: [:development, :test]
+
+gem "solid_queue", "~> 1.7"

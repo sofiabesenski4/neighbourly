@@ -10,6 +10,8 @@ class Report < ApplicationRecord
 
   scope :pending, -> { where(status: "pending") }
   scope :most_recent, -> { order(created_at: :desc) }
+  # Reports that have not yet gone out in an admin digest email.
+  scope :undigested, -> { where(digested_at: nil) }
 
   def pending?
     status == "pending"

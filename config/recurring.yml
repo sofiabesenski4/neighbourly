@@ -1,0 +1,18 @@
+shared: &shared
+  # Moderators review reports once a day, so batch them into a single morning
+  # email instead of one email per report.
+  report_digest:
+    class: ReportDigestJob
+    schedule: "0 8 * * * America/Vancouver"
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12
+
+development:
+  <<: *shared
+
+staging:
+  <<: *shared
+
+production:
+  <<: *shared
