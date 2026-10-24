@@ -1,4 +1,5 @@
 require "rails_helper"
+require "pdf/reader"
 
 RSpec.describe "Flyers", type: :request do
   describe "GET /flyers/new" do
@@ -48,19 +49,22 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).to eq("%PDF-1.4 fake")
     end
 
-    it "re-renders the form when nothing is selected" do
-      expect(FlyerGenerator).not_to receive(:call)
+    it "generates the unfiltered guide when nothing is selected" do
+      expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all")
 
       post flyers_path, params: {flyer: {categories: [""]}}
 
-      expect(response).to have_http_status(:unprocessable_content)
-      expect(response.body).to include("must include at least one type of information")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to eq("%PDF-all")
     end
 
-    it "re-renders the form when no flyer params are sent" do
+    it "generates the unfiltered guide when no flyer params are sent" do
+      expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all")
+
       post flyers_path
 
-      expect(response).to have_http_status(:unprocessable_content)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to eq("%PDF-all")
     end
 
     it "re-renders the form when the flyer param is not a hash" do
@@ -95,10 +99,28 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "returns structured validation errors for the live builder's PDF request" do
-      post flyers_path, params: {flyer: {categories: []}}, headers: {"Accept" => "application/pdf"}
+      post flyers_path, params: {flyer: {categories: ["unknown"]}}, headers: {"Accept" => "application/pdf"}
 
       expect(response).to have_http_status(:unprocessable_content)
-      expect(response.parsed_body["errors"]).to include("Categories must include at least one type of information")
+      expect(response.parsed_body["errors"]).to include("Categories include unknown options: unknown")
+    end
+
+    it "rejects a malformed category filter instead of broadening it to all resources" do
+      expect(FlyerGenerator).not_to receive(:call)
+
+      post flyers_path, params: {flyer: {categories: "food"}}, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to include("Categories must be provided as a list")
+    end
+
+    it "rejects an unsupported filter key instead of printing every resource" do
+      expect(FlyerGenerator).not_to receive(:call)
+
+      post flyers_path, params: {flyer: {category: "food"}}, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to include("Unsupported flyer filters: category")
     end
 
     it "returns a structured empty-result error instead of following a redirect into HTML" do
@@ -147,6 +169,56 @@ RSpec.describe "Flyers", type: :request do
       expect(category["key"]).to eq("food")
       expect(category["resources"].map { |resource| resource["title"] }).to eq(["Community meal"])
       expect(category["resources"].first["fields"]).to include({"label" => "Notes", "value" => "Call ahead"})
+    end
+
+    it "includes a category-tagged resource without an embedding in the preview and PDF" do
+      source = Source.find_by!(name: "Local")
+      listing = source.documents.create!(title: "Offline listing", content: "Offline listing", metadata: {resource_categories: ["food"]})
+      listing.update_column(:embedding, nil)
+
+      get preview_flyers_path(format: :json), params: {flyer: {categories: ["food"]}}
+
+      expect(response).to have_http_status(:ok)
+      titles = response.parsed_body.fetch("categories").first.fetch("resources").map { |resource| resource.fetch("title") }
+      expect(titles).to include("Offline listing")
+
+      post flyers_path, params: {flyer: {categories: ["food"]}}, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text).to include("Offline listing")
+    end
+
+    it "shows all visible resources in JSON when no filters are specified" do
+      get preview_flyers_path(format: :json)
+
+      expect(response).to have_http_status(:ok)
+      resources = response.parsed_body.fetch("categories").flat_map { |category| category.fetch("resources") }
+      expect(resources.map { |resource| resource["title"] }).to contain_exactly("Community meal", "Unrelated clinic")
+    end
+
+    it "restores all resources when the category selection is cleared" do
+      get preview_flyers_path(format: :json), params: {flyer: {categories: [""]}}
+
+      expect(response).to have_http_status(:ok)
+      resources = response.parsed_body.fetch("categories").flat_map { |category| category.fetch("resources") }
+      expect(resources.map { |resource| resource["title"] }).to contain_exactly("Community meal", "Unrelated clinic")
+    end
+
+    it "generates a complete PDF without category filters" do
+      post flyers_path, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:ok)
+      expect(response.media_type).to eq("application/pdf")
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text).to include("Community meal", "Unrelated clinic")
+    end
+
+    it "rejects malformed preview filters instead of treating them as an empty selection" do
+      get preview_flyers_path(format: :json), params: {flyer: {categories: "food"}}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to include("Categories must be provided as a list")
     end
 
     it "rejects invalid category selections in JSON" do

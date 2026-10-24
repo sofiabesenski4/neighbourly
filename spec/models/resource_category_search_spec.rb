@@ -24,15 +24,15 @@ RSpec.describe ResourceCategorySearch do
     expect(sections[1].resources).to eq([both, shelter])
   end
 
-  it "excludes resources removed from search, accepted removals, and closed listings" do
+  it "includes resources without embeddings while excluding accepted removals and closed listings" do
     visible = resource("Visible", ["food"])
-    missing_embedding = resource("Removed", ["food"])
+    missing_embedding = resource("No embedding", ["food"])
     missing_embedding.update_column(:embedding, nil)
     reported = resource("Accepted removal", ["food"])
     reported.reports.create!(reason: "out of date", status: "valid")
     resource("Closed", ["food"], closed: true)
 
-    expect(described_class.call(categories: ["food"]).first.resources).to eq([visible])
+    expect(described_class.call(categories: ["food"]).first.resources).to contain_exactly(visible, missing_embedding)
   end
 
   it "keeps a pending report from silently removing a resource" do
@@ -53,9 +53,43 @@ RSpec.describe ResourceCategorySearch do
     expect(described_class.call(categories: ["legal"]).first.resources).to be_empty
   end
 
-  it "rejects empty or unknown categories" do
-    expect { described_class.call(categories: []) }.to raise_error(ArgumentError)
+  it "rejects unknown categories" do
     expect { described_class.call(categories: ["food' OR 1=1 --"]) }.to raise_error(ArgumentError)
+  end
+
+  it "returns all visible resources with no filters, including uncategorized records" do
+    food = resource("Meals", ["food"])
+    shelter = resource("Shelter", ["shelter"])
+    other = resource("Other service", [])
+    unfamiliar = resource("Unmapped service", ["custom_category"])
+    resource("Closed", [], closed: true)
+    removed = resource("Accepted removal", [])
+    removed.reports.create!(reason: "out of date", status: "valid")
+    unsearchable = resource("No embedding", [])
+    unsearchable.update_column(:embedding, nil)
+
+    sections = described_class.call(categories: [])
+
+    expect(sections.map { |section| section.category.key }).to eq(ResourceCategory.all.map(&:key) + ["uncategorized"])
+    expect(sections.flat_map(&:resources)).to match_array([food, shelter, other, unfamiliar, unsearchable])
+    expect(sections.last.category.name).to eq("Other resources")
+    expect(sections.last.resources).to eq([unsearchable, other, unfamiliar])
+  end
+
+  it "keeps an unfiltered guide within its supplied scope" do
+    chosen = resource("Chosen", [])
+    resource("Other", ["food"])
+
+    sections = described_class.call(categories: [], scope: Document.where(id: chosen.id))
+
+    expect(sections.flat_map(&:resources)).to eq([chosen])
+  end
+
+  it "limits explicit filters to those categories and leaves uncategorized records out" do
+    food = resource("Meals", ["food"])
+    resource("Other", [])
+
+    expect(described_class.call(categories: ["food"]).flat_map(&:resources)).to eq([food])
   end
 
   it "makes no embedding or chat call to retrieve category results" do

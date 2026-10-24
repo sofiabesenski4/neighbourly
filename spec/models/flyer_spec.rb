@@ -7,11 +7,11 @@ RSpec.describe Flyer, type: :model do
     expect(flyer).to be_valid
   end
 
-  it "requires at least one category" do
+  it "accepts no category filters" do
     flyer = Flyer.new(categories: [])
 
-    expect(flyer).not_to be_valid
-    expect(flyer.errors[:categories]).to include("must include at least one type of information")
+    expect(flyer).to be_valid
+    expect(flyer.categories).to be_empty
   end
 
   it "rejects categories that are not offered" do

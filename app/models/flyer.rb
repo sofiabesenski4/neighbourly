@@ -1,4 +1,5 @@
-# The set of information a user has chosen to include on a printable flyer.
+# Optional category filters for a printable flyer. An empty selection means
+# all eligible resources.
 # Not persisted; it validates the selection before handing it to
 # FlyerGenerator.
 class Flyer
@@ -23,9 +24,7 @@ class Flyer
   private
 
   def categories_are_available
-    if categories.empty?
-      errors.add(:categories, "must include at least one type of information")
-    elsif (unknown = categories - self.class.available_categories.keys).any?
+    if (unknown = categories - self.class.available_categories.keys).any?
       errors.add(:categories, "include unknown options: #{unknown.join(", ")}")
     end
   end

@@ -19,12 +19,15 @@ RSpec.describe "Flyers", type: :system do
     expect(page).to have_content("No resources matched those categories")
   end
 
-  it "asks the visitor to choose something when nothing is selected" do
+  it "lets a visitor print the complete guide after clearing the default filters" do
+    expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all-resources")
+
     visit new_flyer_path
     uncheck "Food"
     uncheck "Shelter & housing"
     click_button "Generate printout"
 
-    expect(page).to have_content("must include at least one type of information")
+    expect(page.response_headers["Content-Type"]).to include("application/pdf")
+    expect(page.body).to eq("%PDF-all-resources")
   end
 end

@@ -6,6 +6,8 @@ class FlyersController < ApplicationController
     policy.object_src :blob
   end
 
+  before_action :reject_malformed_selection
+
   # Flyers are open to anonymous users so outreach workers and neighbours can
   # print one without an account. Building a PDF will not be cheap, so keep a
   # per-IP ceiling that a shared library or shelter connection won't hit.
@@ -87,8 +89,30 @@ class FlyersController < ApplicationController
 
   private
 
-  # A hand-crafted request can send `flyer` as a string or array; treat that
-  # like an empty selection so it fails validation instead of raising.
+  # A malformed filter is an error, rather than an instruction to show all.
+  def reject_malformed_selection
+    return unless params.key?(:flyer)
+
+    input = params[:flyer]
+    unexpected = input.is_a?(ActionController::Parameters) ? input.keys - ["categories"] : []
+    valid = input.is_a?(ActionController::Parameters) &&
+      unexpected.empty? &&
+      (input[:categories].nil? || (input[:categories].is_a?(Array) && input[:categories].all? { |value| value.is_a?(String) }))
+    return if valid
+
+    @flyer = Flyer.new
+    if unexpected.any?
+      @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}")
+    else
+      @flyer.errors.add(:categories, "must be provided as a list")
+    end
+    if request.format.json? || request.format.pdf?
+      render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
+    else
+      render :new, status: :unprocessable_content
+    end
+  end
+
   def flyer_params
     flyer = params.fetch(:flyer, {})
     flyer.is_a?(ActionController::Parameters) ? flyer.permit(categories: []) : {}
