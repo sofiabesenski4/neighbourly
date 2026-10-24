@@ -26,6 +26,14 @@ RSpec.describe "Flyers", type: :request do
       document = Nokogiri::HTML(response.body)
       expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq(["health"])
     end
+
+    it "starts with no categories checked and explains the unfiltered view" do
+      get new_flyer_path
+
+      document = Nokogiri::HTML(response.body)
+      expect(document.css('input[type="checkbox"][checked]')).to be_empty
+      expect(response.body).to include("No selection shows all available resources.")
+    end
   end
 
   describe "POST /flyers" do
@@ -130,6 +138,25 @@ RSpec.describe "Flyers", type: :request do
 
       expect(response).to have_http_status(:not_found)
       expect(response.parsed_body["errors"]).to include("No resources matched those categories. Try another selection.")
+    end
+
+    it "explains when the complete guide has no available resources" do
+      allow(FlyerGenerator).to receive(:call).with(categories: []).and_return(nil)
+
+      post flyers_path, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:not_found)
+      expect(response.parsed_body["errors"]).to include("No resources are available to print.")
+    end
+
+    it "shows the same complete-guide message after a standard form submission" do
+      allow(FlyerGenerator).to receive(:call).with(categories: []).and_return(nil)
+
+      post flyers_path, params: {flyer: {categories: [""]}}
+      expect(response).to redirect_to(new_flyer_path)
+      follow_redirect!
+
+      expect(response.body).to include("No resources are available to print.")
     end
 
     it "reports PDF generation failures with a safe structured message" do

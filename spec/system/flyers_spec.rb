@@ -12,19 +12,18 @@ RSpec.describe "Flyers", type: :system do
     click_link "Make a printable flyer"
 
     check "Food"
-    uncheck "Shelter & housing"
     check "Harm reduction"
     click_button "Generate printout"
 
     expect(page).to have_content("No resources matched those categories")
   end
 
-  it "lets a visitor print the complete guide after clearing the default filters" do
+  it "lets a visitor print the complete guide without selecting filters" do
     expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all-resources")
 
     visit new_flyer_path
-    uncheck "Food"
-    uncheck "Shelter & housing"
+    expect(page).not_to have_checked_field("Food")
+    expect(page).not_to have_checked_field("Shelter & housing")
     click_button "Generate printout"
 
     expect(page.response_headers["Content-Type"]).to include("application/pdf")

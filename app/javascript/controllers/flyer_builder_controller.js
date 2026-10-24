@@ -57,11 +57,6 @@ export default class extends Controller {
     this.previewErrorTarget.hidden = true;
     this.setLoading();
     const categories = this.selectedCategories();
-    if (categories.length === 0) {
-      this.render([]);
-      return;
-    }
-
     const url = new URL(this.previewUrlValue, window.location.origin);
     categories.forEach((key) =>
       url.searchParams.append("flyer[categories][]", key),
@@ -134,14 +129,22 @@ export default class extends Controller {
       }
       fragment.append(section);
     });
-    if (categories.length === 0) {
+    if (total === 0) {
+      fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className = "flyer-empty";
-      empty.textContent = "Select a category to see matching resources.";
+      empty.textContent =
+        this.selectedCategories().length === 0
+          ? "No resources are available to display."
+          : "No resources match the selected categories.";
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} · ${total} ${total === 1 ? "card" : "cards"} across ${categories.length} ${categories.length === 1 ? "category" : "categories"}`;
+    const scope =
+      this.selectedCategories().length === 0
+        ? "All available resources · "
+        : "";
+    this.countTarget.textContent = `${scope}${ids.size} ${ids.size === 1 ? "resource" : "resources"} · ${total} ${total === 1 ? "card" : "cards"} across ${categories.length} ${categories.length === 1 ? "category" : "categories"}`;
     this.hasResults = total > 0;
     this.statusTarget.textContent = "Live preview";
     this.cardsTarget.setAttribute("aria-busy", "false");

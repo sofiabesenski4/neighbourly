@@ -17,7 +17,7 @@ class FlyersController < ApplicationController
     only: :create
 
   def new
-    @flyer = Flyer.new(params.key?(:flyer) ? flyer_params : {categories: %w[food shelter]})
+    @flyer = Flyer.new(flyer_params)
   end
 
   def preview
@@ -70,7 +70,11 @@ class FlyersController < ApplicationController
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
     else
-      message = "No resources matched those categories. Try another selection."
+      message = if @flyer.categories.empty?
+        "No resources are available to print."
+      else
+        "No resources matched those categories. Try another selection."
+      end
       if request.format.pdf?
         render json: {errors: [message]}, status: :not_found
       else

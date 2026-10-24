@@ -24,7 +24,7 @@
       <aside class="flyer-filters" aria-label="Resource filters">
         <fieldset>
           <legend class="font-semibold text-lg text-stone-900">Categories</legend>
-          <p class="mt-1 mb-4 text-sm text-stone-600">Select one or more</p>
+          <p class="mt-1 mb-4 text-sm text-stone-600">No selection shows all available resources.</p>
           <div class="space-y-1">
             <%= form.collection_check_boxes :categories, Flyer.available_categories, :first, :last do |option| %>
               <%= option.label class: "flyer-category" do %>
@@ -47,7 +47,7 @@
               <h2 id="flyer-preview-heading" class="font-semibold text-xl text-stone-900">Your guide</h2>
               <span class="text-sm text-sage-700" data-flyer-builder-target="status" role="status">Live preview</span>
             </div>
-            <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="count" aria-live="polite">Choose categories to build your guide.</p>
+            <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="count" aria-live="polite">Loading resources…</p>
           </div>
           <%= form.button "Generate printout", type: :submit,
                 class: "flyer-generate rounded-lg px-4 py-2.5 bg-sage-600 hover:bg-sage-700 text-white font-medium cursor-pointer",
@@ -61,8 +61,8 @@
 
         <div data-flyer-builder-target="cards" aria-busy="false">
           <div class="flyer-empty">
-            <p class="font-medium text-stone-900">Your guide starts here</p>
-            <p class="mt-1">Select a category to see matching resources.</p>
+            <p class="font-medium text-stone-900">Loading your guide…</p>
+            <p class="mt-1">Select categories to narrow the results.</p>
           </div>
         </div>
 
