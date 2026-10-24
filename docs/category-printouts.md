@@ -132,16 +132,16 @@ is the eligible-resource query in `ResourceCategorySearch`.
 
 ## Print layout
 
-- Letter portrait with two independently stacked columns.
+- Letter portrait with cards in alphabetical reading order: left, right, then
+  the next row. Rows can leave space beneath the shorter card.
 - Card title 13.5 pt, body 11.5 pt, secondary fields 10.5 pt.
 - Font sizes never shrink to fit a page. Redistributable DejaVu fonts and
   their license are bundled for consistent rendering.
 - Text is measured at both widths and cached for that PDF generation.
-- A greedy fit compares at most eight full-width alternatives per pass.
-  It does not enumerate every possible arrangement or promise a globally
-  minimum page count.
-- Full-width cards can fill shorter remaining space. Categories can share a
-  page, with each heading spanning both columns.
+- A single card uses the full width. A card that does not fit beside the next
+  one may use the full width or move to the next page. Later titles never jump
+  ahead of earlier ones to fill unused space.
+- Categories can share a page, with each heading spanning both columns.
 - A complete card stays on one page whenever it can fit on an empty page.
   A card exceeding even a full page continues at full width, with repeated
   resource and category headings. Extremely long titles are retained in the

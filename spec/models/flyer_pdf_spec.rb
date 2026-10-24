@@ -36,6 +36,77 @@ RSpec.describe FlyerPdf do
     expect(widths.any? { |width| (width - 525.6).abs < 0.1 }).to be(true)
   end
 
+  it "prints differently sized cards alphabetically across aligned rows" do
+    titles = %w[Alpha Bravo Charlie Delta]
+    resources = titles.zip([1, 12, 3, 8]).map { |title, lines|
+      resource(title: title, notes: ("Details for #{title}. " * lines))
+    }
+    section = ResourceCategorySearch::Section.new(category: ResourceCategory.all.first, resources: resources)
+    renderer = described_class.new(sections: [section])
+    placements = []
+    allow(renderer).to receive(:draw_card).and_wrap_original do |draw, entry, x, top, width|
+      placements << {title: entry.title, page: renderer.instance_variable_get(:@pdf).page_number,
+                     x: x, top: top, width: width}
+      draw.call(entry, x, top, width)
+    end
+
+    reader = PDF::Reader.new(StringIO.new(renderer.render))
+
+    expect(reader.page_count).to eq(1)
+    expect(placements.map { |placement| placement[:title] }).to eq(titles)
+    expect(placements.map { |placement| placement[:page] }).to eq([1, 1, 1, 1])
+    expect(placements[0][:top]).to eq(placements[1][:top])
+    expect(placements[2][:top]).to eq(placements[3][:top])
+    expect(placements[0][:top]).to be > placements[2][:top]
+    expect(placements.map { |placement| placement[:x] }).to eq([0, renderer.instance_variable_get(:@column_width) + described_class::GUTTER] * 2)
+    first_mentions = titles.map { |title| reader.pages.first.text.index(title) }
+    expect(first_mentions).to all(be_present)
+    expect(first_mentions).to eq(first_mentions.sort)
+  end
+
+  it "keeps the title sequence while continuing a category across pages" do
+    titles = (1..24).map { |number| "Resource #{number.to_s.rjust(2, "0")}" }
+    resources = titles.each_with_index.map { |title, index|
+      resource(title: title, notes: "Opening hours and details. " * (index.even? ? 20 : 80))
+    }
+    section = ResourceCategorySearch::Section.new(category: ResourceCategory.all.first, resources: resources)
+    renderer = described_class.new(sections: [section])
+    printed_titles = []
+    allow(renderer).to receive(:draw_card).and_wrap_original do |draw, entry, x, top, width|
+      printed_titles << entry.title
+      draw.call(entry, x, top, width)
+    end
+
+    reader = PDF::Reader.new(StringIO.new(renderer.render))
+
+    expect(reader.page_count).to be > 1
+    expect(printed_titles).to eq(titles)
+    text = reader.pages.map(&:text).join("\n")
+    first_mentions = titles.map { |title| text.index(title) }
+    expect(first_mentions).to all(be_present)
+    expect(first_mentions).to eq(first_mentions.sort)
+  end
+
+  it "starts a new page instead of skipping a tall earlier card" do
+    sections = [
+      ResourceCategorySearch::Section.new(category: ResourceCategory.all.first,
+        resources: [resource(title: "Intro")]),
+      ResourceCategorySearch::Section.new(category: ResourceCategory.with_keys(["health"]).first,
+        resources: [resource(title: "Alpha"), resource(title: "Beta")])
+    ]
+    renderer = described_class.new(sections: sections)
+    heights = {"Intro" => 430, "Alpha" => 300, "Beta" => 40}
+    allow(renderer).to receive(:measurement) do |entry, _width|
+      described_class::Measure.new(height: heights.fetch(entry.title), header_height: 0, row_heights: [])
+    end
+    printed_titles = []
+    allow(renderer).to receive(:draw_card) { |entry, _x, _top, _width| printed_titles << entry.title }
+
+    renderer.render
+
+    expect(printed_titles).to eq(%w[Intro Alpha Beta])
+  end
+
   it "continues an oversized field across pages without dropping its text" do
     words = (1..2400).map { |i| "step#{i.to_s.rjust(5, "0")}" }
     reader = reader_for([resource(notes: words.join(" "))])

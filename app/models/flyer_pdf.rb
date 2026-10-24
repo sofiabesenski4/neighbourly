@@ -1,6 +1,6 @@
 require "prawn"
 
-# A measured, bounded-lookahead layout. Cards stay at the agreed text sizes;
+# A measured, row-based layout. Cards stay at the agreed text sizes;
 # narrow and full-width measurements are cached for the duration of a render.
 # A card that exceeds a full page continues across pages without losing text.
 class FlyerPdf
@@ -11,7 +11,6 @@ class FlyerPdf
   BODY_SIZE = 11.5
   TITLE_SIZE = 13.5
   SECONDARY_SIZE = 10.5
-  LOOKAHEAD = 8
   BOTTOM = 6
   Entry = Data.define(:key, :title, :rows)
   Measure = Data.define(:height, :header_height, :row_heights)
@@ -98,42 +97,26 @@ class FlyerPdf
     @cursor -= height
   end
 
-  def pack_columns(entries, height)
-    columns = [[], []]
-    used = [0.0, 0.0]
-    entries.each do |entry|
-      needed = measurement(entry, @column_width).height
-      column = [0, 1].sort_by { |index| used[index] }.find { |index|
-        used[index] + (columns[index].empty? ? 0 : GAP) + needed <= height
-      }
-      next unless column
-      used[column] += (columns[column].empty? ? 0 : GAP) + needed
-      columns[column] << entry
-    end
-    [columns, used]
-  end
+  def draw_next_row(remaining)
+    first = remaining.first
+    second = remaining[1]
+    available = @cursor - BOTTOM
+    first_narrow = measurement(first, @column_width).height
+    second_narrow = measurement(second, @column_width).height if second
 
-  def arrangement(entries, height)
-    sorted = entries.sort_by { |entry| -measurement(entry, @column_width).height }
-    columns, used = pack_columns(sorted, height)
-    best = {columns: columns, used: used, wide: nil}
-    score = columns.flatten.sum { |entry| measurement(entry, @column_width).height }
-    candidates = (sorted.first(LOOKAHEAD - 2) + sorted.last(2)).uniq
-    candidates.each do |candidate|
-      wide_height = measurement(candidate, @width).height
-      next if wide_height > height
-      alternatives, sizes = pack_columns(sorted.reject { |entry| entry == candidate }, height - wide_height - GAP)
-      alternative_score = (alternatives.flatten + [candidate]).sum { |entry| measurement(entry, @column_width).height }
-      next unless alternative_score > score + 0.1
-      best = {columns: alternatives, used: sizes, wide: candidate}
-      score = alternative_score
+    if second && first_narrow <= available && second_narrow <= available
+      draw_card(first, 0, @cursor, @column_width)
+      draw_card(second, @column_width + GUTTER, @cursor, @column_width)
+      @cursor -= [first_narrow, second_narrow].max + GAP
+      remaining.shift(2)
+    else
+      wide_height = measurement(first, @width).height
+      raise "Unable to place a resource card" if wide_height > available
+
+      draw_card(first, 0, @cursor, @width)
+      @cursor -= wide_height + GAP
+      remaining.shift
     end
-    # A single remaining card uses the width rather than leaving an empty column.
-    placed = best[:columns].flatten
-    if best[:wide].nil? && placed.size == 1
-      best = {columns: [[], []], used: [0, 0], wide: placed.first}
-    end
-    best
   end
 
   def render_section(section)
@@ -143,8 +126,7 @@ class FlyerPdf
     while remaining.any?
       label = section.category.name + (continued ? " continued" : "")
       available = @cursor - BOTTOM - (heading_pending ? heading_height(label) : 0)
-      fits = remaining.any? { |entry| measurement(entry, @width).height <= available }
-      unless fits
+      unless measurement(remaining.first, @width).height <= available
         if @cursor == @page_top
           draw_heading(label) if heading_pending
           render_oversized(remaining.shift, section.category.name)
@@ -160,24 +142,7 @@ class FlyerPdf
         draw_heading(label)
         heading_pending = false
       end
-      plan = arrangement(remaining, @cursor - BOTTOM)
-      top = @cursor
-      plan[:columns].each_with_index do |column, index|
-        y = top
-        column.each do |entry|
-          draw_card(entry, index * (@column_width + GUTTER), y, @column_width)
-          y -= measurement(entry, @column_width).height + GAP
-        end
-      end
-      @cursor -= plan[:used].max + (plan[:columns].flatten.any? ? GAP : 0)
-      if plan[:wide]
-        entry = plan[:wide]
-        draw_card(entry, 0, @cursor, @width)
-        @cursor -= measurement(entry, @width).height + GAP
-      end
-      placed = plan[:columns].flatten + [plan[:wide]].compact
-      raise "Unable to place a resource card" if placed.empty?
-      remaining -= placed
+      draw_next_row(remaining)
       continued = true
     end
     @cursor -= 8
