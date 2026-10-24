@@ -48,3 +48,36 @@ test("clearing every category requests and renders the complete guide", async ()
     globalThis.fetch = previousFetch;
   }
 });
+
+test("rendered resource cards use Tailwind utility classes", () => {
+  const previousDocument = globalThis.document;
+
+  try {
+    globalThis.document = {
+      createElement: (tagName) => ({
+        tagName,
+        children: [],
+        append(...children) {
+          this.children.push(...children);
+        },
+      }),
+    };
+
+    const controller = Object.create(FlyerBuilderController.prototype);
+    const article = controller.card({
+      title: "Food bank",
+      fields: [{ label: "Hours", value: "Monday" }],
+    });
+
+    assert.match(article.className, /\bborder\b/);
+    assert.match(article.className, /\bbg-white\b/);
+    assert.match(article.children[0].className, /\bbg-stone-100\b/);
+    assert.match(
+      article.children[1].children[0].children[1].className,
+      /\bwhitespace-pre-line\b/,
+    );
+    assert.doesNotMatch(article.className, /\bflyer-card\b/);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});

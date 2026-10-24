@@ -104,16 +104,17 @@ export default class extends Controller {
     let total = 0;
     categories.forEach((category) => {
       const section = document.createElement("section");
-      section.className = "flyer-card-section";
+      section.className = "mt-7 first:mt-0";
       const heading = document.createElement("h3");
+      heading.className = "mb-3 text-lg font-semibold text-stone-900";
       heading.textContent = category.name;
       const count = document.createElement("span");
-      count.className = "flyer-card-total";
+      count.className = "ml-2.5 text-sm font-normal text-stone-600";
       count.textContent = `${category.resources.length} ${category.resources.length === 1 ? "card" : "cards"}`;
       heading.append(count);
       section.append(heading);
       const grid = document.createElement("div");
-      grid.className = "flyer-cards";
+      grid.className = "grid grid-cols-1 items-start gap-[18px] lg:grid-cols-2";
       category.resources.forEach((resource) => {
         ids.add(resource.id);
         total += 1;
@@ -132,7 +133,8 @@ export default class extends Controller {
     if (total === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
-      empty.className = "flyer-empty";
+      empty.className =
+        "rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600";
       empty.textContent =
         this.selectedCategories().length === 0
           ? "No resources are available to display."
@@ -153,15 +155,22 @@ export default class extends Controller {
 
   card(resource) {
     const article = document.createElement("article");
-    article.className = "flyer-card";
+    article.className =
+      "min-w-0 overflow-hidden rounded-[10px] border border-stone-300 bg-white text-stone-800";
     const title = document.createElement("h4");
+    title.className =
+      "border-b border-stone-200 bg-stone-100 px-4 py-[13px] font-semibold [overflow-wrap:anywhere]";
     title.textContent = resource.title;
     const details = document.createElement("dl");
+    details.className = "grid gap-[9px] px-4 pt-[14px] pb-4";
     resource.fields.forEach((field) => {
       const row = document.createElement("div");
+      row.className = "[overflow-wrap:anywhere]";
       const label = document.createElement("dt");
+      label.className = "inline font-semibold";
       label.textContent = `${field.label}: `;
       const value = document.createElement("dd");
+      value.className = "m-0 inline whitespace-pre-line";
       value.textContent = field.value;
       row.append(label, value);
       details.append(row);
@@ -212,7 +221,7 @@ export default class extends Controller {
       this.pdfLinkTarget.href = this.pdfUrl;
       this.printoutTarget.hidden = false;
       this.printFrame = document.createElement("iframe");
-      this.printFrame.className = "flyer-print-frame";
+      this.printFrame.className = "fixed right-0 bottom-0 h-px w-px border-0";
       this.printFrame.title = "Printable resource guide";
       this.printFrame.setAttribute("aria-hidden", "true");
       this.printFrame.tabIndex = -1;

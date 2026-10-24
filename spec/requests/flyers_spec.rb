@@ -34,6 +34,20 @@ RSpec.describe "Flyers", type: :request do
       expect(document.css('input[type="checkbox"][checked]')).to be_empty
       expect(response.body).to include("No selection shows all available resources.")
     end
+
+    it "uses Tailwind utilities for the builder layout instead of a separate stylesheet" do
+      get new_flyer_path
+
+      document = Nokogiri::HTML(response.body)
+      layout = document.at_css('[data-controller="flyer-builder"] form > div:last-child')
+      filters = document.at_css('aside[aria-label="Resource filters"]')
+      selected_label = document.at_css('label:has(input[data-flyer-builder-target="category"])')
+
+      expect(layout["class"].split).to include("grid", "sm:grid-cols-[215px_minmax(0,1fr)]", "lg:grid-cols-[240px_minmax(0,1fr)]")
+      expect(filters["class"].split).to include("rounded-xl", "border-stone-200")
+      expect(selected_label["class"].split).to include("has-checked:bg-sage-100", "hover:bg-sage-50")
+      expect(document.css('link[href*="flyer_builder"]')).to be_empty
+    end
   end
 
   describe "POST /flyers" do

@@ -29,4 +29,13 @@ RSpec.describe "Flyers", type: :system do
     expect(page.response_headers["Content-Type"]).to include("application/pdf")
     expect(page.body).to eq("%PDF-all-resources")
   end
+
+  it "shows responsive Tailwind filter controls without the builder stylesheet" do
+    visit new_flyer_path
+
+    filters = find('aside[aria-label="Resource filters"]')
+    expect(filters[:class].split).to include("rounded-xl", "border-stone-200")
+    expect(first('label:has(input[data-flyer-builder-target="category"])')[:class].split).to include("has-checked:bg-sage-100")
+    expect(page).to have_no_css('link[href*="flyer_builder"]', visible: :all)
+  end
 end
