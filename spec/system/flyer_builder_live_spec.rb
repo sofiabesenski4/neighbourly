@@ -109,4 +109,15 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("article h4", text: "Beta clinic")
     expect(page).to have_button("Generate printout", disabled: false)
   end
+
+  it "shows the retry state when the preview database is unavailable" do
+    allow(ResourceCategorySearch).to receive(:call).and_raise(ActiveRecord::ConnectionNotEstablished, "Private connection detail")
+
+    visit new_flyer_path
+
+    expect(page).to have_text("Preview unavailable")
+    expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
+    expect(page).to have_button("Generate printout", disabled: true)
+    expect(page).to have_no_text("Private connection detail")
+  end
 end

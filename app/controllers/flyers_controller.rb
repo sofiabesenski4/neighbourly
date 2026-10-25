@@ -40,7 +40,7 @@ class FlyersController < ApplicationController
         }}
       end
     end
-  rescue => error
+  rescue ActiveRecord::ConnectionNotEstablished, ActiveRecord::ConnectionFailed => error
     Rails.error.report(error, context: {feature: "category_preview", categories: @flyer&.categories})
     message = "We couldn't load those resources. Please try again."
     respond_to do |format|
@@ -81,7 +81,7 @@ class FlyersController < ApplicationController
         redirect_to new_flyer_path, notice: message
       end
     end
-  rescue => error
+  rescue ActiveRecord::ConnectionNotEstablished, ActiveRecord::ConnectionFailed => error
     Rails.error.report(error, context: {feature: "category_flyer", categories: @flyer&.categories})
     message = "We couldn't create the flyer. Please try again."
     if request.format.pdf?

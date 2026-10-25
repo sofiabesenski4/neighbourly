@@ -108,8 +108,8 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).to include("spaceships")
     end
 
-    it "records generation failures and gives the user a useful message" do
-      error = StandardError.new("PDF renderer unavailable")
+    it "records a temporary database outage and gives the user a useful message" do
+      error = ActiveRecord::ConnectionNotEstablished.new("Private database connection detail")
       allow(FlyerGenerator).to receive(:call).and_raise(error)
       expect(Rails.error).to receive(:report).with(error, context: {feature: "category_flyer", categories: ["food"]})
 
@@ -173,8 +173,8 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).to include("No resources are available to print.")
     end
 
-    it "reports PDF generation failures with a safe structured message" do
-      error = StandardError.new("Internal renderer details")
+    it "reports a lost database connection with a safe structured message" do
+      error = ActiveRecord::ConnectionFailed.new("Internal connection details")
       allow(FlyerGenerator).to receive(:call).and_raise(error)
       expect(Rails.error).to receive(:report).with(error, context: {feature: "category_flyer", categories: ["food"]})
 
@@ -182,7 +182,15 @@ RSpec.describe "Flyers", type: :request do
 
       expect(response).to have_http_status(:service_unavailable)
       expect(response.parsed_body["errors"]).to include("We couldn't create the flyer. Please try again.")
-      expect(response.body).not_to include("Internal renderer details")
+      expect(response.body).not_to include("Internal connection details")
+    end
+
+    it "lets a programming error in PDF generation fail visibly" do
+      allow(FlyerGenerator).to receive(:call).and_raise(NoMethodError, "Unexpected renderer bug")
+
+      expect {
+        post flyers_path, params: {flyer: {categories: ["food"]}}, headers: {"Accept" => "application/pdf"}
+      }.to raise_error(NoMethodError, "Unexpected renderer bug")
     end
   end
 
@@ -277,8 +285,8 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).to start_with("%PDF-")
     end
 
-    it "records failed category lookups without exposing the exception to the front end" do
-      error = StandardError.new("Private database connection detail")
+    it "records a temporary database outage without exposing details to the front end" do
+      error = ActiveRecord::ConnectionNotEstablished.new("Private database connection detail")
       allow(ResourceCategorySearch).to receive(:call).and_raise(error)
       expect(Rails.error).to receive(:report).with(error, context: {feature: "category_preview", categories: ["food"]})
 
@@ -287,6 +295,22 @@ RSpec.describe "Flyers", type: :request do
       expect(response).to have_http_status(:service_unavailable)
       expect(response.parsed_body["errors"]).to include("We couldn't load those resources. Please try again.")
       expect(response.body).not_to include("Private database connection detail")
+    end
+
+    it "lets a programming error in the preview fail visibly" do
+      allow(ResourceCategorySearch).to receive(:call).and_raise(NoMethodError, "Unexpected query bug")
+
+      expect {
+        get preview_flyers_path(format: :json), params: {flyer: {categories: ["food"]}}
+      }.to raise_error(NoMethodError, "Unexpected query bug")
+    end
+
+    it "does not hide a SQL bug as a temporary outage" do
+      allow(ResourceCategorySearch).to receive(:call).and_raise(ActiveRecord::StatementInvalid, "Bad SQL")
+
+      expect {
+        get preview_flyers_path(format: :json), params: {flyer: {categories: ["food"]}}
+      }.to raise_error(ActiveRecord::StatementInvalid, "Bad SQL")
     end
   end
 end
