@@ -81,3 +81,53 @@ test("rendered resource cards use Tailwind utility classes", () => {
     globalThis.document = previousDocument;
   }
 });
+
+test("a delayed preview response cannot replace a newer selection", async () => {
+  const previousWindow = globalThis.window;
+  const previousFetch = globalThis.fetch;
+
+  try {
+    globalThis.window = { location: { origin: "https://neighbourly.example" } };
+
+    let releaseOldResponse;
+    const rendered = [];
+    let selected = ["food"];
+    globalThis.fetch = (url) => {
+      const categories = new URL(url).searchParams.getAll(
+        "flyer[categories][]",
+      );
+      if (categories.includes("food")) {
+        return new Promise((resolve) => {
+          releaseOldResponse = () =>
+            resolve({
+              ok: true,
+              json: async () => ({ categories: ["old"] }),
+            });
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({ categories: ["latest"] }),
+      });
+    };
+
+    const controller = Object.create(FlyerBuilderController.prototype);
+    controller.revision = 0;
+    controller.previewUrlValue = "/flyers/preview.json";
+    controller.previewErrorTarget = { hidden: true };
+    controller.setLoading = () => {};
+    controller.selectedCategories = () => selected;
+    controller.render = (categories) => rendered.push(categories);
+
+    const oldRequest = controller.refresh();
+    selected = ["health"];
+    await controller.refresh();
+    releaseOldResponse();
+    await oldRequest;
+
+    assert.deepEqual(rendered, [["latest"]]);
+  } finally {
+    globalThis.window = previousWindow;
+    globalThis.fetch = previousFetch;
+  }
+});
