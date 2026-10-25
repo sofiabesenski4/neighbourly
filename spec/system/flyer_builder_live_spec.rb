@@ -120,4 +120,16 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_no_text("Private connection detail")
   end
+
+  it "opens an old HTML preview link in the live builder with its filters" do
+    visit preview_flyers_path(flyer: {categories: ["food"]})
+
+    expect(page).to have_current_path(new_flyer_path, ignore_query: true)
+    expect(page).to have_checked_field("Food")
+    expect(page).to have_no_checked_field("Health")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(page).to have_no_css("article h4", text: "Beta clinic")
+    expect(page).to have_no_css("article h4", text: "Gamma noticeboard")
+    expect(page).to have_text("1 resource · 1 card")
+  end
 end

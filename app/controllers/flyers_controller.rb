@@ -30,9 +30,14 @@ class FlyersController < ApplicationController
       return
     end
 
+    if request.format.html?
+      destination = @flyer.categories.empty? ? new_flyer_path : new_flyer_path(flyer: {categories: @flyer.categories})
+      redirect_to destination
+      return
+    end
+
     @sections = ResourceCategorySearch.call(categories: @flyer.categories)
     respond_to do |format|
-      format.html
       format.json do
         render json: {categories: @sections.map { |section|
           {key: section.category.key, name: section.category.name,

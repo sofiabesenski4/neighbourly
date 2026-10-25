@@ -202,12 +202,31 @@ RSpec.describe "Flyers", type: :request do
       source.documents.create!(title: "Unrelated clinic", content: "Clinic", metadata: {resource_categories: ["health"]})
     end
 
-    it "displays category-filtered cards without signing in" do
+    it "redirects a filtered HTML preview to the builder with its selection" do
+      expect(ResourceCategorySearch).not_to receive(:call)
+
       get preview_flyers_path, params: {flyer: {categories: ["food"]}}
 
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("Community meal", "Call ahead")
-      expect(response.body).not_to include("Unrelated clinic", "Last checked", "Not provided")
+      expect(response).to redirect_to(new_flyer_path(flyer: {categories: ["food"]}))
+      follow_redirect!
+
+      document = Nokogiri::HTML(response.body)
+      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq(["food"])
+    end
+
+    it "redirects an unfiltered HTML preview to the complete builder" do
+      expect(ResourceCategorySearch).not_to receive(:call)
+
+      get preview_flyers_path
+
+      expect(response).to redirect_to(new_flyer_path)
+    end
+
+    it "still rejects an invalid category in an HTML preview link" do
+      get preview_flyers_path, params: {flyer: {categories: ["unknown"]}}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.body).to include("unknown")
     end
 
     it "returns the same filtered data as JSON for the front-end integration" do

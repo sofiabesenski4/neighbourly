@@ -21,7 +21,8 @@ sections = ResourceCategorySearch.call(categories: ["food", "shelter"])
 pdf = FlyerGenerator.call(categories: ["food", "shelter"])
 ```
 
-- `GET /flyers/preview?flyer[categories][]=food` displays matching cards.
+- `GET /flyers/preview?flyer[categories][]=food` redirects an older HTML link
+  to the live builder, preserving its valid category selection.
 - `GET /flyers/preview.json?flyer[categories][]=food&flyer[categories][]=shelter`
   returns the same grouped resources for Scott's front end.
 - `POST /flyers`, with `flyer[categories][]=food` and any other selected keys,
@@ -29,6 +30,9 @@ pdf = FlyerGenerator.call(categories: ["food", "shelter"])
 - `GET /flyers/new` shows sidebar filters, live HTML cards and Generate printout.
   No checkboxes are selected initially and the preview shows all available
   resources. An explicit `flyer[categories][]` query preselects those filters.
+
+The separate HTML preview template has been retired. Browser cards are now
+rendered only by the live builder; its JSON preview endpoint remains available.
 
 ## Live interface
 
