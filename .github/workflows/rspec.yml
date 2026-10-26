@@ -45,6 +45,9 @@ jobs:
       - name: Install JS dependencies and build assets
         run: yarn install --frozen-lockfile && yarn build
 
+      - name: Run JavaScript tests
+        run: yarn test-javascript
+
       - name: Prepare headless browser tests
         run: |
           google-chrome --version
