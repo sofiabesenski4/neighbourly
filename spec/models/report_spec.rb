@@ -93,6 +93,14 @@ RSpec.describe Report, type: :model do
       expect(Report.most_recent.first).to eq(new_report)
       expect(Report.most_recent.last).to eq(old_report)
     end
+
+    it ".undigested returns only reports not yet sent in a digest" do
+      new_report = Report.create!(document: document, user: user, reason: "out of date")
+      digested_report = Report.create!(document: document, user: user, reason: "offensive", digested_at: 1.day.ago)
+
+      expect(Report.undigested).to include(new_report)
+      expect(Report.undigested).not_to include(digested_report)
+    end
   end
 
   describe "status predicates" do

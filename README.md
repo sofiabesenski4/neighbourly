@@ -42,6 +42,12 @@ BASIC_AUTH_ENABLED=false
 
 In production and staging, also set `APP_HOST` to the domain the app is served from, such as `example.org`. The app only accepts requests for that domain and sends mail from `no-reply@` that domain.
 
+Production and staging also need these variables:
+
+- `SOLID_QUEUE_IN_PUMA=1` runs background jobs inside the web server. Without it, chat responses and the daily moderation email never run.
+- `SMTP_ADDRESS`, `SMTP_USERNAME` and `SMTP_PASSWORD` come from your mail provider. Without them, password resets and moderation emails are not delivered.
+- `SMTP_PORT` is optional and defaults to `587`.
+
 ## App Setup
 
 Install dependencies.
@@ -70,6 +76,18 @@ bin/dev
 ```
 
 You can now access the app at `http://localhost:3000`.
+
+## Background Jobs
+
+Admins get one email each morning at 8am Pacific listing new content reports. It is skipped on days with no new reports, so moderators are not flooded. The schedule lives in `config/recurring.yml`.
+
+In development, jobs run inside the server and scheduled jobs do not run. To try the schedule locally, start the job runner in a separate terminal.
+
+```
+bin/jobs
+```
+
+To see the moderation email without sending it, open `http://localhost:3000/rails/mailers/report_mailer/daily_digest`.
 
 ## Developing
 
