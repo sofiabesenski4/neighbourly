@@ -57,8 +57,6 @@ RSpec.describe ChatResponseJob, type: :job do
   end
 
   context "when the model cannot reply" do
-    let(:use_rag) { false }
-
     it "uses the same alert ID for repeated failures so Turbo replaces the previous alert" do
       allow_any_instance_of(Chat).to receive(:ask).and_raise(RubyLLM::Error, "API down")
 
@@ -92,6 +90,38 @@ RSpec.describe ChatResponseJob, type: :job do
           described_class.perform_now(chat.id, "Hello")
         }.to raise_error(error.class)
           .and have_broadcasted_to("chat_#{chat.id}").with(a_string_including("the assistant couldn't reply"))
+      end
+    end
+  end
+
+  context "when looking up local resources fails" do
+    [
+      RubyLLM::Error.new("embedding provider unavailable"),
+      Faraday::TimeoutError.new("timed out")
+    ].each do |error|
+      context "with #{error.class}" do
+        before do
+          allow(rag_context).to receive(:augment).and_raise(error)
+          allow(Rails.error).to receive(:report)
+        end
+
+        it "does not ask the LLM" do
+          expect_any_instance_of(Chat).not_to receive(:ask)
+          described_class.perform_now(chat.id, "Where are shelters?")
+        end
+
+        it "saves the user's message and an apology asking them to start a new chat" do
+          described_class.perform_now(chat.id, "Where are shelters?")
+
+          expect(chat.messages.where(role: "user").last.content).to eq("Where are shelters?")
+          expect(chat.messages.where(role: "assistant").last.content).to eq(described_class::FALLBACK_RESPONSE)
+        end
+
+        it "reports the error" do
+          described_class.perform_now(chat.id, "Where are shelters?")
+
+          expect(Rails.error).to have_received(:report).with(error, context: {chat_id: chat.id})
+        end
       end
     end
   end

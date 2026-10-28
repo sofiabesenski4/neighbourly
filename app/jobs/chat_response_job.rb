@@ -1,8 +1,20 @@
 class ChatResponseJob < ApplicationJob
+  # Shown when we cannot look up local resources. Answering without them would
+  # read as a grounded answer with no sources, so we ask for a fresh start.
+  FALLBACK_RESPONSE = "Sorry, something went wrong while looking up local resources for your question. " \
+    "Please start a new chat and try again.".freeze
+
   def perform(chat_id, content)
     chat = Chat.find(chat_id)
 
-    result = RagContext.new.augment(content)
+    begin
+      result = RagContext.new.augment(content)
+    rescue RubyLLM::Error, Faraday::Error => e
+      Rails.error.report(e, context: {chat_id: chat.id})
+      respond_with_fallback(chat, content)
+      return
+    end
+
     rag_documents = result.documents
 
     chat.ask(result.prompt) do |chunk|
@@ -31,5 +43,12 @@ class ChatResponseJob < ApplicationJob
     # so the failure is still logged and reported.
     chat.broadcast_reply_failed
     raise
+  end
+
+  private
+
+  def respond_with_fallback(chat, content)
+    chat.messages.create!(role: "user", content: content)
+    chat.messages.create!(role: "assistant", content: FALLBACK_RESPONSE)
   end
 end
