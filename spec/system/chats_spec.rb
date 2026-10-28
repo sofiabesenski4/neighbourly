@@ -110,25 +110,6 @@ RSpec.describe "Chats", type: :system do
 
       expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question")
     end
-
-    it "creates a chat with RAG enabled when the toggle is checked" do
-      visit new_chat_path
-
-      fill_in "Prompt", with: "Where can I find shelter?"
-      check "Search local resources"
-      click_button "Start new chat"
-
-      expect(Chat.last.use_rag).to be true
-    end
-
-    it "creates a chat without RAG by default" do
-      visit new_chat_path
-
-      fill_in "Prompt", with: "Hello"
-      click_button "Start new chat"
-
-      expect(Chat.last.use_rag).to be false
-    end
   end
 
   context "when logged in as an admin" do

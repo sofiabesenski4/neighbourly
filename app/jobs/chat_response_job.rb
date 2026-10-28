@@ -2,16 +2,10 @@ class ChatResponseJob < ApplicationJob
   def perform(chat_id, content)
     chat = Chat.find(chat_id)
 
-    if chat.use_rag?
-      result = RagContext.new.augment(content)
-      prompt = result.prompt
-      rag_documents = result.documents
-    else
-      prompt = content
-      rag_documents = []
-    end
+    result = RagContext.new.augment(content)
+    rag_documents = result.documents
 
-    chat.ask(prompt) do |chunk|
+    chat.ask(result.prompt) do |chunk|
       if chunk.content && !chunk.content.empty?
         message = chat.messages.last
         message.broadcast_append_chunk(chunk.content)
