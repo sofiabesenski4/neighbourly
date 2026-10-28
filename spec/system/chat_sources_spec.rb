@@ -8,7 +8,7 @@ RSpec.describe "Chat sources", type: :system do
   end
 
   let(:user) { User.create!(email: "sourcesuser@example.com", password: "password123") }
-  let(:chat) { user.chats.create!(use_rag: true) }
+  let(:chat) { user.chats.create! }
   let(:source) { Source.create!(name: "Shelter Directory", url: "https://example.com/shelters", source_type: "html") }
   let(:document) do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.1))
