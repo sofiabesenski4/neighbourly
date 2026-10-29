@@ -12,6 +12,9 @@ module ContentPipeline
     # are the same as at the model's native size.
     def embed(input)
       vector = RubyLLM.embed(input, model: @model).vectors
+      if vector.size > DIMENSIONS
+        raise RubyLLM::Error, "Embedding model #{@model} returned #{vector.size} dimensions; documents support at most #{DIMENSIONS}. Choose a compatible EMBEDDING_MODEL."
+      end
       vector + Array.new(DIMENSIONS - vector.size, 0.0)
     end
 
