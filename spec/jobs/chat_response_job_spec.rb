@@ -78,6 +78,31 @@ RSpec.describe ChatResponseJob, type: :job do
   context "when the model cannot reply" do
     let(:use_rag) { false }
 
+    it "uses the same alert ID for repeated failures so Turbo replaces the previous alert" do
+      allow_any_instance_of(Chat).to receive(:ask).and_raise(RubyLLM::Error, "API down")
+
+      expect {
+        2.times do
+          expect { described_class.perform_now(chat.id, "Hello") }.to raise_error(RubyLLM::Error)
+        end
+      }.to have_broadcasted_to("chat_#{chat.id}").with(
+        a_string_including('action="append"', 'target="messages"', "id=\"chat_#{chat.id}_reply_failed\"")
+      ).exactly(2).times
+    end
+
+    it "removes the failure alert after a successful retry" do
+      allow_any_instance_of(Chat).to receive(:ask).and_raise(RubyLLM::Error, "API down")
+      expect { described_class.perform_now(chat.id, "Hello") }.to raise_error(RubyLLM::Error)
+
+      allow_any_instance_of(Chat).to receive(:ask).and_yield(chunk)
+
+      expect {
+        described_class.perform_now(chat.id, "Hello again")
+      }.to have_broadcasted_to("chat_#{chat.id}").with(
+        a_string_including('action="remove"', "target=\"chat_#{chat.id}_reply_failed\"")
+      )
+    end
+
     [RubyLLM::BadRequestError.new("Bad request"), Faraday::ConnectionFailed.new("Connection refused")].each do |error|
       it "tells the chat after a #{error.class}" do
         allow_any_instance_of(Chat).to receive(:ask).and_raise(error)
