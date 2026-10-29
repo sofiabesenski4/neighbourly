@@ -2,11 +2,11 @@ source "https://rubygems.org"
 ruby "4.0.4"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.1.2"
+gem "rails", "~> 8.1.4"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # Use postgresql as the database for Active Record
-gem "pg", "~> 1.1"
+gem "pg", "~> 1.7"
 # Use the Puma web server [https://github.com/puma/puma]
 gem "puma", ">= 5.0"
 # Bundle and transpile JavaScript [https://github.com/rails/jsbundling-rails]
@@ -84,7 +84,7 @@ gem "rspec-rails", "~> 8.0"
 
 gem "tailwindcss-rails", "~> 4.4"
 
-gem "ruby_llm", "~> 2.0"
+gem "ruby_llm", "~> 2.1"
 
 gem "neighbor", "~> 1.1"
 

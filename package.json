@@ -4,7 +4,7 @@
   "packageManager": "yarn@1.22.22",
   "type": "module",
   "devDependencies": {
-    "esbuild": "^0.28.0",
+    "esbuild": "^0.28.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsonc": "^3.1.2",
     "husky": "^9.1.7",

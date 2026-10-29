@@ -16,6 +16,6 @@ class Message < ApplicationRecord
     broadcast_replace_to "chat_#{chat_id}",
       target: "message_#{id}_rag_context",
       partial: "messages/rag_context",
-      locals: {message: self}
+      locals: {message: self, show_report_button: true}
   end
 end
