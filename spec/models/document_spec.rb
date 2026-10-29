@@ -61,6 +61,18 @@ RSpec.describe Document, type: :model do
       expect(doc.save).to be false
       expect(doc.errors[:base]).to include(a_string_matching(/Failed to generate embedding/))
     end
+
+    it "prevents saving an empty provider embedding as a zero vector" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_call_original
+      allow(RubyLLM).to receive(:embed).and_return(instance_double(RubyLLM::Embedding, vectors: []))
+
+      doc = source.documents.build(content: "Will fail", external_id: "auto-empty")
+
+      expect(doc.save).to be false
+      expect(doc).not_to be_persisted
+      expect(doc.embedding).to be_nil
+      expect(doc.errors[:base]).to include(a_string_matching(/Failed to generate embedding.*empty vector/))
+    end
   end
 
   describe ".search_by_similarity" do

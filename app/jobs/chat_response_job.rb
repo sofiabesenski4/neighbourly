@@ -29,6 +29,8 @@ class ChatResponseJob < ApplicationJob
       user_message&.broadcast_rag_context
       assistant_message&.broadcast_rag_context
     end
+
+    chat.broadcast_reply_succeeded
   rescue RubyLLM::Error, Faraday::Error
     # RubyLLM deletes the empty reply when the API call fails, which would
     # leave the user's message sitting there unanswered. Say so, then re-raise

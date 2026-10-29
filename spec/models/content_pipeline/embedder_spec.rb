@@ -32,6 +32,16 @@ RSpec.describe ContentPipeline::Embedder do
       end
     end
 
+    context "with an empty embedding" do
+      let(:fake_vector) { [] }
+
+      it "raises an actionable error instead of padding an empty vector" do
+        expect { embedder.embed("test input") }.to raise_error(
+          RubyLLM::Error, /Embedding model .* returned an empty vector.*EMBEDDING_MODEL/
+        )
+      end
+    end
+
     context "with an embedding larger than the database supports" do
       let(:fake_vector) { Array.new(3072, 0.5) }
 
