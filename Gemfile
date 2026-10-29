@@ -49,7 +49,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   # Debugging
-  gem "pry", "~> 0.16.0"
+  gem "pry", "~> 0.16.1"
   gem "pry-rails"
 
   # HTTP stubbing for tests
