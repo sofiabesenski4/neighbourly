@@ -49,9 +49,9 @@
               <% if document.metadata["city"].present? %>
                 <%= document.metadata["city"] %>
               <% end %>
-              <% if document.metadata["categories"].present? %>
+              <% if document.categories.present? %>
                 <% if document.metadata["city"].present? %>&middot;<% end %>
-                <%= Array(document.metadata["categories"]).join(", ") %>
+                <%= document.categories.join(", ") %>
               <% end %>
             </div>
             <div class="text-sm text-gray-500">

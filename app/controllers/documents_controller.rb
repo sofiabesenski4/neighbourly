@@ -19,6 +19,7 @@ class DocumentsController < ApplicationController
     @document = source.documents.build(
       title: document_params[:title],
       content: build_content,
+      categories: build_categories,
       metadata: build_metadata
     )
 
@@ -39,6 +40,7 @@ class DocumentsController < ApplicationController
     @document.assign_attributes(
       title: document_params[:title],
       content: build_content,
+      categories: build_categories,
       metadata: build_metadata
     )
 
@@ -90,6 +92,10 @@ class DocumentsController < ApplicationController
     parts.join("\n")
   end
 
+  def build_categories
+    document_params[:categories].to_s.split(",").map(&:strip).reject(&:blank?)
+  end
+
   def build_metadata
     p = document_params
     meta = {}
@@ -106,7 +112,6 @@ class DocumentsController < ApplicationController
       }.compact
     end
     meta[:gender] = p[:gender].split(",").map(&:strip).reject(&:blank?) if p[:gender].present?
-    meta[:categories] = p[:categories].split(",").map(&:strip).reject(&:blank?) if p[:categories].present?
     meta[:description] = p[:description] if p[:description].present?
     meta[:notes] = p[:notes] if p[:notes].present?
     meta

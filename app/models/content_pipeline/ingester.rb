@@ -53,6 +53,7 @@ module ContentPipeline
       document = @source.documents.find_or_initialize_by(external_id: chunk[:external_id])
       document.title = chunk[:title]
       document.content = chunk[:content]
+      document.categories = chunk[:categories] || []
       document.metadata = chunk[:metadata]
       document.save!
     end

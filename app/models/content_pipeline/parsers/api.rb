@@ -16,6 +16,7 @@ module ContentPipeline
             title: record["post_title"],
             content: build_content(record),
             external_id: record["id"]&.to_s || record["ID"]&.to_s,
+            categories: taxonomy_categories(record),
             metadata: build_metadata(record)
           }
         end
@@ -55,7 +56,7 @@ module ContentPipeline
         genders = Array(record["gender"]).map { |g| g["label"] }.compact
         parts << "Gender: #{genders.join(", ")}" if genders.any?
 
-        categories = Array(record["taxonomies"]).map { |t| t["name"] }.compact
+        categories = taxonomy_categories(record)
         parts << "Categories: #{categories.join(", ")}" if categories.any?
 
         notes = record["notes"]
@@ -83,9 +84,12 @@ module ContentPipeline
           full: beds&.dig("full"),
           age_range: age_range,
           gender: Array(record["gender"]).map { |g| g["value"] }.compact,
-          categories: Array(record["taxonomies"]).map { |t| t["name"] }.compact,
           closed: record["closed"]
         }.compact
+      end
+
+      def taxonomy_categories(record)
+        Array(record["taxonomies"]).map { |taxonomy| taxonomy["name"] }.compact
       end
 
       def hash_field(record, key)
