@@ -113,12 +113,22 @@ export default class extends Controller {
       count.textContent = `${category.resources.length} ${category.resources.length === 1 ? "card" : "cards"}`;
       heading.append(count);
       section.append(heading);
-      const grid = document.createElement("div");
-      grid.className = "grid grid-cols-1 items-start gap-[18px] lg:grid-cols-2";
-      category.resources.forEach((resource) => {
+      const columns = [
+        document.createElement("div"),
+        document.createElement("div"),
+      ];
+      columns.forEach((col) => {
+        col.className = "flex flex-col gap-[18px]";
+      });
+      category.resources.forEach((resource, index) => {
         ids.add(resource.id);
         total += 1;
-        grid.append(this.card(resource));
+        columns[index % 2].append(this.card(resource));
+      });
+      const grid = document.createElement("div");
+      grid.className = "grid grid-cols-1 lg:grid-cols-2 gap-x-5";
+      columns.forEach((col) => {
+        grid.append(col);
       });
       if (category.resources.length === 0) {
         const empty = document.createElement("p");
