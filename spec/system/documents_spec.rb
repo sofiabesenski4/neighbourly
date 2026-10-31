@@ -47,8 +47,8 @@ RSpec.describe "Documents", type: :system do
 
         expect(page).to have_content("Resource 'Harbour Street Society' was created.")
         expect(Document.last.title).to eq("Harbour Street Society")
+        expect(Document.last.categories).to eq(["shelter", "meals"])
         expect(Document.last.metadata["city"]).to eq("Victoria")
-        expect(Document.last.metadata["categories"]).to eq(["shelter", "meals"])
         expect(Document.last.metadata["age_range"]).to eq({"min" => 19, "max" => 65})
       end
 
@@ -79,12 +79,12 @@ RSpec.describe "Documents", type: :system do
         doc = source.documents.create!(
           title: "Lantern House Society",
           content: "Lantern House Society\nCity: Victoria",
+          categories: ["shelter", "health"],
           metadata: {
             city: "Victoria",
             address: "200 Lantern Way",
             phone: ["250-555-0101"],
             hours: "24/7",
-            categories: ["shelter", "health"],
             description: "Housing and health services"
           }
         )

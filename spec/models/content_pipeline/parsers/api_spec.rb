@@ -45,6 +45,7 @@ RSpec.describe ContentPipeline::Parsers::Api do
       expect(chunk[:content]).to include("Categories: 24 Hour, Pet Friendly")
       expect(chunk[:content]).to include("Notes: No drugs or alcohol")
       expect(chunk[:content]).to include("Intake: First come first served")
+      expect(chunk[:categories]).to eq(["24 Hour", "Pet Friendly"])
     end
 
     it "stores structured metadata" do
@@ -53,7 +54,6 @@ RSpec.describe ContentPipeline::Parsers::Api do
       expect(chunk[:metadata][:city]).to eq("vancouver")
       expect(chunk[:metadata][:phone]).to eq(["604-555-1234"])
       expect(chunk[:metadata][:gender]).to eq(["men"])
-      expect(chunk[:metadata][:categories]).to eq(["24 Hour", "Pet Friendly"])
     end
 
     it "skips records without a post_title" do

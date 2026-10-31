@@ -73,6 +73,7 @@ RSpec.describe "Documents", type: :request do
 
         doc = Document.last
         expect(doc.title).to eq("Harbour Street Society")
+        expect(doc.categories).to eq(["shelter", "meals", "clothing"])
         expect(doc.content).to include("Harbour Street Society")
         expect(doc.content).to include("City: Victoria")
         expect(doc.content).to include("Address: 100 Harbour St")
@@ -93,7 +94,6 @@ RSpec.describe "Documents", type: :request do
         expect(meta["email"]).to eq("info@example.org")
         expect(meta["website"]).to eq("https://example.org")
         expect(meta["hours"]).to eq("Mon-Sun 7am-11pm")
-        expect(meta["categories"]).to eq(["shelter", "meals", "clothing"])
         expect(meta["age_range"]).to eq({"min" => 19})
         expect(meta["gender"]).to eq(["all"])
         expect(meta["notes"]).to eq("No referral needed")

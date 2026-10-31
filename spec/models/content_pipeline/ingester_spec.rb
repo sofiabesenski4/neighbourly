@@ -6,7 +6,8 @@ RSpec.describe ContentPipeline::Ingester do
   let(:fake_vector) { Array.new(1536) { rand(-1.0..1.0) } }
 
   let(:api_response) do
-    [{"id" => 1, "post_title" => "Test Shelter", "location" => {"city" => {"label" => "Vancouver"}}}].to_json
+    [{"id" => 1, "post_title" => "Test Shelter", "location" => {"city" => {"label" => "Vancouver"}},
+      "taxonomies" => [{"name" => "Food"}, {"name" => "Shelter"}]}].to_json
   end
 
   before do
@@ -22,8 +23,12 @@ RSpec.describe ContentPipeline::Ingester do
       expect(doc.title).to eq("Test Shelter")
       expect(doc.content).to include("Test Shelter")
       expect(doc.content).to include("City: Vancouver")
+      expect(doc.content).to include("Categories: Food, Shelter")
+      expect(doc.categories).to eq(["Food", "Shelter"])
+      expect(doc.metadata).not_to have_key("categories")
       expect(doc.source).to eq(source)
       expect(doc.embedding).not_to be_nil
+      expect(ContentPipeline::Embedder).to have_received(:embed).with(doc.content)
     end
 
     it "updates the source's last_fetched_at timestamp" do
