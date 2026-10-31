@@ -55,7 +55,7 @@ class DocumentsController < ApplicationController
     authorize @document
     title = @document.title
     @document.destroy!
-    redirect_back fallback_location: sources_path, notice: "Resource '#{title}' was deleted.", status: :see_other
+    redirect_to sources_path, notice: "Resource '#{title}' was deleted.", status: :see_other
   end
 
   private
