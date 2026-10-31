@@ -15,3 +15,6 @@ application.register("dialog", DialogController);
 
 import MobileMenuController from "./mobile_menu_controller";
 application.register("mobile-menu", MobileMenuController);
+
+import FlyerBuilderController from "./flyer_builder_controller";
+application.register("flyer-builder", FlyerBuilderController);

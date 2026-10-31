@@ -14,6 +14,7 @@
   "scripts": {
     "build": "esbuild app/javascript/*.* --bundle --sourcemap --format=esm --outdir=app/assets/builds --public-path=/assets",
     "prepare": "husky",
+    "test-javascript": "node --test spec/javascript/*.test.js",
     "lint-javascript": "eslint"
   },
   "dependencies": {
