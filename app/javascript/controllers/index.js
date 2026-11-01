@@ -20,3 +20,6 @@ import FlyerBuilderController from "./flyer_builder_controller";
 application.register("flyer-builder", FlyerBuilderController);
 import MarkdownController from "./markdown_controller";
 application.register("markdown", MarkdownController);
+
+import ChatWorkspaceController from "./chat_workspace_controller";
+application.register("chat-workspace", ChatWorkspaceController);

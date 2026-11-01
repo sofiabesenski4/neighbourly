@@ -1,0 +1,16 @@
+<%= link_to "New chat", new_chat_path, class: "block rounded-lg bg-sage-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-sage-700 focus-visible:outline-sage-600" %>
+
+<h2 class="mt-6 mb-2 px-2 text-xs font-semibold uppercase tracking-wide text-stone-500">Recent conversations</h2>
+<nav aria-label="Recent conversations" class="min-h-0 flex-1 overflow-y-auto space-y-1">
+  <% @recent_chats.each do |recent_chat| %>
+    <% active = chat.persisted? && recent_chat.id == chat.id %>
+    <%= link_to chat_title(recent_chat), recent_chat,
+        aria: { current: active ? "page" : nil },
+        class: "block truncate rounded-lg px-3 py-2 text-sm #{active ? "bg-sage-100 text-sage-900 font-medium" : "text-stone-700 hover:bg-stone-200"}" %>
+  <% end %>
+  <% if @recent_chats.empty? %>
+    <p class="px-2 py-3 text-sm text-stone-500">Your conversations will appear here.</p>
+  <% end %>
+</nav>
+
+<%= link_to "All chats", chats_path, class: "mt-4 block border-t border-stone-200 px-3 pt-4 text-sm font-medium text-stone-600 hover:text-stone-900" %>
