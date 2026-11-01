@@ -1,6 +1,8 @@
 require "rails_helper"
 
 RSpec.describe ChatResponseJob, type: :job do
+  include ActiveJob::TestHelper
+
   let(:user) { User.create!(email: "test@example.com", password: "password123") }
   let(:chat) { user.chats.create! }
   let(:rag_context) { instance_double(RagContext) }
@@ -9,7 +11,7 @@ RSpec.describe ChatResponseJob, type: :job do
   before do
     allow(RagContext).to receive(:new).and_return(rag_context)
     allow(rag_context).to receive(:augment).and_return(
-      RagContext::Result.new(prompt: "augmented prompt", documents: [])
+      RagContext::Result.new(instructions: nil, documents: [])
     )
 
     # Stub chat.ask to yield a single chunk
@@ -27,8 +29,14 @@ RSpec.describe ChatResponseJob, type: :job do
     expect(rag_context).to have_received(:augment).with("Where are shelters?")
   end
 
-  it "passes the augmented prompt to chat.ask" do
-    expect_any_instance_of(Chat).to receive(:ask).with("augmented prompt")
+  it "passes only the original question to chat.ask" do
+    expect_any_instance_of(Chat).to receive(:ask).with("Where are shelters?")
+    described_class.perform_now(chat.id, "Where are shelters?")
+  end
+
+  it "does not add reference instructions when no documents are found" do
+    expect_any_instance_of(Chat).not_to receive(:with_instructions)
+
     described_class.perform_now(chat.id, "Where are shelters?")
   end
 
@@ -41,9 +49,47 @@ RSpec.describe ChatResponseJob, type: :job do
 
     before do
       allow(rag_context).to receive(:augment).and_return(
-        RagContext::Result.new(prompt: "augmented prompt", documents: documents)
+        RagContext::Result.new(instructions: "reference instructions", documents: documents)
       )
       chat.messages.create!(role: "user", content: "Where are shelters?")
+    end
+
+    it "keeps reference instructions in the model context without saving or broadcasting them" do
+      allow_any_instance_of(Chat).to receive(:ask).and_call_original
+      # Stop at the generation boundary, exercising RubyLLM's real message
+      # persistence and context assembly without making a provider request.
+      expect_any_instance_of(Chat).to receive(:complete) do |record|
+        expect(record.messages.where(role: "user").last.content).to eq("Where are shelters?")
+        expect(record.messages.where(role: "system")).to be_empty
+        expect(record.to_llm.messages.select { |message| message.role == :system }.map(&:content))
+          .to include("reference instructions")
+        expect(record.to_llm.messages.last.content).to eq("Where are shelters?")
+      end
+
+      expect {
+        perform_enqueued_jobs do
+          described_class.perform_now(chat.id, "Where are shelters?")
+        end
+      }.to have_broadcasted_to("chat_#{chat.id}").with(
+        satisfy("shows the original question without reference instructions") do |payload|
+          payload.include?("Where are shelters?") && !payload.include?("reference instructions")
+        end
+      )
+
+      expect(chat.messages.pluck(:content)).not_to include("reference instructions")
+    end
+
+    it "preserves the original question when generation fails" do
+      allow_any_instance_of(Chat).to receive(:ask).and_call_original
+      allow_any_instance_of(Chat).to receive(:complete).and_raise(RubyLLM::Error, "API down")
+
+      expect {
+        described_class.perform_now(chat.id, "Where are shelters?")
+      }.to raise_error(RubyLLM::Error)
+
+      expect(chat.messages.where(role: "user").last.content).to eq("Where are shelters?")
+      expect(chat.messages.where(role: "system")).to be_empty
+      expect(chat.messages.pluck(:content)).not_to include("reference instructions")
     end
 
     it "associates documents and broadcasts RAG context" do
