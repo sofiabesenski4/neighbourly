@@ -2,6 +2,7 @@ class Chat < ApplicationRecord
   acts_as_chat
 
   belongs_to :user
+  has_one :first_user_message, -> { where(role: "user").order(:id) }, class_name: "Message"
 
   def broadcast_reply_failed
     # Turbo replaces an existing direct child with the same ID on append.
