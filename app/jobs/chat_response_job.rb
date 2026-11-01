@@ -35,7 +35,6 @@ class ChatResponseJob < ApplicationJob
       user_message&.rag_documents = rag_documents
       assistant_message&.rag_documents = rag_documents
 
-      user_message&.broadcast_rag_context
       assistant_message&.broadcast_rag_context
     end
 

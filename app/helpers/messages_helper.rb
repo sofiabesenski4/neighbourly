@@ -3,6 +3,13 @@ module MessagesHelper
     "Default: #{RubyLLM.models.find(RubyLLM.config.default_model).label}"
   end
 
+  def reference_source_url(source)
+    uri = URI.parse(source.url.to_s)
+    uri.to_s if uri.is_a?(URI::HTTP) && uri.host.present?
+  rescue URI::InvalidURIError
+    nil
+  end
+
   def tool_result_partial(message)
     name = message.respond_to?(:parent_tool_call) ? message.parent_tool_call&.name.to_s : ""
     partial_for(prefix: "messages/tool_results", name: name)
