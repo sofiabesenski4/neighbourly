@@ -25,3 +25,92 @@
   --color-sage-800: #2a4a2a;
   --color-sage-900: #1f361f;
 }
+
+/* Scoped to assistant replies; user messages retain their original text. */
+.assistant-markdown {
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+
+  & > * + * {
+    margin-top: 0.75rem;
+  }
+  & > :first-child {
+    margin-top: 0;
+  }
+  & > :last-child {
+    margin-bottom: 0;
+  }
+
+  & :is(h1, h2, h3, h4, h5, h6) {
+    font-weight: 600;
+    line-height: 1.3;
+    margin-top: 1.25rem;
+  }
+  & h1 {
+    font-size: 1.5rem;
+  }
+  & h2 {
+    font-size: 1.25rem;
+  }
+  & h3 {
+    font-size: 1.125rem;
+  }
+  & :is(ul, ol) {
+    padding-left: 1.5rem;
+  }
+  & ul {
+    list-style-type: disc;
+  }
+  & ol {
+    list-style-type: decimal;
+  }
+  & li + li {
+    margin-top: 0.25rem;
+  }
+  & li > :is(ul, ol, p) {
+    margin-top: 0.25rem;
+  }
+  & a {
+    color: var(--color-sage-700);
+    text-decoration: underline;
+  }
+  & a:focus-visible {
+    outline: 2px solid var(--color-sage-600);
+    outline-offset: 2px;
+  }
+  & blockquote {
+    border-left: 3px solid var(--color-stone-300);
+    padding-left: 1rem;
+    color: var(--color-stone-600);
+  }
+  & code {
+    font-size: 0.875em;
+    background: var(--color-stone-100);
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.25rem;
+  }
+  & pre {
+    overflow-x: auto;
+    background: var(--color-stone-100);
+    padding: 0.75rem;
+    border-radius: 0.375rem;
+  }
+  & pre code {
+    padding: 0;
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  & hr {
+    border-color: var(--color-stone-300);
+  }
+  & table {
+    display: block;
+    overflow-x: auto;
+    border-collapse: collapse;
+  }
+  & :is(th, td) {
+    border: 1px solid var(--color-stone-300);
+    padding: 0.5rem;
+    text-align: left;
+  }
+}

@@ -6,7 +6,10 @@
     </span>
   </div>
 
-  <div id="message_<%= assistant.id %>_content" class="whitespace-pre-wrap"><%= assistant.content %></div>
+  <div data-controller="markdown">
+    <div id="message_<%= assistant.id %>_content" data-markdown-target="source" class="whitespace-pre-wrap"><%= assistant.content %></div>
+    <div data-markdown-target="output" class="assistant-markdown" hidden></div>
+  </div>
 
   <%= render "messages/rag_context", message: assistant, show_report_button: true %>
 
