@@ -8,8 +8,6 @@
 
   <div id="message_<%= user.id %>_content" class="whitespace-pre-wrap"><%= user.content %></div>
 
-  <%= render "messages/rag_context", message: user, show_report_button: true %>
-
   <div>
     <span class="text-sm text-gray-600"><%= user.created_at&.strftime("%I:%M %p") %></span>
   </div>
