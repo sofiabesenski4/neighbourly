@@ -21,14 +21,14 @@ RSpec.describe RagContext do
         )
       end
 
-      it "prepends reference documents to the user's question" do
+      it "returns reference instructions separately from the user's question" do
         result = rag_context.augment("Where can I find shelter?")
 
-        expect(result.prompt).to include("REFERENCE DOCUMENTS")
-        expect(result.prompt).to include("Test Shelter")
-        expect(result.prompt).to include("City: Vancouver")
-        expect(result.prompt).to include("Source: BC 211 Shelters, URL: https://example.com/api")
-        expect(result.prompt).to include("Where can I find shelter?")
+        expect(result.instructions).to include("REFERENCE DOCUMENTS")
+        expect(result.instructions).to include("Test Shelter")
+        expect(result.instructions).to include("City: Vancouver")
+        expect(result.instructions).to include("Source: BC 211 Shelters, URL: https://example.com/api")
+        expect(result.instructions).not_to include("Where can I find shelter?")
       end
 
       it "returns the matched documents" do
@@ -52,16 +52,16 @@ RSpec.describe RagContext do
         )
 
         result = rag_context.augment("shelters?")
-        expect(result.prompt).to include("[1]")
-        expect(result.prompt).to include("[2]")
+        expect(result.instructions).to include("[1]")
+        expect(result.instructions).to include("[2]")
         expect(result.documents.length).to eq(2)
       end
     end
 
     context "when no documents exist at all" do
-      it "returns the original content unchanged" do
+      it "returns no reference instructions" do
         result = rag_context.augment("Hello")
-        expect(result.prompt).to eq("Hello")
+        expect(result.instructions).to be_nil
         expect(result.documents).to be_empty
       end
     end
