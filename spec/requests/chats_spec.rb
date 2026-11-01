@@ -56,6 +56,18 @@ RSpec.describe "Chats", type: :request do
 
         expect(response).to have_http_status(:ok)
       end
+
+      it "uses the first user question as the conversation title" do
+        chat.messages.create!(role: "system", content: "Internal instructions")
+        chat.messages.create!(role: "user", content: "Find food\n in Victoria")
+        chat.messages.create!(role: "user", content: "A later question")
+
+        get chat_path(chat)
+
+        html = Nokogiri::HTML(response.body)
+        expect(html.at_css("h1").text).to eq("Find food in Victoria")
+        expect(html.at_css("#chat_sidebar a[aria-current='page']").text).to eq("Find food in Victoria")
+      end
     end
 
     context "as an admin" do
@@ -78,6 +90,46 @@ RSpec.describe "Chats", type: :request do
         follow_redirect!
         expect(response.body).to include("You are not authorized to perform this action")
       end
+    end
+  end
+
+  describe "GET /chats/new" do
+    it "limits recent conversations to the signed-in user's chats" do
+      sign_in owner
+      chat.messages.create!(role: "user", content: "My conversation")
+      private_chat = other_user.chats.create!
+      private_chat.messages.create!(role: "user", content: "Another user's private question")
+
+      get new_chat_path
+
+      html = Nokogiri::HTML(response.body)
+      expect(html.at_css("#chat_sidebar").text).to include("My conversation")
+      expect(response.body).not_to include("Another user's private question", chat_path(private_chat))
+      expect(html.at_css("h1").text).to eq("New conversation")
+    end
+
+    it "keeps an admin's personal sidebar separate from the full chat list" do
+      sign_in admin
+      own_chat = admin.chats.create!
+      chat
+
+      get new_chat_path
+
+      sidebar = Nokogiri::HTML(response.body).at_css("#chat_sidebar")
+      expect(sidebar.css("a").map { |link| link["href"] }).to include(chat_path(own_chat))
+      expect(sidebar.css("a").map { |link| link["href"] }).not_to include(chat_path(chat))
+    end
+
+    it "shows the 30 most recent conversations" do
+      sign_in owner
+      oldest_chat = owner.chats.create!(created_at: 2.days.ago)
+      recent_chats = Array.new(30) { owner.chats.create! }
+
+      get new_chat_path
+
+      links = Nokogiri::HTML(response.body).css("#chat_sidebar nav a").map { |link| link["href"] }
+      expect(links).to eq(recent_chats.reverse.map { |recent_chat| chat_path(recent_chat) })
+      expect(links).not_to include(chat_path(oldest_chat))
     end
   end
 
