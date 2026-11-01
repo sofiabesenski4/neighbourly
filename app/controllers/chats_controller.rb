@@ -1,6 +1,7 @@
 class ChatsController < ApplicationController
   before_action :authenticate_user!
   before_action :set_chat, only: [:show, :destroy]
+  before_action :set_recent_chats, only: [:new, :show]
   after_action :verify_authorized, except: :index
 
   # Every chat created fires an LLM call billed to our API keys. Declared after
@@ -51,6 +52,10 @@ class ChatsController < ApplicationController
   end
 
   private
+
+  def set_recent_chats
+    @recent_chats = current_user.chats.order(created_at: :desc, id: :desc).limit(30).includes(:first_user_message)
+  end
 
   def set_chat
     @chat = Chat.find(params[:id])

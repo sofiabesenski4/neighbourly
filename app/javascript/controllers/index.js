@@ -18,3 +18,6 @@ application.register("mobile-menu", MobileMenuController);
 
 import MarkdownController from "./markdown_controller";
 application.register("markdown", MarkdownController);
+
+import ChatWorkspaceController from "./chat_workspace_controller";
+application.register("chat-workspace", ChatWorkspaceController);
