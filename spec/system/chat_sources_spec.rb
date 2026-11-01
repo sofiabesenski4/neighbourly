@@ -19,7 +19,7 @@ RSpec.describe "Chat sources", type: :system do
     rag_context = instance_double(RagContext)
     allow(RagContext).to receive(:new).and_return(rag_context)
     allow(rag_context).to receive(:augment).and_return(
-      RagContext::Result.new(prompt: "augmented prompt", documents: [document])
+      RagContext::Result.new(instructions: "reference instructions", documents: [document])
     )
     allow_any_instance_of(Chat).to receive(:ask).and_yield(double("chunk", content: "Try the downtown shelter."))
 
