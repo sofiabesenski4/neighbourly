@@ -40,6 +40,20 @@ RSpec.describe ChatResponseJob, type: :job do
     described_class.perform_now(chat.id, "Where are shelters?")
   end
 
+  it "queues a title after a successful reply" do
+    expect {
+      described_class.perform_now(chat.id, "Where are shelters?")
+    }.to have_enqueued_job(ChatTitleJob).with(chat.id)
+  end
+
+  it "does not queue another title once one has been generated" do
+    chat.update!(title: "Local shelter options")
+
+    expect {
+      described_class.perform_now(chat.id, "Where are shelters?")
+    }.not_to have_enqueued_job(ChatTitleJob)
+  end
+
   context "when RAG documents are found" do
     let(:source) { Source.create!(name: "Test Source", url: "https://example.com", source_type: "html") }
     let(:documents) do
@@ -72,7 +86,7 @@ RSpec.describe ChatResponseJob, type: :job do
         end
       }.to have_broadcasted_to("chat_#{chat.id}").with(
         satisfy("shows the original question without reference instructions") do |payload|
-          payload.include?("Where are shelters?") && !payload.include?("reference instructions")
+          payload.include?('action="append"') && payload.include?("Where are shelters?") && !payload.include?("reference instructions")
         end
       )
 

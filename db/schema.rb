@@ -63,6 +63,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
     t.bigint "ruby_llm_model_id"
     t.datetime "updated_at", null: false
     t.bigint "user_id", null: false
+    t.string "title"
     t.index ["ruby_llm_model_id"], name: "index_chats_on_ruby_llm_model_id"
     t.index ["user_id"], name: "index_chats_on_user_id"
   end
