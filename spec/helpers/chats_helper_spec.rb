@@ -5,6 +5,13 @@ RSpec.describe ChatsHelper, type: :helper do
   let(:chat) { user.chats.create! }
 
   describe "#chat_title" do
+    it "uses the generated title when available" do
+      chat.update!(title: "Food support in Victoria")
+      chat.messages.create!(role: "user", content: "I need somewhere to eat")
+
+      expect(helper.chat_title(chat)).to eq("Food support in Victoria")
+    end
+
     it "uses the first user question and normalizes whitespace" do
       chat.messages.create!(role: "system", content: "Internal instructions")
       chat.messages.create!(role: "assistant", content: "Hello")

@@ -6,6 +6,8 @@ class Message < ApplicationRecord
 
   broadcasts_to ->(message) { "chat_#{message.chat_id}" }, inserts_by: :append
 
+  after_create_commit :broadcast_initial_chat_title, if: -> { role == "user" }
+
   def broadcast_append_chunk(content)
     broadcast_append_to "chat_#{chat_id}",
       target: "message_#{id}_content",
@@ -17,5 +19,13 @@ class Message < ApplicationRecord
       target: "message_#{id}_rag_context",
       partial: "messages/rag_context",
       locals: {message: self, show_report_button: true}
+  end
+
+  private
+
+  def broadcast_initial_chat_title
+    if chat.title.blank? && chat.messages.where(role: "user").order(:id).pick(:id) == id
+      chat.broadcast_title
+    end
   end
 end
