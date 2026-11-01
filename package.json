@@ -20,8 +20,10 @@
   "dependencies": {
     "@hotwired/stimulus": "^3.2.2",
     "@hotwired/turbo-rails": "^8.0.23",
+    "dompurify": "^3.4.17",
     "eslint": "^10.4.0",
     "eslint-plugin-prettier": "^5.5.5",
-    "globals": "^17.6.0"
+    "globals": "^17.6.0",
+    "marked": "^18.1.2"
   }
 }
