@@ -1,5 +1,5 @@
-# Builds augmented prompts by retrieving relevant document context
-# via vector similarity search and prepending it to the user's question.
+# Retrieves reference instructions separately from the user's question so
+# internal context does not become part of the displayed conversation.
 class RagContext
   SYSTEM_PREFIX = <<~PROMPT.freeze
     Use the following reference documents to help answer the user's question.
@@ -14,17 +14,17 @@ class RagContext
     @limit = limit
   end
 
-  Result = Struct.new(:prompt, :documents)
+  Result = Struct.new(:instructions, :documents)
 
   def augment(content)
     documents = Document.search_by_similarity(content, limit: @limit)
-    return Result.new(prompt: content, documents: []) if documents.empty?
+    return Result.new(instructions: nil, documents: []) if documents.empty?
 
     context_block = documents.map.with_index do |doc, i|
       "[#{i + 1}] #{doc.title} (Source: #{doc.source.name}, URL: #{doc.source.url})\n#{doc.content}"
     end.join("\n\n")
 
-    prompt = "#{SYSTEM_PREFIX}#{context_block}\n--- END REFERENCE DOCUMENTS ---\n\n#{content}"
-    Result.new(prompt: prompt, documents: documents.to_a)
+    instructions = "#{SYSTEM_PREFIX}#{context_block}\n--- END REFERENCE DOCUMENTS ---"
+    Result.new(instructions: instructions, documents: documents.to_a)
   end
 end
