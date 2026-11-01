@@ -74,7 +74,7 @@ RSpec.describe "Chat workspace", type: :system do
     expect(page.evaluate_script("document.activeElement.textContent")).to eq("Close")
     find("#chat_drawer").send_keys(:escape)
     expect(page).not_to have_css("#chat_drawer[open]")
-    expect(find("button[aria-label='Open conversations']")["aria-expanded"]).to eq("false")
+    expect(page).to have_css("button[aria-label='Open conversations'][aria-expanded='false']")
 
     find("button[aria-label='Open conversations']").click
     within("#chat_drawer") { click_link "Find nearby meals" }
@@ -86,7 +86,7 @@ RSpec.describe "Chat workspace", type: :system do
     page.go_back
     expect(page).to have_current_path(new_chat_path)
     expect(page).not_to have_css("#chat_drawer[open]")
-    expect(find("button[aria-label='Open conversations']")["aria-expanded"]).to eq("false")
+    expect(page).to have_css("button[aria-label='Open conversations'][aria-expanded='false']")
   end
 
   it "keeps the composer visible while a long conversation scrolls independently" do
