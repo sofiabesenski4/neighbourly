@@ -24,9 +24,9 @@
     <%= Sentry.get_trace_propagation_meta.html_safe if Rails.env.production? || Rails.env.staging? %>
   </head>
 
-  <body class="h-full bg-stone-50">
+  <body class="<%= content_for?(:chat_workspace) ? "h-dvh flex flex-col overflow-hidden bg-stone-50" : "h-full bg-stone-50" %>">
     <!-- Navigation -->
-    <nav class="bg-white border-b border-stone-200" data-controller="mobile-menu">
+    <nav class="shrink-0 bg-white border-b border-stone-200" data-controller="mobile-menu">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex">
@@ -107,7 +107,7 @@
 
     <!-- Flash Messages -->
     <% if notice.present? || alert.present? %>
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
+      <div class="shrink-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
         <% if notice.present? %>
           <div class="rounded-md bg-sage-50 border border-sage-200 p-4 mb-4">
             <div class="flex">
@@ -140,7 +140,7 @@
     <% end %>
 
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="<%= content_for?(:chat_workspace) ? "flex-1 min-h-0 overflow-hidden" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8" %>">
       <%= yield %>
     </main>
   </body>
