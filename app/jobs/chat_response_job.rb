@@ -39,6 +39,7 @@ class ChatResponseJob < ApplicationJob
     end
 
     chat.broadcast_reply_succeeded
+    ChatTitleJob.perform_later(chat.id) if chat.title.blank?
   rescue RubyLLM::Error, Faraday::Error
     # RubyLLM deletes the empty reply when the API call fails, which would
     # leave the user's message sitting there unanswered. Say so, then re-raise

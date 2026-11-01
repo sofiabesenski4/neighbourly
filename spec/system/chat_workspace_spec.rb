@@ -16,6 +16,36 @@ RSpec.describe "Chat workspace", type: :system do
   let(:user) { User.create!(email: "workspace@example.com", password: "password123") }
   let(:chat) { user.chats.create! }
 
+  it "aligns navigation with the sidebar and opens Chat directly in the workspace" do
+    visit chat_path(chat)
+
+    brand = find("nav[aria-label='Main navigation']").find_link("Neighbourly Resources")
+    new_chat_link = find("#chat_sidebar").find_link("New chat")
+    expect(brand.evaluate_script("this.getBoundingClientRect().left"))
+      .to eq(new_chat_link.evaluate_script("this.getBoundingClientRect().left"))
+
+    within("nav[aria-label='Main navigation']") { click_link "Chat", exact: true }
+    expect(page).to have_current_path(new_chat_path)
+    expect(page).to have_css("h2", text: "What would you like help finding?")
+  end
+
+  it "places user messages on the right and assistant replies on the left" do
+    question = chat.messages.create!(role: "user", content: "Where can I find a meal?")
+    reply = chat.messages.create!(role: "assistant", content: "Try **Rainbow Kitchen**.")
+    visit chat_path(chat)
+
+    messages = find("#messages")
+    bubble = find("#message_#{question.id} > div")
+    assistant = find("#message_#{reply.id}")
+    expect(bubble.evaluate_script("this.getBoundingClientRect().right"))
+      .to be_within(1).of(messages.evaluate_script("this.getBoundingClientRect().right"))
+    expect(bubble.evaluate_script("this.getBoundingClientRect().left"))
+      .to be > assistant.evaluate_script("this.getBoundingClientRect().left")
+    expect(assistant.evaluate_script("this.getBoundingClientRect().left"))
+      .to eq(messages.evaluate_script("this.getBoundingClientRect().left"))
+    expect(assistant).to have_css("strong", text: "Rainbow Kitchen")
+  end
+
   it "collapses the desktop sidebar without leaving the conversation" do
     chat.messages.create!(role: "user", content: "Find food in Victoria")
     visit chat_path(chat)
