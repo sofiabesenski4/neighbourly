@@ -28,8 +28,15 @@ class ChatsController < ApplicationController
   end
 
   def create
-    @chat = current_user.chats.build(model: params.dig(:chat, :model).presence)
+    @chat = current_user.chats.build
     authorize @chat
+
+    selected_model = ChatModelAvailability.new.find(params.dig(:chat, :model).presence || RubyLLM.config.default_model)
+    unless selected_model
+      redirect_to new_chat_path, alert: "That model is unavailable. Please choose an available model.", status: :see_other
+      return
+    end
+    @chat.model = selected_model
 
     prompt = params.dig(:chat, :prompt)
     if prompt.present?
