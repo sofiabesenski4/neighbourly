@@ -22,16 +22,6 @@
         <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
       </button>
       <h1 data-chat-title="<%= chat.id %>" class="min-w-0 flex-1 truncate text-sm font-medium text-stone-700"><%= chat_title(chat) %></h1>
-      <% if chat.persisted? %>
-        <p class="w-full truncate text-xs text-stone-500 sm:w-auto sm:max-w-xs" title="<%= chat.model&.label || default_model_display_name %>"><%= chat.model&.label || default_model_display_name %></p>
-      <% else %>
-        <div class="w-full sm:w-auto sm:max-w-xs">
-          <%= label_tag :chat_model, "Select AI model", class: "sr-only" %>
-          <%= select_tag "chat[model]",
-              options_for_select(@chat_models.map { |model| [model.label, model.id] }.unshift([default_model_display_name, nil]), @selected_model),
-              id: "chat_model", form: "new_chat", class: "w-full rounded-lg border-0 bg-stone-50 px-3 py-2 text-xs text-stone-600 focus:outline-sage-600" %>
-        </div>
-      <% end %>
     </header>
 
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-6" tabindex="0" aria-label="Conversation">
