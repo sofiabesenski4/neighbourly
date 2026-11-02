@@ -2,7 +2,7 @@
 <% failed = response&.failed? || false %>
 <% cancelled = response&.cancelled? || false %>
 <% retry_error = local_assigns[:retry_error] %>
-<%= tag.div id: "chat_#{chat.id}_response_status", data: { composer_target: "response", responding: busy }, hidden: !busy && !failed && !cancelled && retry_error.blank?, role: failed || retry_error.present? ? "alert" : "status", class: "mt-4 text-sm text-stone-500" do %>
+<%= tag.div id: "chat_#{chat.id}_response_status", data: { composer_target: "response", response_sync_target: "status", responding: busy, response_id: response&.id || 0, response_version: chat_sync_version(response), assistant_message_id: response&.assistant_message_id }, hidden: !busy && !failed && !cancelled && retry_error.blank?, role: failed || retry_error.present? ? "alert" : "status", class: "mt-4 text-sm text-stone-500" do %>
   <% if retry_error.present? %>
     <p class="mb-2 text-red-700"><%= retry_error %></p>
   <% end %>

@@ -20,29 +20,33 @@ class Message < ApplicationRecord
   def broadcast_append_chunk(content)
     return unless conversation_visible?
 
-    broadcast_append_to "chat_#{chat_id}",
-      target: "message_#{id}_content",
-      content: ERB::Util.html_escape(content.to_s)
+    broadcast_safely do
+      broadcast_append_to "chat_#{chat_id}",
+        target: "message_#{id}_content",
+        content: ERB::Util.html_escape(content.to_s)
+    end
   end
 
   def broadcast_rag_context
     return unless role == "assistant" && conversation_visible?
 
-    broadcast_replace_to "chat_#{chat_id}",
-      target: "message_#{id}_rag_context",
-      partial: "messages/rag_context",
-      locals: {message: self, show_report_button: true}
+    broadcast_safely do
+      broadcast_replace_to "chat_#{chat_id}",
+        target: "message_#{id}_rag_context",
+        partial: "messages/rag_context",
+        locals: {message: self, show_report_button: true}
+    end
   end
 
   private
 
   def broadcast_conversation_append
-    broadcast_append_to "chat_#{chat_id}", target: "messages"
+    broadcast_safely { broadcast_append_to "chat_#{chat_id}", target: "messages" }
   end
 
   def broadcast_conversation_update
     if conversation_visible?
-      broadcast_replace_to "chat_#{chat_id}"
+      broadcast_safely { broadcast_replace_to "chat_#{chat_id}" }
     elsif CONVERSATION_ROLES.include?(role_before_last_save)
       # An assistant placeholder can turn into a tool call after streaming.
       # Remove its visible shell without rendering the internal payload.
@@ -51,12 +55,19 @@ class Message < ApplicationRecord
   end
 
   def broadcast_conversation_removal
-    broadcast_remove_to "chat_#{chat_id}"
+    broadcast_safely { broadcast_remove_to "chat_#{chat_id}" }
   end
 
   def broadcast_initial_chat_title
     if chat.title.blank? && chat.messages.where(role: "user").order(:id).pick(:id) == id
-      chat.broadcast_title
+      broadcast_safely { chat.broadcast_title }
     end
+  end
+
+  def broadcast_safely
+    yield
+  rescue => error
+    # Delivery is best-effort; a Cable outage must not prevent a saved reply.
+    Rails.error.report(error, context: {message_id: id, chat_id: chat_id})
   end
 end

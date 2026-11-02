@@ -1,6 +1,7 @@
 class ChatResponsesController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_chat_response
+  before_action :set_chat
+  before_action :set_chat_response, except: :latest
   after_action :verify_authorized
 
   # Retrying spends the same API budget as sending another message.
@@ -35,11 +36,29 @@ class ChatResponsesController < ApplicationController
     end
   end
 
+  def latest
+    latest_response = @chat.latest_response
+    boundary = Integer(params[:after_response_id], exception: false).to_i.clamp(0, latest_response&.id || 0)
+    responses = @chat.chat_responses.where(id: boundary..).includes(:user_message,
+      assistant_message: [:ruby_llm_usages, :ruby_llm_tool_calls, {rag_documents: :source}]).order(:id).to_a
+    response.set_header("Cache-Control", "no-store")
+    response.set_header("X-Chat-Response-Boundary", latest_response&.id.to_i.to_s)
+    respond_to do |format|
+      format.turbo_stream do
+        render partial: "chat_responses/snapshot", formats: [:html], locals: {chat: @chat, response: latest_response, responses: responses}
+      end
+      format.html { redirect_to @chat }
+    end
+  end
+
   private
 
-  def set_chat_response
+  def set_chat
     @chat = Chat.find(params[:chat_id])
-    authorize @chat, :update?
+    authorize @chat, (action_name == "latest") ? :show? : :update?
+  end
+
+  def set_chat_response
     @chat_response = @chat.chat_responses.find(params[:id])
   end
 
