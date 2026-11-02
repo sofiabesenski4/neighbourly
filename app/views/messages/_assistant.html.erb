@@ -1,5 +1,5 @@
 <% assistant ||= local_assigns[:message] %>
-<div id="message_<%= assistant.id %>" aria-label="Assistant message" class="min-w-0 space-y-3 text-stone-800" data-controller="citations" data-action="markdown:rendered->citations#refresh click->citations#follow">
+<div id="message_<%= assistant.id %>" aria-label="Assistant message" class="min-w-0 space-y-3 text-stone-800" data-controller="citations" data-action="markdown:rendered->citations#refresh click->citations#follow" data-message-version="<%= chat_sync_version(assistant) %>" data-message-enrichment="<%= message_sync_enrichment(assistant) %>">
   <div data-controller="markdown">
     <div id="message_<%= assistant.id %>_content" data-markdown-target="source" class="whitespace-pre-wrap break-words"><%= assistant.content %></div>
     <div data-markdown-target="output" data-citations-target="content" class="assistant-markdown" hidden></div>

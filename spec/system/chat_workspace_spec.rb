@@ -116,6 +116,6 @@ RSpec.describe "Chat workspace", type: :system do
 
     expect(page).to have_content("Chat was successfully created.")
     expect(Chat.last.model_id).to eq("claude-sonnet-4-5")
-    expect(ChatResponseJob).to have_received(:perform_later).with(Chat.last.id, "Find food support")
+    expect(ChatResponseJob).to have_received(:perform_later).with(Chat.last.id, "Find food support", hash_including(model: alternate_model.id, provider: "anthropic", response_id: Integer))
   end
 end

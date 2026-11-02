@@ -1,4 +1,8 @@
 <% if defined?(@chat) && @chat.present? %>
+  <% if @user_message %>
+    <%= turbo_stream.append "messages", @user_message %>
+  <% end %>
+  <%= render "chat_responses/snapshot", chat: @chat, response: @chat.latest_response %>
   <%= turbo_stream.replace "new_message" do %>
     <%= render "messages/form",
       chat: @chat,

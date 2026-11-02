@@ -144,6 +144,8 @@ class ChatResponse < ApplicationRecord
   rescue ActiveRecord::RecordNotFound
     # Deleting a conversation can race an already-committed status callback.
     nil
+  rescue => error
+    Rails.error.report(error, context: {chat_response_id: id, chat_id: chat_id})
   end
 
   private
