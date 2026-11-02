@@ -1,9 +1,10 @@
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["input", "submit"];
+  static targets = ["input", "submit", "response"];
 
   initialize() {
+    this.responding = false;
     this.widths = new WeakMap();
     this.observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
@@ -33,6 +34,11 @@ export default class extends Controller {
     this.observer.unobserve(input);
   }
 
+  responseTargetConnected(response) {
+    this.responding = response.dataset.responding === "true";
+    if (this.hasInputTarget && this.hasSubmitTarget) this.resize();
+  }
+
   resize() {
     const input = this.inputTarget;
     const scrollTop = input.scrollTop;
@@ -42,7 +48,8 @@ export default class extends Controller {
 
     // Respect Turbo's disabled submit button while a request is in progress.
     if (!input.form.hasAttribute("aria-busy")) {
-      this.submitTarget.disabled = input.value.trim().length === 0;
+      this.submitTarget.disabled =
+        this.responding || input.value.trim().length === 0;
     }
   }
 

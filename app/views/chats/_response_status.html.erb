@@ -1,0 +1,9 @@
+<% busy = response&.active? || false %>
+<% failed = response&.failed? || false %>
+<%= tag.div id: "chat_#{chat.id}_response_status", data: { composer_target: "response", responding: busy }, hidden: !busy && !failed, role: failed ? "alert" : "status", class: "mt-4 text-sm text-stone-500" do %>
+  <% if busy %>
+    <p><%= { "queued" => "Getting ready…", "searching" => "Finding local resources…", "writing" => "Writing a response…" }.fetch(response.status) %></p>
+  <% elsif failed %>
+    <p class="text-red-700"><%= response.error_message.presence || "The assistant couldn't finish this reply. Your question is saved." %></p>
+  <% end %>
+<% end %>

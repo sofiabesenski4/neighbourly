@@ -84,11 +84,12 @@ export default class extends Controller {
     this.updateJump();
   }
 
-  jumpToLatest() {
+  jumpToLatest(event) {
     this.following = true;
     this.unseen = false;
     this.scheduleUpdate();
-    this.viewportTarget.focus({ preventScroll: true });
+    if (event?.type !== "turbo:submit-start")
+      this.viewportTarget.focus({ preventScroll: true });
   }
 
   scheduleUpdate() {

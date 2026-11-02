@@ -3,10 +3,19 @@ class Chat < ApplicationRecord
 
   belongs_to :user
   has_one :first_user_message, -> { where(role: "user").order(:id) }, class_name: "Message"
+  has_many :chat_responses, dependent: :destroy
 
   validates :title, length: {maximum: 60}, allow_nil: true
 
   after_update_commit :broadcast_title, if: :saved_change_to_title?
+
+  def response_in_progress?
+    chat_responses.active.exists?
+  end
+
+  def latest_response
+    chat_responses.order(:id).last
+  end
 
   def broadcast_title
     broadcast_update_to "chat_#{id}",
