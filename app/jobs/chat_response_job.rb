@@ -6,9 +6,10 @@ class ChatResponseJob < ApplicationJob
   FALLBACK_RESPONSE = "Sorry, something went wrong while looking up local resources for your question. " \
     "Please start a new chat and try again.".freeze
 
-  def perform(chat_id, content, model: nil, provider: nil, response_id: nil)
-    return ChatResponseRunner.new(response_id).call if response_id
+  def perform(chat_id, content, model: nil, provider: nil, response_id: nil, attempt_token: nil)
+    return ChatResponseRunner.new(response_id, attempt_token: attempt_token).call if response_id
 
+    # Finish jobs enqueued before durable reply tracking with their original flow.
     chat = Chat.find(chat_id)
     chat.with_model(model, provider: provider) if model
 

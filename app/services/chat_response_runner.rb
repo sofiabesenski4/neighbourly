@@ -1,10 +1,12 @@
 class ChatResponseRunner
-  def initialize(response_id)
+  def initialize(response_id, attempt_token: nil)
     @response_id = response_id
+    @attempt_token = attempt_token
   end
 
   def call
     @response = ChatResponse.find(@response_id)
+    @response.expected_attempt_token = @attempt_token || @response.attempt_token
     return unless @response.claim!
 
     @chat = @response.chat
@@ -24,6 +26,7 @@ class ChatResponseRunner
       @assistant = @chat.messages.target.last
       raise "The assistant placeholder was not created" unless @assistant&.role == "assistant"
 
+      @assistant.chat_response_run = @response
       @response.while_running { @response.update!(assistant_message: @assistant) }
     end
 
@@ -67,7 +70,7 @@ class ChatResponseRunner
     return unless @response&.persisted?
 
     @response.with_lock do
-      return unless @response.cancelling?
+      return unless @response.current_attempt? && @response.cancelling?
 
       persist_partial
       @response.acknowledge_cancellation!

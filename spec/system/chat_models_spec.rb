@@ -39,7 +39,7 @@ RSpec.describe "Composer model picker", type: :system do
     end
 
     expect(page).to have_field("Message", with: "")
-    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is open today?", model: alternate_model.id, provider: "anthropic", response_id: Integer)
+    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is open today?", model: alternate_model.id, provider: "anthropic", response_id: Integer, attempt_token: String)
     expect(page).to have_select("message_model", selected: "Anthropic - Claude Sonnet")
     expect(page).to have_content("Earlier reply from the original model.")
   end
