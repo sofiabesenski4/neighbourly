@@ -19,7 +19,22 @@ class MessagesController < ApplicationController
     authorize @chat, :update?
     content = params.dig(:message, :content)
     if content.present?
-      ChatResponseJob.perform_later(@chat.id, content)
+      requested_model = params.dig(:message, :model).presence
+      if requested_model
+        selected_model = available_chat_models.find { |model| model.id == requested_model }
+        if @chat.model_id == requested_model
+          model_id, provider = @chat.model_id, @chat.provider
+        elsif selected_model
+          model_id, provider = selected_model.id, selected_model.provider
+        else
+          redirect_to @chat, alert: "That model is no longer available. Please choose another model.", status: :see_other
+          return
+        end
+        @selected_model = model_id
+        ChatResponseJob.perform_later(@chat.id, content, model: model_id, provider: provider.to_s)
+      else
+        ChatResponseJob.perform_later(@chat.id, content)
+      end
 
       respond_to do |format|
         format.turbo_stream

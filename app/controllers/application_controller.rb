@@ -4,6 +4,8 @@ class ApplicationController < ActionController::Base
 
   include Pundit::Authorization
 
+  helper_method :available_chat_models
+
   before_action :enforce_basic_auth
 
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
@@ -34,7 +36,7 @@ class ApplicationController < ActionController::Base
   private
 
   def available_chat_models
-    RubyLLM.models.chat_models.all
+    @available_chat_models ||= RubyLLM.models.chat_models.all
       .sort_by { |model| [model.provider.to_s, model.name.to_s] }
   end
 end
