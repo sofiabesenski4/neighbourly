@@ -57,6 +57,26 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
     t.index ["document_id", "category_id"], name: "index_categories_documents_on_document_id_and_category_id", unique: true
   end
 
+  create_table "chat_responses", force: :cascade do |t|
+    t.bigint "chat_id", null: false
+    t.bigint "user_message_id", null: false
+    t.bigint "assistant_message_id"
+    t.string "model_id", null: false
+    t.string "provider", null: false
+    t.string "status", default: "queued", null: false
+    t.text "error_message"
+    t.datetime "started_at"
+    t.datetime "finished_at"
+    t.datetime "heartbeat_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["assistant_message_id"], name: "index_chat_responses_on_assistant_message_id"
+    t.index ["chat_id", "created_at"], name: "index_chat_responses_on_chat_id_and_created_at"
+    t.index ["chat_id"], name: "index_chat_responses_one_active_per_chat", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying])::text[]))"
+    t.index ["user_message_id"], name: "index_chat_responses_on_user_message_id", unique: true
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "chat_responses_status_check"
+  end
+
   create_table "chats", force: :cascade do |t|
     t.boolean "cancelled", default: false, null: false
     t.datetime "created_at", null: false
@@ -389,6 +409,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "categories_documents", "categories", on_delete: :cascade
   add_foreign_key "categories_documents", "documents", on_delete: :cascade
+  add_foreign_key "chat_responses", "chats", on_delete: :cascade
+  add_foreign_key "chat_responses", "messages", column: "assistant_message_id", on_delete: :nullify
+  add_foreign_key "chat_responses", "messages", column: "user_message_id", on_delete: :cascade
   add_foreign_key "chats", "ruby_llm_models"
   add_foreign_key "chats", "users"
   add_foreign_key "document_messages", "documents", on_delete: :cascade
