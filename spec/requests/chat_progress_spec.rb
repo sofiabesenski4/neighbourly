@@ -44,6 +44,15 @@ RSpec.describe "Chat response progress", type: :request do
     expect(ChatResponseJob).to have_received(:perform_later).once
   end
 
+  it "renders a rejected HTML submission with the saved draft and chat workspace" do
+    post chat_messages_path(chat), params: {message: {content: "First question"}}
+    post chat_messages_path(chat), params: {message: {content: "A later draft"}}
+
+    expect(response).to have_http_status(:conflict)
+    expect(response.body).to include("A later draft", "already replying", "Conversation sidebar")
+    expect(chat.chat_responses.count).to eq(1)
+  end
+
   it "shows persistent progress and failure after a page refresh" do
     post chat_messages_path(chat), params: {message: {content: "Find meals"}}
     record = chat.chat_responses.last

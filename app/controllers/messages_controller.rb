@@ -9,11 +9,11 @@ class MessagesController < ApplicationController
   rate_limit to: 10, within: 1.minute,
     by: -> { current_user.id },
     with: -> { rate_limit_exceeded("You're sending messages faster than we can answer them. Please wait a moment.") },
-    only: :create, name: "burst"
+    only: :create, name: "burst", scope: "chat_replies"
   rate_limit to: 100, within: 1.hour,
     by: -> { current_user.id },
     with: -> { rate_limit_exceeded("You've sent a lot of messages in the past hour. Please try again later.") },
-    only: :create, name: "sustained"
+    only: :create, name: "sustained", scope: "chat_replies"
 
   def create
     authorize @chat, :update?

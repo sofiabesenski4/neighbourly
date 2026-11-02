@@ -2,4 +2,4 @@
 <% content_for :chat_workspace, "true" %>
 
 <%= turbo_stream_from "chat_#{@chat.id}" %>
-<%= render "workspace", chat: @chat %>
+<%= render "chats/workspace", chat: @chat %>
