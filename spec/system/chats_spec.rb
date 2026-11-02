@@ -91,7 +91,7 @@ RSpec.describe "Chats", type: :system do
     it "allows selecting an AI model for the chat" do
       visit new_chat_path
 
-      expect(page).to have_select("chat_model", options: ["Default: Anthropic - Claude Haiku", "Anthropic - Claude Haiku", "Anthropic - Claude Sonnet"])
+      expect(page).to have_select("chat_model", options: ["Anthropic - Claude Haiku", "Anthropic - Claude Sonnet"])
 
       select "Anthropic - Claude Sonnet", from: "chat_model"
       fill_in "Prompt", with: "Tell me about Rails"
@@ -108,7 +108,7 @@ RSpec.describe "Chats", type: :system do
       fill_in "Message", with: "Follow-up question"
       click_button "Send message"
 
-      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question")
+      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question", model: chat.model_id, provider: chat.provider.to_s)
     end
   end
 
