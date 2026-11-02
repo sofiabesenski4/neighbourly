@@ -16,6 +16,9 @@ application.register("dialog", DialogController);
 import MobileMenuController from "./mobile_menu_controller";
 application.register("mobile-menu", MobileMenuController);
 
+import FlashController from "./flash_controller";
+application.register("flash", FlashController);
+
 import MarkdownController from "./markdown_controller";
 application.register("markdown", MarkdownController);
 
