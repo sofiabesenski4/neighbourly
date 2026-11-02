@@ -12,8 +12,21 @@ RSpec.describe "Flash notifications", type: :system do
 
   def start_conversation
     visit new_chat_path
+    # Keep the toast focused while checking layout and navigation. turbo:load
+    # runs after the destination page applies its normal composer autofocus.
+    page.execute_script(<<~JS)
+      document.addEventListener("turbo:load", function pauseNotification() {
+        const button = document.querySelector("[data-controller='flash'][role='status'] button[aria-label='Dismiss notification']");
+        if (!button) return;
+
+        button.focus({ preventScroll: true });
+        document.removeEventListener("turbo:load", pauseNotification);
+      });
+    JS
     fill_in "Prompt", with: "Find food support"
     click_button "Start new chat"
+    expect(page).to have_current_path(%r{\A/chats/\d+\z}, wait: 10)
+    expect(page).to have_field("Message", wait: 10)
     expect(page).to have_css("[data-controller='flash'][role='status']", text: "Chat was successfully created.")
   end
 
@@ -34,6 +47,7 @@ RSpec.describe "Flash notifications", type: :system do
 
   it "dismisses a success notification automatically" do
     start_conversation
+    find_field("Message").click
 
     expect(page).not_to have_css("[data-controller='flash']", wait: 8)
     expect(page).to have_field("Message")
