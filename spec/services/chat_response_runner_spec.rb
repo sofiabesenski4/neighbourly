@@ -103,6 +103,25 @@ RSpec.describe ChatResponseRunner do
     expect(response.reload).to be_failed
   end
 
+  it "does not let an expired SDK attempt overwrite its retry" do
+    token = response.attempt_token
+    provider_complete do |_provider, _messages, **_options, &stream|
+      stream.call(chunk("Old partial"))
+      response.update!(heartbeat_at: 1.day.ago)
+      ChatResponseRecovery.call(Chat.find(chat.id))
+      expect(response.reload.retry!).to eq(:queued)
+      answer("A late answer from the expired attempt")
+    end
+
+    described_class.new(response.id, attempt_token: token).call
+
+    expect(response.reload).to be_queued
+    expect(response.attempt_token).not_to eq(token)
+    expect(chat.messages.where(role: "assistant")).to be_empty
+    expect(chat.messages.where(role: "user").count).to eq(1)
+    expect(Rails.error).not_to have_received(:report)
+  end
+
   context "with retrieved documents" do
     let(:source) { Source.create!(name: "Community directory", url: "https://example.com", source_type: "html") }
     let(:documents) do

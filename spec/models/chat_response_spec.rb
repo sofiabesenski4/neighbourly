@@ -14,7 +14,7 @@ RSpec.describe ChatResponse, type: :model do
     response = nil
     expect {
       response = enqueue("Where can I find meals?\nNear downtown")
-    }.to have_enqueued_job(ChatResponseJob).with(chat.id, "Where can I find meals?\nNear downtown", model: chat.model_id, provider: chat.provider.to_s, response_id: kind_of(Integer))
+    }.to have_enqueued_job(ChatResponseJob).with(chat.id, "Where can I find meals?\nNear downtown", model: chat.model_id, provider: chat.provider.to_s, response_id: kind_of(Integer), attempt_token: kind_of(String))
 
     expect(response).to be_queued
     expect(response.user_message).to have_attributes(role: "user", content: "Where can I find meals?\nNear downtown", chat_id: chat.id)

@@ -14,7 +14,7 @@ RSpec.describe "Message delivery resilience", type: :model do
     expect(response).to be_persisted
     expect(response.user_message.reload.content).to eq("Find food")
     expect(ChatResponseJob).to have_been_enqueued.with(chat.id, "Find food", model: chat.model_id,
-      provider: chat.provider, response_id: response.id)
+      provider: chat.provider, response_id: response.id, attempt_token: response.attempt_token)
     expect(Rails.error).to have_received(:report).with(an_instance_of(IOError), any_args).at_least(:once)
   end
 end

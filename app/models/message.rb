@@ -6,6 +6,10 @@ class Message < ApplicationRecord
 
   CONVERSATION_ROLES = %w[user assistant].freeze
 
+  attr_accessor :chat_response_run
+
+  around_save :persist_for_current_response
+
   scope :visible_in_conversation, -> { where(role: CONVERSATION_ROLES).where.missing(:ruby_llm_tool_calls) }
 
   after_create_commit :broadcast_conversation_append, if: :conversation_visible?
@@ -39,6 +43,14 @@ class Message < ApplicationRecord
   end
 
   private
+
+  def persist_for_current_response(&block)
+    if chat_response_run
+      chat_response_run.while_persistable(&block)
+    else
+      yield
+    end
+  end
 
   def broadcast_conversation_append
     broadcast_safely { broadcast_append_to "chat_#{chat_id}", target: "messages" }
