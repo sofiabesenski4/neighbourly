@@ -26,3 +26,6 @@ application.register("chat-workspace", ChatWorkspaceController);
 
 import ConversationMenuController from "./conversation_menu_controller";
 application.register("conversation-menu", ConversationMenuController);
+
+import ComposerController from "./composer_controller";
+application.register("composer", ComposerController);
