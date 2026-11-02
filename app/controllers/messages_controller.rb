@@ -20,16 +20,15 @@ class MessagesController < ApplicationController
     content = params.dig(:message, :content)
     if content.present?
       requested_model = params.dig(:message, :model).presence
+      selection = requested_model || @chat.model_id
+      provider = @chat.provider if requested_model.blank? || requested_model == @chat.model_id
+      selected_model = ChatModelAvailability.new.find(selection, provider: provider)
+      unless selected_model
+        redirect_to @chat, alert: "That model is no longer available. Please choose another model.", status: :see_other
+        return
+      end
       if requested_model
-        selected_model = available_chat_models.find { |model| model.id == requested_model }
-        if @chat.model_id == requested_model
-          model_id, provider = @chat.model_id, @chat.provider
-        elsif selected_model
-          model_id, provider = selected_model.id, selected_model.provider
-        else
-          redirect_to @chat, alert: "That model is no longer available. Please choose another model.", status: :see_other
-          return
-        end
+        model_id, provider = selected_model.id, selected_model.provider
         @selected_model = model_id
         ChatResponseJob.perform_later(@chat.id, content, model: model_id, provider: provider.to_s)
       else
