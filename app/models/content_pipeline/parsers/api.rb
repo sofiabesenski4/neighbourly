@@ -86,6 +86,14 @@ module ContentPipeline
           gender: Array(record["gender"]).map { |g| g["value"] }.compact,
           categories: categories,
           resource_categories: ResourceCategory.keys_for(categories),
+          notes: record["notes"],
+          intake_info: record["intake_info"],
+          hours: record["hours"],
+          email: record["email"],
+          website: record["website"],
+          description: record["description"],
+          last_updated_at: record["last_updated_at"],
+          source_url: record["source_url"],
           closed: record["closed"]
         }.compact
       end

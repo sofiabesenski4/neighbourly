@@ -88,4 +88,11 @@ gem "ruby_llm", "~> 2.0"
 
 gem "neighbor", "~> 1.1"
 
+# Render resource cards directly from saved data, without a browser or LLM.
+gem "prawn", "~> 2.5"
+
+group :test do
+  gem "pdf-reader", "~> 2.15"
+end
+
 gem "dotenv-rails", groups: [:development, :test]
