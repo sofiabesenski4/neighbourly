@@ -27,7 +27,7 @@
     <div class="min-h-0 flex-1 overflow-y-auto px-4 py-6" tabindex="0" aria-label="Conversation">
       <% if chat.persisted? %>
         <div id="messages" class="mx-auto w-full max-w-3xl space-y-8">
-          <% chat.messages.where.not(id: nil).each do |message| %>
+          <% chat.messages.where.not(id: nil).includes(:ruby_llm_usages).each do |message| %>
             <%= render message %>
           <% end %>
         </div>

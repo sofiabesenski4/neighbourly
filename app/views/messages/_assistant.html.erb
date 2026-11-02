@@ -6,4 +6,8 @@
   </div>
 
   <%= render "messages/rag_context", message: assistant, show_report_button: true %>
+
+  <% if (model_label = reply_model_label(assistant)) %>
+    <p class="text-xs text-stone-400" data-reply-model>Answered with <%= model_label %></p>
+  <% end %>
 </div>
