@@ -1,5 +1,5 @@
 <% content_for :title, chat_title(@chat) %>
 <% content_for :chat_workspace, "true" %>
 
-<%= turbo_stream_from "chat_#{@chat.id}" %>
+<%= turbo_stream_from "chat_#{@chat.id}", id: "chat_#{@chat.id}_stream" %>
 <%= render "chats/workspace", chat: @chat %>

@@ -28,7 +28,8 @@ class MessagesController < ApplicationController
         return
       end
       @selected_model = selected_model.id
-      ChatResponse.enqueue!(chat: @chat, content: content, model: selected_model.id, provider: selected_model.provider)
+      @chat_response = ChatResponse.enqueue!(chat: @chat, content: content, model: selected_model.id, provider: selected_model.provider)
+      @user_message = @chat_response.user_message
 
       respond_to do |format|
         format.turbo_stream
