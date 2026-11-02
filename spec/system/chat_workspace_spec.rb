@@ -80,7 +80,7 @@ RSpec.describe "Chat workspace", type: :system do
     within("#chat_drawer") { click_link "Find nearby meals" }
     expect(page).to have_current_path(chat_path(chat))
     expect(page).to have_css("h1", text: "Find nearby meals")
-    expect(page).to have_button("Send message")
+    expect(page).to have_button("Send message", disabled: true)
     expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
 
     page.go_back
