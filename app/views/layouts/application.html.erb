@@ -47,7 +47,7 @@
           </div>
           <div class="<%= content_for?(:chat_workspace) ? "hidden lg:flex" : "hidden sm:flex" %> items-center space-x-4">
             <% if user_signed_in? %>
-              <span class="<%= "hidden" if content_for?(:chat_workspace) %> text-sm text-stone-600">
+              <span class="min-w-0 max-w-48 truncate text-sm text-stone-600" title="<%= current_user.email %>">
                 <%= current_user.email %>
                 <% if current_user.admin? %>
                   <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-sage-100 text-sage-800">
