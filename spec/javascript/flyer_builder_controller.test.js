@@ -82,6 +82,64 @@ test("rendered resource cards use Tailwind utility classes", () => {
   }
 });
 
+test("resource cards stay in row-major order in one responsive grid", () => {
+  const previousDocument = globalThis.document;
+
+  try {
+    const createElement = (tagName) => ({
+      tagName,
+      children: [],
+      append(...children) {
+        this.children.push(...children);
+      },
+      replaceChildren(...children) {
+        this.children = children.flatMap((child) =>
+          child.tagName === "#document-fragment" ? child.children : [child],
+        );
+      },
+      setAttribute() {},
+    });
+
+    globalThis.document = {
+      createElement,
+      createDocumentFragment: () =>
+        Object.assign(createElement("#document-fragment"), {
+          replaceChildren(...children) {
+            this.children = children;
+          },
+        }),
+    };
+
+    const controller = Object.create(FlyerBuilderController.prototype);
+    controller.cardsTarget = createElement("div");
+    controller.countTarget = {};
+    controller.statusTarget = {};
+    controller.generateTarget = {};
+    controller.selectedCategories = () => [];
+    controller.generating = false;
+
+    controller.render([
+      {
+        name: "Food",
+        resources: ["Alpha", "Bravo", "Charlie", "Delta"].map(
+          (title, index) => ({ id: index + 1, title, fields: [] }),
+        ),
+      },
+    ]);
+
+    const grid = controller.cardsTarget.children[0].children[1];
+    assert.match(grid.className, /grid-cols-1/);
+    assert.match(grid.className, /lg:grid-cols-2/);
+    assert.equal(grid.children.length, 4);
+    assert.deepEqual(
+      grid.children.map((card) => card.children[0].textContent),
+      ["Alpha", "Bravo", "Charlie", "Delta"],
+    );
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("a delayed preview response cannot replace a newer selection", async () => {
   const previousWindow = globalThis.window;
   const previousFetch = globalThis.fetch;
