@@ -3,6 +3,7 @@ Rails.application.routes.draw do
     resources :messages, only: [:create]
     resources :chat_responses, only: [] do
       post :retry, on: :member, action: :retry_response
+      post :stop, on: :member
     end
   end
   resources :models, only: [:index, :show], constraints: {id: /[^\/]+/} do

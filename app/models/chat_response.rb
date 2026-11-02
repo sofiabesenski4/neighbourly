@@ -1,7 +1,8 @@
 class ChatResponse < ApplicationRecord
   class Busy < StandardError; end
 
-  ACTIVE_STATUSES = %w[queued searching writing].freeze
+  RUNNING_STATUSES = %w[searching writing].freeze
+  ACTIVE_STATUSES = %w[queued searching writing cancelling].freeze
   FAILED_MESSAGE = "The assistant couldn't finish this reply. Your question is saved. Please try again.".freeze
   LOOKUP_FAILED_MESSAGE = "Local resources couldn't be looked up. Your question is saved. Please try again.".freeze
 
@@ -9,7 +10,7 @@ class ChatResponse < ApplicationRecord
   belongs_to :user_message, class_name: "Message"
   belongs_to :assistant_message, class_name: "Message", optional: true
 
-  enum :status, %w[queued searching writing completed failed].index_with(&:itself), validate: true
+  enum :status, %w[queued searching writing cancelling completed failed cancelled].index_with(&:itself), validate: true
 
   scope :active, -> { where(status: ACTIVE_STATUSES) }
 
@@ -60,15 +61,56 @@ class ChatResponse < ApplicationRecord
     end
   end
 
+  def start_writing!
+    with_lock do
+      return false unless searching?
+
+      update!(status: "writing", heartbeat_at: Time.current)
+      true
+    end
+  end
+
+  def cancel!
+    with_lock do
+      if queued?
+        update!(status: "cancelled", error_message: nil, finished_at: Time.current, heartbeat_at: Time.current)
+      elsif RUNNING_STATUSES.include?(status)
+        # Keep the chat occupied until its worker has saved any partial reply.
+        update!(status: "cancelling", error_message: nil, heartbeat_at: Time.current)
+      end
+    end
+  end
+
+  def acknowledge_cancellation!
+    with_lock do
+      return false unless cancelling?
+
+      update!(status: "cancelled", error_message: nil, finished_at: Time.current, heartbeat_at: Time.current)
+      true
+    end
+  end
+
+  def cancellation_requested?
+    self.class.uncached { !RUNNING_STATUSES.include?(self.class.where(id: id).pick(:status)) }
+  end
+
+  def while_running
+    with_lock do
+      raise RubyLLM::CancelledError unless RUNNING_STATUSES.include?(status)
+
+      yield
+    end
+  end
+
   def fail!(message = FAILED_MESSAGE)
     with_lock do
-      update!(status: "failed", error_message: message, finished_at: Time.current, heartbeat_at: Time.current) if active?
+      update!(status: "failed", error_message: message, finished_at: Time.current, heartbeat_at: Time.current) if active? && !cancelling?
     end
   end
 
   def complete!
     with_lock do
-      return false unless active?
+      return false unless active? && !cancelling?
 
       update!(status: "completed", error_message: nil, finished_at: Time.current, heartbeat_at: Time.current)
       true
@@ -76,9 +118,12 @@ class ChatResponse < ApplicationRecord
   end
 
   def heartbeat!
-    return if heartbeat_at && heartbeat_at > 10.seconds.ago
+    with_lock do
+      return unless RUNNING_STATUSES.include?(status)
+      return if heartbeat_at && heartbeat_at > 10.seconds.ago
 
-    touch(:heartbeat_at)
+      touch(:heartbeat_at)
+    end
   end
 
   def enqueue_job
