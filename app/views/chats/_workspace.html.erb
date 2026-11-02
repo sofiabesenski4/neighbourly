@@ -28,7 +28,7 @@
     <div data-chat-scroll-target="viewport" data-action="scroll->chat-scroll#scrolled" class="h-full overflow-y-auto px-4 py-6" tabindex="0" aria-label="Conversation">
       <% if chat.persisted? %>
         <div id="messages" data-chat-scroll-target="content" class="mx-auto w-full max-w-3xl space-y-8">
-          <% chat.messages.where.not(id: nil).includes(:ruby_llm_usages).each do |message| %>
+            <% chat.messages.visible_in_conversation.includes(:ruby_llm_usages, :ruby_llm_tool_calls).each do |message| %>
             <%= render message %>
           <% end %>
         </div>
