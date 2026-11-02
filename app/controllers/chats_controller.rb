@@ -48,7 +48,20 @@ class ChatsController < ApplicationController
   def destroy
     authorize @chat
     @chat.destroy!
-    redirect_to chats_path, notice: "Chat was successfully destroyed.", status: :see_other
+
+    if params[:from] == "workspace"
+      @current_chat = policy_scope(Chat).find_by(id: params[:current_chat_id])
+      if @current_chat || params[:current_chat_id].blank?
+        respond_to do |format|
+          format.turbo_stream
+          format.html { redirect_to @current_chat || new_chat_path, notice: "Chat was successfully destroyed.", status: :see_other }
+        end
+      else
+        redirect_to new_chat_path, notice: "Chat was successfully destroyed.", status: :see_other
+      end
+    else
+      redirect_to chats_path, notice: "Chat was successfully destroyed.", status: :see_other
+    end
   end
 
   private
