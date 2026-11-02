@@ -4,8 +4,9 @@ class ChatResponseJob < ApplicationJob
   FALLBACK_RESPONSE = "Sorry, something went wrong while looking up local resources for your question. " \
     "Please start a new chat and try again.".freeze
 
-  def perform(chat_id, content)
+  def perform(chat_id, content, model: nil, provider: nil)
     chat = Chat.find(chat_id)
+    chat.with_model(model, provider: provider) if model
 
     begin
       result = RagContext.new.augment(content)

@@ -1,0 +1,13 @@
+<% options = (@chat_models || available_chat_models).map { |model| [model.label, model.id] }.uniq { |option| option.last } %>
+<% if chat.model %>
+  <% options.reject! { |option| option.last == chat.model_id } %>
+  <% options.unshift([chat.model.label, chat.model_id]) %>
+<% end %>
+<% selected_model = @selected_model.presence || chat.model_id || RubyLLM.config.default_model %>
+<div class="w-64 min-w-0 max-w-[calc(100%-3rem)]">
+  <%= label_tag "#{scope}_model", "Model", class: "sr-only" %>
+  <%= select_tag "#{scope}[model]", options_for_select(options, selected_model),
+      id: "#{scope}_model", title: "Model for your next message", aria: { describedby: "#{scope}_model_hint" },
+      class: "max-w-full rounded-full border-0 bg-stone-100 px-3 py-1.5 text-xs text-stone-600 focus:outline-sage-600" %>
+  <span id="<%= scope %>_model_hint" class="sr-only">Applies to your next message. Earlier replies are unchanged.</span>
+</div>

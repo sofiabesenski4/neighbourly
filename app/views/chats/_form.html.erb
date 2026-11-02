@@ -17,7 +17,8 @@
         class: ["block w-full resize-none border-0 bg-transparent px-1 py-1 text-sm leading-6 focus:outline-none", {"outline outline-red-400": chat.errors[:prompt].any?}] %>
   </div>
 
-  <div class="flex justify-end">
+  <div class="flex items-center justify-between gap-2">
+    <%= render "model_picker", chat: chat, scope: "chat" %>
     <%= form.button type: "submit", aria: { label: "Start new chat" }, class: "inline-flex h-9 w-9 items-center justify-center rounded-full bg-sage-600 text-white hover:bg-sage-700 focus-visible:outline-sage-600" do %>
       <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path stroke-linecap="round" stroke-linejoin="round" d="M12 19V5m-6 6 6-6 6 6" /></svg>
       <span class="sr-only">Start new chat</span>

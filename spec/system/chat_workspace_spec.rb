@@ -104,7 +104,7 @@ RSpec.describe "Chat workspace", type: :system do
     expect(find("#messages").evaluate_script("this.getBoundingClientRect().width")).to be <= 768
   end
 
-  it "submits the model selected in the header with the new-chat composer" do
+  it "submits the model selected in the composer for a new chat" do
     default_model = RubyLLM::Model.new(id: "claude-haiku-4-5", name: "Claude Haiku", provider: "anthropic")
     alternate_model = RubyLLM::Model.new(id: "claude-sonnet-4-5", name: "Claude Sonnet", provider: "anthropic")
     allow(RubyLLM).to receive(:models).and_return(RubyLLM::Models.new([default_model, alternate_model]))

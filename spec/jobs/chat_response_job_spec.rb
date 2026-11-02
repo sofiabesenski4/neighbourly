@@ -54,6 +54,29 @@ RSpec.describe ChatResponseJob, type: :job do
     }.not_to have_enqueued_job(ChatTitleJob)
   end
 
+  context "with a model selected for this message" do
+    let(:default_model) { RubyLLM::Model.new(id: "claude-haiku-4-5", name: "Claude Haiku", provider: "anthropic") }
+    let(:alternate_model) { RubyLLM::Model.new(id: "claude-sonnet-4-5", name: "Claude Sonnet", provider: "anthropic") }
+
+    before do
+      allow(RubyLLM).to receive(:models).and_return(RubyLLM::Models.new([default_model, alternate_model]))
+    end
+
+    it "uses the queued model rather than a later change to the conversation's model" do
+      previous = chat.messages.create!(role: "assistant", content: "An earlier answer")
+      chat.with_model(alternate_model.id, provider: "anthropic")
+      allow(Chat).to receive(:find).with(chat.id).and_return(chat)
+      expect(chat).to receive(:ask).with("Find meals") do
+        expect(chat.to_llm.model.id).to start_with(default_model.id)
+      end
+
+      described_class.perform_now(chat.id, "Find meals", model: default_model.id, provider: "anthropic")
+
+      expect(chat.reload.model_id).to eq(default_model.id)
+      expect(previous.reload.content).to eq("An earlier answer")
+    end
+  end
+
   context "when RAG documents are found" do
     let(:source) { Source.create!(name: "Test Source", url: "https://example.com", source_type: "html") }
     let(:documents) do
