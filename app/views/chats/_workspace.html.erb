@@ -13,7 +13,7 @@
     </div>
   </dialog>
 
-  <section aria-label="Chat workspace" data-controller="<%= "chat-scroll" if chat.persisted? %>" class="flex min-h-0 min-w-0 flex-1 flex-col">
+  <section aria-label="Chat workspace" data-controller="<%= "chat-scroll response-sync" if chat.persisted? %>" data-response-sync-url-value="<%= latest_chat_chat_responses_path(chat) if chat.persisted? %>" data-response-sync-stream-id-value="chat_<%= chat.id %>_stream" class="flex min-h-0 min-w-0 flex-1 flex-col">
     <header class="flex shrink-0 flex-wrap items-center gap-3 bg-white px-4 py-2">
       <button type="button" data-action="chat-workspace#toggleSidebar" data-chat-workspace-target="sidebarToggle" aria-label="Toggle conversation sidebar" aria-controls="chat_sidebar" aria-expanded="true" class="hidden rounded-lg px-2 py-2 text-stone-600 hover:bg-stone-100 md:inline-flex">
         <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M4 5h16v14H4zM9 5v14" /></svg>
@@ -29,7 +29,7 @@
       <% if chat.persisted? %>
         <div data-chat-scroll-target="content" class="mx-auto w-full max-w-3xl">
           <div id="messages" class="space-y-8">
-            <% chat.messages.visible_in_conversation.includes(:ruby_llm_usages, :ruby_llm_tool_calls).each do |message| %>
+            <% chat.messages.visible_in_conversation.includes(:ruby_llm_usages, :ruby_llm_tool_calls, rag_documents: :source).each do |message| %>
             <%= render message %>
           <% end %>
           </div>

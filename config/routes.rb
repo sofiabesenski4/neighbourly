@@ -2,6 +2,7 @@ Rails.application.routes.draw do
   resources :chats do
     resources :messages, only: [:create]
     resources :chat_responses, only: [] do
+      get :latest, on: :collection
       post :retry, on: :member, action: :retry_response
       post :stop, on: :member
     end
