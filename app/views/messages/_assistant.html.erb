@@ -1,8 +1,8 @@
 <% assistant ||= local_assigns[:message] %>
-<div id="message_<%= assistant.id %>" aria-label="Assistant message" class="min-w-0 space-y-3 text-stone-800">
+<div id="message_<%= assistant.id %>" aria-label="Assistant message" class="min-w-0 space-y-3 text-stone-800" data-controller="citations" data-action="markdown:rendered->citations#refresh click->citations#follow">
   <div data-controller="markdown">
     <div id="message_<%= assistant.id %>_content" data-markdown-target="source" class="whitespace-pre-wrap break-words"><%= assistant.content %></div>
-    <div data-markdown-target="output" class="assistant-markdown" hidden></div>
+    <div data-markdown-target="output" data-citations-target="content" class="assistant-markdown" hidden></div>
   </div>
 
   <%= render "messages/rag_context", message: assistant, show_report_button: true %>

@@ -67,5 +67,6 @@ export default class extends Controller {
       ALLOW_DATA_ATTR: false,
       ALLOW_ARIA_ATTR: false,
     });
+    this.dispatch("rendered");
   }
 }

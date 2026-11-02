@@ -32,3 +32,6 @@ application.register("composer", ComposerController);
 
 import ChatScrollController from "./chat_scroll_controller";
 application.register("chat-scroll", ChatScrollController);
+
+import CitationsController from "./citations_controller";
+application.register("citations", CitationsController);
