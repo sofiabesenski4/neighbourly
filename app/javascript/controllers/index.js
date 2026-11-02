@@ -29,3 +29,6 @@ application.register("conversation-menu", ConversationMenuController);
 
 import ComposerController from "./composer_controller";
 application.register("composer", ComposerController);
+
+import ChatScrollController from "./chat_scroll_controller";
+application.register("chat-scroll", ChatScrollController);
