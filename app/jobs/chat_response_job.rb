@@ -1,10 +1,14 @@
 class ChatResponseJob < ApplicationJob
+  discard_on ActiveRecord::RecordNotFound
+
   # Shown when we cannot look up local resources. Answering without them would
   # read as a grounded answer with no sources, so we ask for a fresh start.
   FALLBACK_RESPONSE = "Sorry, something went wrong while looking up local resources for your question. " \
     "Please start a new chat and try again.".freeze
 
-  def perform(chat_id, content, model: nil, provider: nil)
+  def perform(chat_id, content, model: nil, provider: nil, response_id: nil)
+    return ChatResponseRunner.new(response_id).call if response_id
+
     chat = Chat.find(chat_id)
     chat.with_model(model, provider: provider) if model
 

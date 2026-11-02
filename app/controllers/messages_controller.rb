@@ -27,17 +27,22 @@ class MessagesController < ApplicationController
         redirect_to @chat, alert: "That model is no longer available. Please choose another model.", status: :see_other
         return
       end
-      if requested_model
-        model_id, provider = selected_model.id, selected_model.provider
-        @selected_model = model_id
-        ChatResponseJob.perform_later(@chat.id, content, model: model_id, provider: provider.to_s)
-      else
-        ChatResponseJob.perform_later(@chat.id, content)
-      end
+      @selected_model = selected_model.id
+      ChatResponse.enqueue!(chat: @chat, content: content, model: selected_model.id, provider: selected_model.provider)
 
       respond_to do |format|
         format.turbo_stream
         format.html { redirect_to @chat }
+      end
+    end
+  rescue ChatResponse::Busy => error
+    @message = @chat.messages.build(content: content)
+    @message.errors.add(:base, error.message)
+    respond_to do |format|
+      format.turbo_stream { render :create, status: :conflict }
+      format.html do
+        @recent_chats = current_user.chats.order(created_at: :desc, id: :desc).limit(30).includes(:first_user_message)
+        render "chats/show", status: :conflict
       end
     end
   end

@@ -40,8 +40,10 @@ class ChatsController < ApplicationController
 
     prompt = params.dig(:chat, :prompt)
     if prompt.present?
-      @chat.save!
-      ChatResponseJob.perform_later(@chat.id, prompt)
+      Chat.transaction do
+        @chat.save!
+        ChatResponse.enqueue!(chat: @chat, content: prompt, model: selected_model.id, provider: selected_model.provider)
+      end
 
       redirect_to @chat, notice: "Chat was successfully created."
     end

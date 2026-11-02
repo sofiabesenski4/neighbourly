@@ -201,12 +201,18 @@ RSpec.describe "Rate limiting", type: :request do
 
     it "allows requests up to the burst limit" do
       expect {
-        10.times { post chat_messages_path(chat), params: params }
+        10.times do
+          post chat_messages_path(chat), params: params
+          chat.chat_responses.last&.complete!
+        end
       }.to have_enqueued_job(ChatResponseJob).exactly(10).times
     end
 
     it "turns the next request away with an explanation" do
-      10.times { post chat_messages_path(chat), params: params }
+      10.times do
+        post chat_messages_path(chat), params: params
+        chat.chat_responses.last&.complete!
+      end
 
       expect {
         post chat_messages_path(chat), params: params
@@ -217,7 +223,10 @@ RSpec.describe "Rate limiting", type: :request do
     end
 
     it "counts per user rather than per IP" do
-      10.times { post chat_messages_path(chat), params: params }
+      10.times do
+        post chat_messages_path(chat), params: params
+        chat.chat_responses.last&.complete!
+      end
       other_chat = other_user.chats.create!
       sign_in other_user
 

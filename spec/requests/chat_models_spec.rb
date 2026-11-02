@@ -19,7 +19,7 @@ RSpec.describe "Conversation model selection", type: :request do
 
     post chat_messages_path(chat), params: {message: {content: "Find food", model: alternate_model.id}}
 
-    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Find food", model: alternate_model.id, provider: "anthropic")
+    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Find food", model: alternate_model.id, provider: "anthropic", response_id: Integer)
     expect(chat.reload.model_id).to eq(original_model)
   end
 
