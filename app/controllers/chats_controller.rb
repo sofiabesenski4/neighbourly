@@ -51,6 +51,7 @@ class ChatsController < ApplicationController
 
   def show
     authorize @chat
+    ChatResponseRecovery.call(@chat)
     @message = @chat.messages.build
   end
 

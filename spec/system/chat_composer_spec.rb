@@ -37,7 +37,7 @@ RSpec.describe "Chat composer ergonomics", type: :system do
 
     expect(page).to have_content("Chat was successfully created.")
     expect(Chat.last.model_id).to eq(alternate_model.id)
-    expect(ChatResponseJob).to have_received(:perform_later).with(Chat.last.id, "Find free meals in Victoria", hash_including(model: alternate_model.id, provider: "anthropic", response_id: Integer)).once
+    expect(ChatResponseJob).to have_received(:perform_later).with(Chat.last.id, "Find free meals in Victoria", hash_including(model: alternate_model.id, provider: "anthropic", response_id: Integer, attempt_token: String)).once
   end
 
   it "inserts a newline with Shift+Enter and continues working after the composer is replaced" do
@@ -50,14 +50,14 @@ RSpec.describe "Chat composer ergonomics", type: :system do
 
     find_field("Message").send_keys(:enter)
     expect(page).to have_field("Message", with: "")
-    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Find meals\nin Victoria", model: chat.model_id, provider: chat.provider.to_s, response_id: Integer).once
+    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Find meals\nin Victoria", model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String).once
 
     chat.chat_responses.last.complete!
     expect(page).not_to have_content("Getting ready…")
     fill_in "Message", with: "What is open today?"
     find_field("Message").send_keys(:enter)
     expect(page).to have_field("Message", with: "")
-    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is open today?", model: chat.model_id, provider: chat.provider.to_s, response_id: Integer).once
+    expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is open today?", model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String).once
   end
 
   it "does not send blank drafts" do
