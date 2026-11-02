@@ -33,6 +33,24 @@ class ChatResponse < ApplicationRecord
     ACTIVE_STATUSES.include?(status)
   end
 
+  def retry!
+    chat.with_lock do
+      with_lock do
+        return :conflict unless failed? && chat.chat_responses.maximum(:id) == id
+        return :conflict if chat.chat_responses.active.exists?
+        return :unavailable unless ChatModelAvailability.new.find(model_id, provider: provider)
+
+        # A failed partial answer must not become history for its replacement.
+        assistant_message&.destroy!
+        self.assistant_message = nil
+        update!(status: "queued", error_message: nil, started_at: nil,
+          finished_at: nil, heartbeat_at: Time.current)
+        ActiveRecord.after_all_transactions_commit { enqueue_job }
+        :queued
+      end
+    end
+  end
+
   def claim!
     with_lock do
       return false unless queued?
