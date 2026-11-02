@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Keep conversation actions visible on touch devices and during keyboard use. */
+@media (hover: hover) and (pointer: fine) {
+  .conversation-menu-trigger {
+    opacity: 0;
+  }
+  .conversation-row:hover .conversation-menu-trigger,
+  .conversation-row:focus-within .conversation-menu-trigger,
+  .conversation-menu-trigger[aria-expanded="true"] {
+    opacity: 1;
+  }
+}
+
 @theme {
   /* Soft Neutral Color Scheme */
   --color-stone-50: #fafaf9;

@@ -23,3 +23,6 @@ application.register("markdown", MarkdownController);
 
 import ChatWorkspaceController from "./chat_workspace_controller";
 application.register("chat-workspace", ChatWorkspaceController);
+
+import ConversationMenuController from "./conversation_menu_controller";
+application.register("conversation-menu", ConversationMenuController);
