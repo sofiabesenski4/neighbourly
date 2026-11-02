@@ -13,7 +13,7 @@
     </div>
   </dialog>
 
-  <section aria-label="Chat workspace" class="flex min-h-0 min-w-0 flex-1 flex-col">
+  <section aria-label="Chat workspace" data-controller="<%= "chat-scroll" if chat.persisted? %>" class="flex min-h-0 min-w-0 flex-1 flex-col">
     <header class="flex shrink-0 flex-wrap items-center gap-3 bg-white px-4 py-2">
       <button type="button" data-action="chat-workspace#toggleSidebar" data-chat-workspace-target="sidebarToggle" aria-label="Toggle conversation sidebar" aria-controls="chat_sidebar" aria-expanded="true" class="hidden rounded-lg px-2 py-2 text-stone-600 hover:bg-stone-100 md:inline-flex">
         <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M4 5h16v14H4zM9 5v14" /></svg>
@@ -24,9 +24,10 @@
       <h1 data-chat-title="<%= chat.id %>" class="min-w-0 flex-1 truncate text-sm font-medium text-stone-700"><%= chat_title(chat) %></h1>
     </header>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-6" tabindex="0" aria-label="Conversation">
+    <div class="relative min-h-0 flex-1">
+    <div data-chat-scroll-target="viewport" data-action="scroll->chat-scroll#scrolled" class="h-full overflow-y-auto px-4 py-6" tabindex="0" aria-label="Conversation">
       <% if chat.persisted? %>
-        <div id="messages" class="mx-auto w-full max-w-3xl space-y-8">
+        <div id="messages" data-chat-scroll-target="content" class="mx-auto w-full max-w-3xl space-y-8">
           <% chat.messages.where.not(id: nil).includes(:ruby_llm_usages).each do |message| %>
             <%= render message %>
           <% end %>
@@ -41,6 +42,10 @@
           </div>
         </div>
       <% end %>
+    </div>
+    <% if chat.persisted? %>
+      <button type="button" data-chat-scroll-target="jump" data-action="chat-scroll#jumpToLatest" hidden class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm text-stone-600 shadow-sm focus-visible:outline-sage-600">Jump to latest</button>
+    <% end %>
     </div>
 
     <div class="shrink-0 bg-white px-4 py-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
