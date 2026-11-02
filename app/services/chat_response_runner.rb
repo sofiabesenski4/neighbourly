@@ -9,10 +9,13 @@ class ChatResponseRunner
 
     @chat = @response.chat
     @chat.with_model(@response.model_id, provider: @response.provider)
+    @chat.to_llm.cancellation_checker = -> { @response.cancellation_requested? }
+    checkpoint!
     result = RagContext.new.augment(@response.user_message.content)
     @documents = result.documents
+    checkpoint!
     @chat.with_instructions(result.instructions, append: true, persist: false) if result.instructions.present?
-    @response.update!(status: "writing", heartbeat_at: Time.current)
+    raise RubyLLM::CancelledError unless @response.start_writing!
 
     @chat.before_message do
       # This is the SDK's own newly-created placeholder, not another record
@@ -21,20 +24,31 @@ class ChatResponseRunner
       @assistant = @chat.messages.target.last
       raise "The assistant placeholder was not created" unless @assistant&.role == "assistant"
 
-      @response.update!(assistant_message: @assistant)
+      @response.while_running { @response.update!(assistant_message: @assistant) }
     end
 
     @chat.complete do |chunk|
       next if chunk.content.blank?
 
-      @assistant.content = @assistant.content.to_s + chunk.content
-      @assistant.broadcast_append_chunk(chunk.content)
-      @response.heartbeat!
+      @response.while_running do
+        @assistant.content = @assistant.content.to_s + chunk.content
+        @assistant.broadcast_append_chunk(chunk.content)
+        @response.heartbeat!
+      end
     end
 
-    link_documents
-    if @response.complete! && @chat.title.blank?
-      ChatTitleJob.perform_later(@chat.id)
+    checkpoint!
+    @response.while_running { link_documents }
+    raise RubyLLM::CancelledError unless @response.complete!
+
+    ChatTitleJob.perform_later(@chat.id) if @chat.title.blank?
+  rescue RubyLLM::CancelledError
+    record_cancellation
+  rescue ActiveRecord::RecordNotFound => error
+    # The user can delete the conversation between a checkpoint and a lock.
+    unless @response && !ChatResponse.exists?(@response.id)
+      record_failure(error)
+      raise
     end
   rescue RubyLLM::Error, Faraday::Error => error
     record_failure(error)
@@ -45,23 +59,50 @@ class ChatResponseRunner
 
   private
 
+  def checkpoint!
+    raise RubyLLM::CancelledError if @response.cancellation_requested?
+  end
+
+  def record_cancellation
+    return unless @response&.persisted?
+
+    @response.with_lock do
+      return unless @response.cancelling?
+
+      persist_partial
+      @response.acknowledge_cancellation!
+    end
+  rescue ActiveRecord::RecordNotFound
+    # Deleting a conversation also removes its response and SDK placeholder.
+    nil
+  end
+
   def record_failure(error)
     return unless @response&.persisted?
 
-    if @assistant&.persisted? && @assistant.content.present?
-      @assistant.save!
-      link_documents
+    @response.while_running do
+      persist_partial
+      message = @response.searching? ? ChatResponse::LOOKUP_FAILED_MESSAGE : ChatResponse::FAILED_MESSAGE
+      @response.fail!(message)
     end
-    message = @response.searching? ? ChatResponse::LOOKUP_FAILED_MESSAGE : ChatResponse::FAILED_MESSAGE
-    @response.fail!(message)
     Rails.error.report(error, context: {chat_id: @response.chat_id, chat_response_id: @response.id})
+  rescue RubyLLM::CancelledError, ActiveRecord::RecordNotFound
+    record_cancellation
+  end
+
+  def persist_partial
+    return unless @assistant&.persisted? && @assistant.content.present?
+    return unless Message.visible_in_conversation.exists?(id: @assistant.id)
+
+    @assistant.save!
+    link_documents
   end
 
   def link_documents
     return if @documents.blank?
 
     @response.user_message.rag_documents = @documents
-    if @assistant&.persisted?
+    if @assistant&.persisted? && Message.visible_in_conversation.exists?(id: @assistant.id)
       @assistant.rag_documents = @documents
       @assistant.broadcast_rag_context
     end

@@ -72,9 +72,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
     t.datetime "updated_at", null: false
     t.index ["assistant_message_id"], name: "index_chat_responses_on_assistant_message_id"
     t.index ["chat_id", "created_at"], name: "index_chat_responses_on_chat_id_and_created_at"
-    t.index ["chat_id"], name: "index_chat_responses_one_active_per_chat", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying])::text[]))"
+    t.index ["chat_id"], name: "index_chat_responses_one_active_per_chat", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'cancelling'::character varying])::text[]))"
     t.index ["user_message_id"], name: "index_chat_responses_on_user_message_id", unique: true
-    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'completed'::character varying, 'failed'::character varying]::text[])", name: "chat_responses_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'cancelling'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])", name: "chat_responses_status_check"
   end
 
   create_table "chats", force: :cascade do |t|
