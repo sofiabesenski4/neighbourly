@@ -18,6 +18,9 @@ application.register("mobile-menu", MobileMenuController);
 
 import FlyerBuilderController from "./flyer_builder_controller";
 application.register("flyer-builder", FlyerBuilderController);
+import FlashController from "./flash_controller";
+application.register("flash", FlashController);
+
 import MarkdownController from "./markdown_controller";
 application.register("markdown", MarkdownController);
 
