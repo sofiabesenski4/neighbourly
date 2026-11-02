@@ -21,7 +21,7 @@ RSpec.describe "Retrying a chat response", type: :model do
     expect {
       expect { expect(response_record.retry!).to eq(:queued) }
         .not_to change(Message, :count)
-    }.to have_enqueued_job(ChatResponseJob).with(chat.id, "Find free meals", model: original_model, provider: original_provider, response_id: response_record.id)
+    }.to have_enqueued_job(ChatResponseJob).with(chat.id, "Find free meals", model: original_model, provider: original_provider, response_id: response_record.id, attempt_token: kind_of(String))
 
     expect(response_record.reload).to have_attributes(status: "queued", user_message_id: original_question,
       model_id: original_model, provider: original_provider, started_at: nil, finished_at: nil, error_message: nil)

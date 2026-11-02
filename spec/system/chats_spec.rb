@@ -49,7 +49,7 @@ RSpec.describe "Chats", type: :system do
       click_button "Start new chat"
 
       chat = Chat.last
-      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is Ruby on Rails?")
+      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is Ruby on Rails?", hash_including(model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String))
     end
 
     it "lists existing chats on the index page" do
@@ -108,7 +108,7 @@ RSpec.describe "Chats", type: :system do
       fill_in "Message", with: "Follow-up question"
       click_button "Send message"
 
-      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question", model: chat.model_id, provider: chat.provider.to_s)
+      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question", hash_including(model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String))
     end
   end
 

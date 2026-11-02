@@ -15,7 +15,7 @@ class ChatResponsesController < ApplicationController
     only: :retry_response, name: "sustained", scope: "chat_replies"
 
   def retry_response
-    case @chat_response.retry!
+    case @chat_response.retry!(expected_token: params[:attempt_token].presence)
     when :queued
       respond_to do |format|
         format.turbo_stream { render_status }
@@ -29,7 +29,10 @@ class ChatResponsesController < ApplicationController
   end
 
   def stop
-    @chat_response.cancel!
+    unless @chat_response.cancel!(expected_token: params[:attempt_token].presence)
+      render_error("This reply has changed. Please try again from the current conversation.", :conflict)
+      return
+    end
     respond_to do |format|
       format.turbo_stream { render_status }
       format.html { redirect_to @chat, status: :see_other }
@@ -37,6 +40,7 @@ class ChatResponsesController < ApplicationController
   end
 
   def latest
+    ChatResponseRecovery.call(@chat)
     latest_response = @chat.latest_response
     boundary = Integer(params[:after_response_id], exception: false).to_i.clamp(0, latest_response&.id || 0)
     responses = @chat.chat_responses.where(id: boundary..).includes(:user_message,

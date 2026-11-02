@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_01_020000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_01_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -56,6 +56,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_01_020000) do
     t.datetime "heartbeat_at", default: -> { "CURRENT_TIMESTAMP" }, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.uuid "attempt_token", default: -> { "gen_random_uuid()" }, null: false
     t.index ["assistant_message_id"], name: "index_chat_responses_on_assistant_message_id"
     t.index ["chat_id", "created_at"], name: "index_chat_responses_on_chat_id_and_created_at"
     t.index ["chat_id"], name: "index_chat_responses_one_active_per_chat", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'cancelling'::character varying])::text[]))"

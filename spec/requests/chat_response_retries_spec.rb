@@ -23,7 +23,7 @@ RSpec.describe "Chat response retries", type: :request do
     expect(response.body).to include("Getting ready")
     expect(response_record.reload).to be_queued
     expect(ChatResponseJob).to have_been_enqueued.with(chat.id, "Find free meals",
-      model: response_record.model_id, provider: response_record.provider, response_id: response_record.id).once
+      model: response_record.model_id, provider: response_record.provider, response_id: response_record.id, attempt_token: response_record.attempt_token).once
   end
 
   it "keeps the failed reply's retry control after refreshing the conversation" do
