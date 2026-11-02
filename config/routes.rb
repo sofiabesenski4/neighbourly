@@ -1,6 +1,9 @@
 Rails.application.routes.draw do
   resources :chats do
     resources :messages, only: [:create]
+    resources :chat_responses, only: [] do
+      post :retry, on: :member, action: :retry_response
+    end
   end
   resources :models, only: [:index, :show], constraints: {id: /[^\/]+/} do
     collection do
