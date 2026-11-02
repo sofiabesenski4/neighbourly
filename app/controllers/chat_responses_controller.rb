@@ -27,6 +27,14 @@ class ChatResponsesController < ApplicationController
     end
   end
 
+  def stop
+    @chat_response.cancel!
+    respond_to do |format|
+      format.turbo_stream { render_status }
+      format.html { redirect_to @chat, status: :see_other }
+    end
+  end
+
   private
 
   def set_chat_response
