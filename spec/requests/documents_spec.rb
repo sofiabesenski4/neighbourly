@@ -10,6 +10,7 @@ RSpec.describe "Documents", type: :request do
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
+    ["Meals", "Shelters", "Clothing"].each { |name| Category.find_or_create_by!(name: name) }
   end
 
   let(:document) { form_source.documents.create!(title: "Test Shelter", content: "Test Shelter\nCity: Victoria") }
@@ -25,7 +26,7 @@ RSpec.describe "Documents", type: :request do
         email: "info@example.org",
         website: "https://example.org",
         hours: "Mon-Sun 7am-11pm",
-        categories: "shelter, meals, clothing",
+        categories: "Shelters, Meals, Clothing",
         age_min: "19",
         age_max: "",
         gender: "all",
@@ -73,12 +74,13 @@ RSpec.describe "Documents", type: :request do
 
         doc = Document.last
         expect(doc.title).to eq("Harbour Street Society")
+        expect(doc.category_names).to eq(["Clothing", "Meals", "Shelters"])
         expect(doc.content).to include("Harbour Street Society")
         expect(doc.content).to include("City: Victoria")
         expect(doc.content).to include("Address: 100 Harbour St")
         expect(doc.content).to include("Phone: 250-555-0100")
         expect(doc.content).to include("Hours: Mon-Sun 7am-11pm")
-        expect(doc.content).to include("Categories: shelter, meals, clothing")
+        expect(doc.content).to include("Categories: Shelters, Meals, Clothing")
         expect(doc.content).to include("Age range: 19+")
         expect(doc.content).to include("Description: Drop-in centre offering meals and shelter")
       end
@@ -93,7 +95,6 @@ RSpec.describe "Documents", type: :request do
         expect(meta["email"]).to eq("info@example.org")
         expect(meta["website"]).to eq("https://example.org")
         expect(meta["hours"]).to eq("Mon-Sun 7am-11pm")
-        expect(meta["categories"]).to eq(["shelter", "meals", "clothing"])
         expect(meta["age_range"]).to eq({"min" => 19})
         expect(meta["gender"]).to eq(["all"])
         expect(meta["notes"]).to eq("No referral needed")
