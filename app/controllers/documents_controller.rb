@@ -21,8 +21,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-
-    if @document.save
+    if @document.save_with_category_names(build_categories)
       redirect_to sources_path, notice: "Resource '#{@document.title}' was created."
     else
       render :new, status: :unprocessable_entity
@@ -41,8 +40,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-
-    if @document.save
+    if @document.save_with_category_names(build_categories)
       redirect_to @document, notice: "Resource '#{@document.title}' was updated."
     else
       render :edit, status: :unprocessable_entity
@@ -90,6 +88,10 @@ class DocumentsController < ApplicationController
     parts.join("\n")
   end
 
+  def build_categories
+    document_params[:categories].to_s.split(",").map(&:strip).reject(&:blank?)
+  end
+
   def build_metadata
     p = document_params
     meta = {}
@@ -106,7 +108,6 @@ class DocumentsController < ApplicationController
       }.compact
     end
     meta[:gender] = p[:gender].split(",").map(&:strip).reject(&:blank?) if p[:gender].present?
-    meta[:categories] = p[:categories].split(",").map(&:strip).reject(&:blank?) if p[:categories].present?
     meta[:description] = p[:description] if p[:description].present?
     meta[:notes] = p[:notes] if p[:notes].present?
     meta

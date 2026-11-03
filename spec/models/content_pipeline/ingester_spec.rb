@@ -6,12 +6,14 @@ RSpec.describe ContentPipeline::Ingester do
   let(:fake_vector) { Array.new(1536) { rand(-1.0..1.0) } }
 
   let(:api_response) do
-    [{"id" => 1, "post_title" => "Test Shelter", "location" => {"city" => {"label" => "Vancouver"}}}].to_json
+    [{"id" => 1, "post_title" => "Test Shelter", "location" => {"city" => {"label" => "Vancouver"}},
+      "taxonomies" => [{"name" => "Food Banks"}, {"name" => "Shelters"}]}].to_json
   end
 
   before do
     allow_any_instance_of(ContentPipeline::Fetcher).to receive(:call).and_return(api_response)
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
+    %w[Food\ Banks Shelters].each { |name| Category.find_or_create_by!(name: name) }
   end
 
   describe "#call" do
@@ -22,8 +24,12 @@ RSpec.describe ContentPipeline::Ingester do
       expect(doc.title).to eq("Test Shelter")
       expect(doc.content).to include("Test Shelter")
       expect(doc.content).to include("City: Vancouver")
+      expect(doc.content).to include("Categories: Food Banks, Shelters")
+      expect(doc.category_names).to eq(["Food Banks", "Shelters"])
+      expect(doc.metadata).not_to have_key("categories")
       expect(doc.source).to eq(source)
       expect(doc.embedding).not_to be_nil
+      expect(ContentPipeline::Embedder).to have_received(:embed).with(doc.content)
     end
 
     it "updates the source's last_fetched_at timestamp" do
