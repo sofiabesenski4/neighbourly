@@ -11,6 +11,27 @@ RSpec.describe ResourceCategorySearch do
     source.documents.create!(title: title, content: title, metadata: {resource_categories: categories}.merge(extra))
   end
 
+  it "filters and groups database categories without metadata tags" do
+    %w[Meals Shelters Showers].each { |name| Category.find_or_create_by!(name: name) }
+    meals = source.documents.create!(title: "Meals", content: "Meals", category_names: ["Meals", "Showers"])
+    shelter = source.documents.create!(title: "Shelter", content: "Shelter", category_names: ["Shelters"])
+
+    sections = described_class.call(categories: ["food", "hygiene"])
+
+    expect(sections.map(&:resources)).to eq([[meals], [meals]])
+    expect(described_class.call(categories: ["shelter"]).first.resources).to eq([shelter])
+    expect(described_class.call(categories: []).last.resources).not_to include(meals, shelter)
+  end
+
+  it "prefers database categories to stale legacy tags" do
+    Category.find_or_create_by!(name: "Shelters")
+    listing = resource("Shelter", ["food"])
+    listing.update!(category_names: ["Shelters"])
+
+    expect(described_class.call(categories: ["food"]).first.resources).to be_empty
+    expect(described_class.call(categories: ["shelter"]).first.resources).to eq([listing])
+  end
+
   it "returns any selected category, grouped in the shared category order" do
     food = resource("Meals", ["food"])
     shelter = resource("Shelter", ["shelter"])

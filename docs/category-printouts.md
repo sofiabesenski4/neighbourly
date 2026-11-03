@@ -98,16 +98,20 @@ Unknown categories and malformed filter parameters are rejected.
 
 ## Existing data
 
-Category matching uses `metadata.resource_categories`, as introduced by the
-base `feat/resource-categories` branch. After updating an existing database,
-run its backfill once:
+Category matching uses the document's database category associations, mapped
+into printable groups by `ResourceCategory`. Records with no associated
+categories continue to use legacy `metadata.resource_categories` tags. Database
+categories take precedence when both are present, so older tags cannot put a
+recategorized resource in the wrong section. Categories outside the printable
+groups appear under Other resources in an unfiltered guide.
+
+The resource form and imports save existing database categories. The optional
+backfill task can refresh legacy group keys from those associations (or older
+metadata labels) without generating new embeddings:
 
 ```sh
 bin/rails resources:categorize
 ```
-
-This updates metadata without generating new embeddings. New imports and
-form entries already set these category keys on the base branch.
 
 `ResourceCard` exposes a fixed allowlist of public card fields. Missing
 values remove the whole field, including its label. `Notes` precedes

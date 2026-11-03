@@ -37,6 +37,17 @@ RSpec.describe "resources rake tasks" do
       expect(picked.reload.metadata["resource_categories"]).to eq(["food", "shelter"])
     end
 
+    it "uses database associations and preserves legacy tags without labels" do
+      Category.find_or_create_by!(name: "Meals")
+      listing = source.documents.create!(content: "Meals", category_names: ["Meals"])
+      legacy = source.documents.create!(content: "Legacy", metadata: {resource_categories: ["shelter"]})
+
+      expect { task.execute }.to output(/Updated resource categories on 1 document$/).to_stdout
+
+      expect(listing.reload.metadata["resource_categories"]).to eq(["food"])
+      expect(legacy.reload.metadata["resource_categories"]).to eq(["shelter"])
+    end
+
     it "does not re-embed documents" do
       source.documents.create!(content: "Drop-in", external_id: "1", metadata: {categories: ["Meals"]})
 

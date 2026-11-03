@@ -5,7 +5,10 @@ namespace :resources do
 
     Document.find_each do |document|
       metadata = document.metadata || {}
-      keys = ResourceCategory.keys_for(metadata["categories"])
+      names = document.category_names.presence || metadata["categories"]
+      next if names.blank?
+
+      keys = ResourceCategory.keys_for(names)
       next if Array(metadata["resource_categories"]) == keys
 
       # Only metadata changes, so the document is not re-embedded.

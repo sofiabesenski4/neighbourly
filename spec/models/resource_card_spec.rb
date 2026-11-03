@@ -7,6 +7,13 @@ RSpec.describe ResourceCard do
     described_class.new(Document.new(title: title, content: content, metadata: metadata, source: source))
   end
 
+  it "uses database category names for service labels" do
+    document = Document.new(content: "Resource", source: source)
+    document.categories.build(name: "Meals")
+
+    expect(described_class.new(document).fields).to include({label: "Services", value: "Meals"})
+  end
+
   it "omits complete fields whose values are missing" do
     expect(card.fields).to be_empty
     expect(card(metadata: {notes: " ", hours: nil, phone: [], email: ""}).fields).to be_empty

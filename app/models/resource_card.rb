@@ -19,7 +19,7 @@ class ResourceCard
     address = value("address", "Address")
     city = value("city", "City")
     rows = [
-      ["Services", value("description", "Description") || value("categories", "Categories")],
+      ["Services", value("description", "Description") || text(document.category_names) || value("categories", "Categories")],
       ["Address", address && [address, city].compact.join(", ")],
       ["City", (city unless address)],
       ["Hours", value("hours", "Hours")],

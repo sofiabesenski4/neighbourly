@@ -5,18 +5,18 @@
 class ResourceCategory < Data.define(:key, :name, :labels)
   ALL = [
     new(key: "food", name: "Food", labels: [
-      "Meals", "Food bank", "Food support"
+      "Meals", "Food bank", "Food Banks", "Food support"
     ]),
     new(key: "shelter", name: "Shelter & housing", labels: [
-      "Emergency shelter", "Shelter", "Seasonal shelter", "Youth emergency shelter",
+      "Shelters", "Housing Services", "Emergency shelter", "Shelter", "Seasonal shelter", "Youth emergency shelter",
       "Shelter and drop-in support", "Transition house", "Transitional housing"
     ]),
     new(key: "health", name: "Health", labels: [
-      "Health services", "Medical support", "Primary health care", "Nursing care",
+      "Health Care", "Health services", "Medical support", "Primary health care", "Nursing care",
       "Dental care", "Foot care"
     ]),
     new(key: "harm_reduction", name: "Harm reduction", labels: [
-      "Harm reduction", "Naloxone", "Naloxone training", "Overdose prevention",
+      "Harm Reduction Resources", "Harm reduction", "Naloxone", "Naloxone training", "Overdose prevention",
       "Supervised consumption", "Substance use support"
     ]),
     new(key: "hygiene", name: "Hygiene & essentials", labels: [
@@ -27,10 +27,10 @@ class ResourceCategory < Data.define(:key, :name, :labels)
       "Legal advice", "Legal clinics", "Legal support", "Civil law", "Criminal law", "Family law"
     ]),
     new(key: "counselling", name: "Counselling & support", labels: [
-      "Counselling", "Counselling and referrals", "Peer support", "Support groups", "Outreach"
+      "Mental Health Support", "Counselling", "Counselling and referrals", "Peer support", "Support groups", "Outreach"
     ]),
     new(key: "family", name: "Family & youth", labels: [
-      "Family services", "Family violence support", "Youth and family mediation"
+      "Youth Services", "Family services", "Family violence support", "Youth and family mediation"
     ])
   ].freeze
 

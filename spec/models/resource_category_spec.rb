@@ -22,6 +22,12 @@ RSpec.describe ResourceCategory do
       expect(described_class.keys_for(["Pet Friendly", "Meals"])).to eq(["food"])
     end
 
+    it "maps the database seed labels to printable groups" do
+      expect(described_class.keys_for(["Food Banks", "Shelters", "Housing Services", "Health Care",
+        "Harm Reduction Resources", "Mental Health Support", "Youth Services"]))
+        .to eq(["food", "shelter", "health", "harm_reduction", "counselling", "family"])
+    end
+
     it "returns nothing for no labels" do
       expect(described_class.keys_for(nil)).to eq([])
     end

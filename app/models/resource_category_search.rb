@@ -24,20 +24,20 @@ class ResourceCategorySearch
     end
 
     resources = resources
-      .includes(:source)
+      .includes(:source, :categories)
       .order(Arel.sql("LOWER(documents.title) ASC"), :id)
       .to_a
 
     sections = selected.map do |category|
       Section.new(category: category, resources: resources.select { |resource|
-        Array(resource.metadata["resource_categories"]).include?(category.key)
+        resource.resource_category_keys.include?(category.key)
       })
     end
 
     if unfiltered
       known_keys = selected.map(&:key)
       other_resources = resources.reject { |resource|
-        Array(resource.metadata["resource_categories"]).intersect?(known_keys)
+        resource.resource_category_keys.intersect?(known_keys)
       }
       if other_resources.any?
         category = ResourceCategory.new(key: "uncategorized", name: "Other resources", labels: [])

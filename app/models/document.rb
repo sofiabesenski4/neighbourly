@@ -13,8 +13,20 @@ class Document < ApplicationRecord
 
   scope :with_embeddings, -> { where.not(embedding: nil) }
 
-  # Documents tagged with a ResourceCategory key, e.g. in_category("food").
-  scope :in_category, ->(key) { where("metadata @> ?", {resource_categories: [key]}.to_json) }
+  # Database categories take precedence over legacy metadata tags.
+  scope :in_category, ->(key) {
+    terms = ResourceCategory.with_keys([key]).flat_map(&:terms).map { |term| term.strip.downcase }
+    categorized = joins(:categories).where("LOWER(TRIM(categories.name)) IN (?)", terms).select(:id)
+    legacy = where.not(id: joins(:categories).select(:id))
+      .where("metadata @> ?", {resource_categories: [key]}.to_json)
+    where(id: categorized).or(legacy)
+  }
+
+  def resource_category_keys
+    names = category_names
+    names.any? ? ResourceCategory.keys_for(names) : Array(metadata["resource_categories"])
+  end
+
   def category_names
     categories.map(&:name)
   end
