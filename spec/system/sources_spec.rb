@@ -71,14 +71,15 @@ RSpec.describe "Sources", type: :system do
 
     it "shows form-created documents on the sources page" do
       form_source = Source.form_entry_source
-      form_source.documents.create!(title: "Manual Resource", content: "test", metadata: {city: "Victoria", categories: ["shelter"]})
+      Category.find_or_create_by!(name: "Shelters")
+      form_source.documents.create!(title: "Manual Resource", content: "test", category_names: ["Shelters"], metadata: {city: "Victoria"})
 
       visit sources_path
 
       expect(page).to have_content("Manual Resource")
       expect(page).to have_content("FORM")
       expect(page).to have_content("Victoria")
-      expect(page).to have_content("shelter")
+      expect(page).to have_content("Shelters")
     end
 
     describe "viewing a source" do

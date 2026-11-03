@@ -27,10 +27,7 @@ class ChatsController < ApplicationController
   end
 
   def create
-    @chat = current_user.chats.build(
-      model: params.dig(:chat, :model).presence,
-      use_rag: params.dig(:chat, :use_rag) == "1"
-    )
+    @chat = current_user.chats.build(model: params.dig(:chat, :model).presence)
     authorize @chat
 
     prompt = params.dig(:chat, :prompt)

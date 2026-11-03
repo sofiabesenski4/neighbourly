@@ -17,11 +17,81 @@ RSpec.describe Document, type: :model do
   end
 
   describe "associations" do
+    before do
+      ["Shelters", "Meals"].each { |name| Category.find_or_create_by!(name: name) }
+    end
+
     it "belongs to a source" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
 
       doc = source.documents.create!(content: "test", external_id: "1")
       expect(doc.source).to eq(source)
+    end
+
+    it "shares categories between documents" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      first = source.documents.create!(content: "first", external_id: "1", category_names: ["Shelters"])
+      second = source.documents.create!(content: "second", external_id: "2", category_names: ["Shelters"])
+
+      expect(first.categories.first).to eq(second.categories.first)
+    end
+
+    it "ignores category names that are not in the categories table" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      document = source.documents.create!(
+        content: "test",
+        external_id: "unknown-category",
+        category_names: ["unseeded"]
+      )
+
+      expect(document.categories).to be_empty
+      expect(Category.exists?(name: "unseeded")).to be false
+    end
+
+    it "keeps categories when their document is deleted" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      document = source.documents.create!(content: "test", external_id: "orphan", category_names: ["Shelters"])
+      category = document.categories.first
+
+      document.destroy!
+
+      expect(category.reload.documents).to be_empty
+    end
+
+    it "keeps categories that are still associated with other documents" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      first = source.documents.create!(content: "first", external_id: "first", category_names: ["Shelters"])
+      second = source.documents.create!(content: "second", external_id: "second", category_names: ["Shelters"])
+      category = first.categories.first
+
+      first.destroy!
+
+      expect(category.reload.documents).to eq([second])
+    end
+
+    it "keeps old categories after replacing a document's categories" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      document = source.documents.create!(content: "test", external_id: "replace", category_names: ["Shelters"])
+      old_category = document.categories.first
+
+      document.category_names = ["Meals"]
+
+      expect(old_category.reload.documents).to be_empty
+      expect(document.reload.category_names).to eq(["Meals"])
+    end
+
+    it "rolls back category replacement when the document save fails" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      document = source.documents.create!(content: "original", external_id: "rollback", category_names: ["Shelters"])
+      old_category = document.categories.first
+      allow(ContentPipeline::Embedder).to receive(:embed).and_raise(RubyLLM::Error.new("API down"))
+      document.content = "updated"
+
+      expect(document.save_with_category_names(["Meals"])).to be false
+
+      expect(old_category.reload.documents).to eq([document])
+      expect(Category.find_by!(name: "Meals").documents).to be_empty
+      expect(document.reload.category_names).to eq(["Shelters"])
     end
   end
 
@@ -60,6 +130,18 @@ RSpec.describe Document, type: :model do
       doc = source.documents.build(content: "Will fail", external_id: "auto-4")
       expect(doc.save).to be false
       expect(doc.errors[:base]).to include(a_string_matching(/Failed to generate embedding/))
+    end
+
+    it "prevents saving an empty provider embedding as a zero vector" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_call_original
+      allow(RubyLLM).to receive(:embed).and_return(instance_double(RubyLLM::Embedding, vectors: []))
+
+      doc = source.documents.build(content: "Will fail", external_id: "auto-empty")
+
+      expect(doc.save).to be false
+      expect(doc).not_to be_persisted
+      expect(doc.embedding).to be_nil
+      expect(doc.errors[:base]).to include(a_string_matching(/Failed to generate embedding.*empty vector/))
     end
   end
 

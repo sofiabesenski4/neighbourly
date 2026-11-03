@@ -21,8 +21,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-
-    if @document.save
+    if @document.save_with_category_names(build_categories)
       redirect_to sources_path, notice: "Resource '#{@document.title}' was created."
     else
       render :new, status: :unprocessable_entity
@@ -41,8 +40,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-
-    if @document.save
+    if @document.save_with_category_names(build_categories)
       redirect_to @document, notice: "Resource '#{@document.title}' was updated."
     else
       render :edit, status: :unprocessable_entity
@@ -65,12 +63,8 @@ class DocumentsController < ApplicationController
   def document_params
     params.require(:document).permit(
       :title, :description, :city, :address, :phone, :email,
-      :website, :hours, :age_min, :age_max, :gender, :notes, resource_categories: []
+      :website, :hours, :categories, :age_min, :age_max, :gender, :notes
     )
-  end
-
-  def selected_categories
-    @selected_categories ||= ResourceCategory.with_keys(document_params[:resource_categories])
   end
 
   def build_content
@@ -88,10 +82,14 @@ class DocumentsController < ApplicationController
       parts << "Age range: #{age_text}"
     end
     parts << "Gender: #{p[:gender]}" if p[:gender].present?
-    parts << "Categories: #{selected_categories.map(&:name).join(", ")}" if selected_categories.any?
+    parts << "Categories: #{p[:categories]}" if p[:categories].present?
     parts << "Description: #{p[:description]}" if p[:description].present?
     parts << "Notes: #{p[:notes]}" if p[:notes].present?
     parts.join("\n")
+  end
+
+  def build_categories
+    document_params[:categories].to_s.split(",").map(&:strip).reject(&:blank?)
   end
 
   def build_metadata
@@ -110,10 +108,6 @@ class DocumentsController < ApplicationController
       }.compact
     end
     meta[:gender] = p[:gender].split(",").map(&:strip).reject(&:blank?) if p[:gender].present?
-    if selected_categories.any?
-      meta[:categories] = selected_categories.map(&:name)
-      meta[:resource_categories] = selected_categories.map(&:key)
-    end
     meta[:description] = p[:description] if p[:description].present?
     meta[:notes] = p[:notes] if p[:notes].present?
     meta

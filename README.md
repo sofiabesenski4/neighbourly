@@ -40,7 +40,60 @@ ANTHROPIC_API_KEY=<your_anthropic_api_key>
 BASIC_AUTH_ENABLED=false
 ```
 
+By default, the app uses `claude-haiku-4-5` for chat and `text-embedding-3-small` for embeddings. Chat uses `ANTHROPIC_API_KEY`, and embeddings use `OPENAI_API_KEY`. You can change the models with `DEFAULT_MODEL` and `EMBEDDING_MODEL`.
+
+### AI Playground
+
+To use UVic's AI Playground locally, add these settings to your `.env` file:
+
+```
+OPENAI_API_KEY=<your_playground_api_key>
+OPENAI_API_BASE=<your_playground_api_base_url>
+DEFAULT_MODEL=qwen3-6-35b-a3b-vllm
+EMBEDDING_MODEL=nomic-embed-text-cpu
+MODEL_REGISTRY_FILE=config/uvic_models.json
+```
+
+Use the API base URL provided by the playground, including its API version path. The playground uses an OpenAI-compatible API, so its key goes in `OPENAI_API_KEY`. You do not need an Anthropic key when both models use the playground.
+
+After setting up the database, load the model registry:
+
+```
+bin/rails ruby_llm:load_models
+```
+
+Restart the app after changing environment variables.
+
+### Production
+
+On Heroku, set the environment variables in the app's Config Vars. The app reads them directly; it does not load your local `.env` file in production.
+
+For the default chat and embedding models, use:
+
+```
+ANTHROPIC_API_KEY=<your_anthropic_api_key>
+OPENAI_API_KEY=<your_openai_api_key>
+DEFAULT_MODEL=claude-haiku-4-5
+EMBEDDING_MODEL=text-embedding-3-small
+```
+
+Remove `OPENAI_API_BASE` and `MODEL_REGISTRY_FILE` from the Heroku config when using these providers. This restores the direct OpenAI endpoint and the default `models.json` registry. Keep the playground settings in your local environment.
+
 In production and staging, also set `APP_HOST` to the domain the app is served from, such as `example.org`. The app only accepts requests for that domain and sends mail from `no-reply@` that domain.
+
+The Heroku release command runs migrations and loads the model registry automatically. After deploying, check that:
+
+- The release completed and the model registry loaded successfully.
+- A new chat streams a reply, and a follow-up message works in the same conversation.
+- A chat with "Search local resources" enabled retrieves a known document and cites its source.
+
+### Changing Models
+
+Chat and embedding models are configured separately. Changing only the chat model does not require rebuilding document embeddings. Start a new chat to use the new default model; existing chats keep their selected model.
+
+Keep development and production databases separate when they use different embedding models. Stored document embeddings and search query embeddings must use the same model. Padding the playground's smaller vectors to fit the database does not make them compatible with OpenAI embeddings.
+
+Before changing the embedding model on a populated database, plan to regenerate all affected document embeddings. The app does not rebuild them automatically, and ingesting unchanged content does not regenerate them. If you cannot confirm which model generated the existing embeddings, rebuild them before using resource lookup with the new model.
 
 ## App Setup
 

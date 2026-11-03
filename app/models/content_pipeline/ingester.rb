@@ -54,7 +54,7 @@ module ContentPipeline
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
-      document.save!
+      document.save_with_category_names!(chunk[:categories] || [])
     end
   end
 end

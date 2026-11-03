@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_31_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -43,12 +43,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
   end
 
+  create_table "categories", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["name"], name: "index_categories_on_name", unique: true
+  end
+
+  create_table "categories_documents", id: false, force: :cascade do |t|
+    t.bigint "category_id", null: false
+    t.bigint "document_id", null: false
+    t.index ["category_id", "document_id"], name: "index_categories_documents_on_category_id_and_document_id", unique: true
+    t.index ["document_id", "category_id"], name: "index_categories_documents_on_document_id_and_category_id", unique: true
+  end
+
   create_table "chats", force: :cascade do |t|
     t.boolean "cancelled", default: false, null: false
     t.datetime "created_at", null: false
     t.bigint "ruby_llm_model_id"
     t.datetime "updated_at", null: false
-    t.boolean "use_rag", default: false, null: false
     t.bigint "user_id", null: false
     t.index ["ruby_llm_model_id"], name: "index_chats_on_ruby_llm_model_id"
     t.index ["user_id"], name: "index_chats_on_user_id"
@@ -190,8 +203,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
     t.index ["chat_type", "chat_id"], name: "index_ruby_llm_usages_on_chat_type_and_chat_id"
     t.index ["message_type", "message_id"], name: "index_ruby_llm_usages_on_message_type_and_message_id"
     t.index ["status"], name: "index_ruby_llm_usages_on_status"
-    t.check_constraint "operation::text = ANY (ARRAY['chat'::character varying, 'embedding'::character varying, 'moderation'::character varying, 'image'::character varying, 'speech'::character varying, 'transcription'::character varying, 'ocr'::character varying, 'rerank'::character varying]::text[])"
-    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying, 'succeeded'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])"
+    t.check_constraint "operation::text = ANY (ARRAY['chat'::character varying::text, 'embedding'::character varying::text, 'moderation'::character varying::text, 'image'::character varying::text, 'speech'::character varying::text, 'transcription'::character varying::text, 'ocr'::character varying::text, 'rerank'::character varying::text])"
+    t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])"
   end
 
   create_table "sources", force: :cascade do |t|
@@ -220,6 +233,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_01_060000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "categories_documents", "categories", on_delete: :cascade
+  add_foreign_key "categories_documents", "documents", on_delete: :cascade
   add_foreign_key "chats", "ruby_llm_models"
   add_foreign_key "chats", "users"
   add_foreign_key "document_messages", "documents", on_delete: :cascade

@@ -110,24 +110,18 @@ RSpec.describe "Chats", type: :system do
 
       expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question")
     end
+  end
 
-    it "creates a chat with RAG enabled when the toggle is checked" do
-      visit new_chat_path
+  context "when logged in as an admin" do
+    let(:admin) { User.create!(email: "chatadmin@example.com", password: "password123", admin: true) }
 
-      fill_in "Prompt", with: "Where can I find shelter?"
-      check "Search local resources"
-      click_button "Start new chat"
+    before { login_as(admin, scope: :user) }
 
-      expect(Chat.last.use_rag).to be true
-    end
+    it "links to the Models page" do
+      visit chats_path
+      click_link "Models"
 
-    it "creates a chat without RAG by default" do
-      visit new_chat_path
-
-      fill_in "Prompt", with: "Hello"
-      click_button "Start new chat"
-
-      expect(Chat.last.use_rag).to be false
+      expect(page).to have_current_path(models_path)
     end
   end
 
