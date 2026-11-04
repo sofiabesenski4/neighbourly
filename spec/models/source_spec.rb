@@ -55,6 +55,12 @@ RSpec.describe Source, type: :model do
       expect(source).to be_valid
     end
 
+    it "only allows known ingestion statuses" do
+      expect(build_source(ingestion_status: nil)).to be_valid
+      expect(build_source(ingestion_status: "pending")).to be_valid
+      expect(build_source(ingestion_status: "queued")).not_to be_valid
+    end
+
     it "does not require a url for csv sources" do
       source = build_source(source_type: "csv", url: nil)
       expect(source).to be_valid

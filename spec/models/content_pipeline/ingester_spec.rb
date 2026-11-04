@@ -81,6 +81,15 @@ RSpec.describe ContentPipeline::Ingester do
     end
   end
 
+  describe "#parse" do
+    it "returns chunks without writing documents" do
+      chunks = nil
+
+      expect { chunks = ingester.parse([{"id" => 1, "post_title" => "Test"}].to_json) }.not_to change(Document, :count)
+      expect(chunks.map { |chunk| chunk[:title] }).to eq(["Test"])
+    end
+  end
+
   describe "#ingest" do
     it "parses raw content directly without fetching from URL" do
       raw_json = [{"id" => 99, "post_title" => "Uploaded Shelter"}].to_json

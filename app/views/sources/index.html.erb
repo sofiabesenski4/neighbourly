@@ -19,6 +19,7 @@
               <span class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                 <%= source.source_type.upcase %>
               </span>
+              <%= render "ingestion_status", source: source %>
             </div>
             <% if source.url.present? %>
               <div class="text-sm text-gray-500"><%= source.url %></div>

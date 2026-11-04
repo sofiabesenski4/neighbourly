@@ -6,6 +6,12 @@ class Source < ApplicationRecord
   validates :url, uniqueness: true, if: -> { url.present? }
   validates :source_type, presence: true, inclusion: {in: %w[api html form csv]}
 
+  # Uploads are ingested by IngestSourceJob. Form entries are never ingested
+  # and have no status.
+  enum :ingestion_status,
+    {pending: "pending", ingesting: "ingesting", succeeded: "succeeded", failed: "failed"},
+    prefix: :ingestion, validate: {allow_nil: true}
+
   scope :api_sources, -> { where(source_type: "api") }
   scope :html_sources, -> { where(source_type: "html") }
   scope :form_sources, -> { where(source_type: "form") }

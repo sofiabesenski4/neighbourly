@@ -21,7 +21,7 @@ module ContentPipeline
     def ingest(raw_content)
       Rails.logger.info "[ContentPipeline] Ingesting source: #{@source.name} (#{@source.source_type})"
 
-      chunks = @parser.parse(raw_content)
+      chunks = parse(raw_content)
 
       Rails.logger.info "[ContentPipeline] Parsed #{chunks.size} chunks from #{@source.name}"
 
@@ -34,6 +34,12 @@ module ContentPipeline
 
       Rails.logger.info "[ContentPipeline] Finished ingesting #{@source.name}: #{chunks.size} documents"
       chunks.size
+    end
+
+    # Parse raw content into document chunks without writing anything. Raises
+    # Parsers::ParseError when the content cannot be read.
+    def parse(raw_content)
+      @parser.parse(raw_content)
     end
 
     private
