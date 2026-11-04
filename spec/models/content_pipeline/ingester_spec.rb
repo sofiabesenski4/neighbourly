@@ -113,5 +113,26 @@ RSpec.describe ContentPipeline::Ingester do
         expect(Document.last.content).to include("Meals served daily")
       end
     end
+
+    context "with a CSV source" do
+      let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv") }
+      let(:csv) { "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n" }
+
+      it "creates one embedded document per row with the row in metadata" do
+        expect { ingester.ingest(csv) }.to change(Document, :count).by(2)
+
+        doc = source.documents.find_by!(title: "Harbour Meals")
+        expect(doc.metadata).to eq("Name" => "Harbour Meals", "Address" => "100 Harbour St")
+        expect(doc.content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
+        expect(doc.categories).to be_empty
+        expect(doc.embedding).not_to be_nil
+      end
+
+      it "does not duplicate documents when the same file is ingested again" do
+        ingester.ingest(csv)
+
+        expect { ingester.ingest(csv) }.not_to change(Document, :count)
+      end
+    end
   end
 end

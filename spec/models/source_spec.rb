@@ -42,15 +42,21 @@ RSpec.describe Source, type: :model do
       expect(source).not_to be_valid
     end
 
-    it "only allows api, html, or form as source_type" do
+    it "only allows api, html, form, or csv as source_type" do
       expect(build_source(source_type: "api")).to be_valid
       expect(build_source(source_type: "html")).to be_valid
       expect(build_source(source_type: "form", url: nil)).to be_valid
+      expect(build_source(source_type: "csv")).to be_valid
       expect(build_source(source_type: "rss")).not_to be_valid
     end
 
     it "does not require a url for form sources" do
       source = build_source(source_type: "form", url: nil)
+      expect(source).to be_valid
+    end
+
+    it "does not require a url for csv sources" do
+      source = build_source(source_type: "csv", url: nil)
       expect(source).to be_valid
     end
   end
@@ -59,6 +65,7 @@ RSpec.describe Source, type: :model do
     before do
       Source.create!(name: "API Source", url: "https://example.com/api", source_type: "api")
       Source.create!(name: "HTML Source", url: "https://example.com/page", source_type: "html")
+      Source.create!(name: "CSV Source", source_type: "csv")
     end
 
     it ".api_sources returns only api sources" do
@@ -67,6 +74,10 @@ RSpec.describe Source, type: :model do
 
     it ".html_sources returns only html sources" do
       expect(Source.html_sources.pluck(:name)).to eq(["HTML Source"])
+    end
+
+    it ".csv_sources returns only csv sources" do
+      expect(Source.csv_sources.pluck(:name)).to eq(["CSV Source"])
     end
   end
 
@@ -83,6 +94,8 @@ RSpec.describe Source, type: :model do
       expect(html_source.api?).to be false
       expect(form_source.form?).to be true
       expect(form_source.api?).to be false
+      expect(build_source(source_type: "csv", url: nil).csv?).to be true
+      expect(api_source.csv?).to be false
     end
   end
 

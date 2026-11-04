@@ -2,13 +2,14 @@ class Source < ApplicationRecord
   has_many :documents, dependent: :destroy
 
   validates :name, presence: true
-  validates :url, presence: true, unless: -> { form? || api? }
+  validates :url, presence: true, unless: -> { form? || api? || csv? }
   validates :url, uniqueness: true, if: -> { url.present? }
-  validates :source_type, presence: true, inclusion: {in: %w[api html form]}
+  validates :source_type, presence: true, inclusion: {in: %w[api html form csv]}
 
   scope :api_sources, -> { where(source_type: "api") }
   scope :html_sources, -> { where(source_type: "html") }
   scope :form_sources, -> { where(source_type: "form") }
+  scope :csv_sources, -> { where(source_type: "csv") }
 
   def api?
     source_type == "api"
@@ -20,6 +21,10 @@ class Source < ApplicationRecord
 
   def form?
     source_type == "form"
+  end
+
+  def csv?
+    source_type == "csv"
   end
 
   def self.form_entry_source
