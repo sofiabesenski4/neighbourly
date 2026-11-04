@@ -99,5 +99,17 @@ RSpec.describe ContentPipeline::Parsers::Csv do
     it "returns no chunks for a header-only file" do
       expect(parser.parse("Name,Phone\n")).to eq([])
     end
+
+    it "strips a UTF-8 byte order mark from the first header" do
+      chunk = parser.parse("﻿Name,Phone\nHarbour Meals,111\n".b).first
+
+      expect(chunk[:metadata].keys.first).to eq("Name")
+    end
+
+    it "reads Windows-1252 files saved from Excel" do
+      chunk = parser.parse("Name\nCaf\xE9 Esperanza\n".b).first
+
+      expect(chunk[:title]).to eq("Café Esperanza")
+    end
   end
 end

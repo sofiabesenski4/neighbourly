@@ -35,9 +35,12 @@ module ContentPipeline
 
       private
 
-      # Uploads arrive as binary, so read them as UTF-8.
+      # Uploads arrive as binary. Spreadsheet exports are often UTF-8 with a
+      # byte order mark, or Windows-1252 when saved from Excel.
       def normalize_encoding(raw_content)
-        raw_content.dup.force_encoding(Encoding::UTF_8)
+        text = raw_content.dup.force_encoding(Encoding::UTF_8)
+        text = text.encode(Encoding::UTF_8, Encoding::Windows_1252, invalid: :replace, undef: :replace) unless text.valid_encoding?
+        text.delete_prefix("﻿")
       end
 
       # Blank headers get a positional name and repeated headers get a suffix,
