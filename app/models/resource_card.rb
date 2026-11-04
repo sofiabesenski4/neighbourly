@@ -17,7 +17,7 @@ class ResourceCard
 
   def fields
     address = value("address", "Address")
-    city = value("city", "City")
+    city = text(content_fields["City"]) || value("city")
     rows = [
       ["Services", value("description", "Description") || text(document.category_names)],
       ["Address", address && [address, city].compact.join(", ")],

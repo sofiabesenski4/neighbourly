@@ -34,6 +34,20 @@ RSpec.describe ResourceCard do
     expect(fields).to include({label: "Notes", value: "First line\nSecond line"}, {label: "Intake", value: "Call first"})
   end
 
+  it "uses the saved city display name instead of its slug in an address" do
+    fields = card(metadata: {address: "123 Main St", city: "north_vancouver"},
+      content: "Place\nCity: North Vancouver\nAddress: 123 Main St").fields
+
+    expect(fields).to include({label: "Address", value: "123 Main St, North Vancouver"})
+    expect(fields.map { |field| field[:label] }).not_to include("City")
+  end
+
+  it "uses the saved city display name when no street address is provided" do
+    fields = card(metadata: {city: "north_vancouver"}, content: "Place\nCity: North Vancouver").fields
+
+    expect(fields).to include({label: "City", value: "North Vancouver"})
+  end
+
   it "labels the saved description Services" do
     expect(card(metadata: {description: "Free hot meals"}).fields)
       .to include({label: "Services", value: "Free hot meals"})
