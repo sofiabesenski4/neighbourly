@@ -109,12 +109,13 @@ RSpec.describe FlyerPdf do
 
   it "continues an oversized field across pages without dropping its text" do
     words = (1..2400).map { |i| "step#{i.to_s.rjust(5, "0")}" }
-    reader = reader_for([resource(notes: words.join(" "))])
+    reader = reader_for([resource(notes: words.join(" "), intake_info: "Walk in")])
     text = reader.pages.map(&:text).join("\n")
 
     expect(reader.page_count).to be > 1
     expect(text).to include("continued")
     expect(text.scan(/step\d{5}/)).to eq(words)
+    expect(reader.pages.last.text).to include("Intake:", "Walk in")
   end
 
   it "retains a very long resource name in the card body" do
