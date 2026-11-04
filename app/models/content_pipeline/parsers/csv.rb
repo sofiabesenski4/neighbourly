@@ -8,7 +8,9 @@ module ContentPipeline
     # rendering so the document is searchable before any LLM summary exists.
     class Csv < Base
       ID_HEADER = /\Aid\z/i
-      TITLE_HEADER = /name|title/i
+      # "name" or "title" as a whole word, so "Program Name" and "job_title"
+      # match but "Filename" and "Username" do not.
+      TITLE_HEADER = /(?:\A|[^a-z])(?:name|title)(?:[^a-z]|\z)/i
       MAX_TITLE_LENGTH = 120
 
       def parse(raw_content)
