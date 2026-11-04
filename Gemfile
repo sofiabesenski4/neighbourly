@@ -92,3 +92,6 @@ gem "dotenv-rails", groups: [:development, :test]
 
 # Parses uploaded CSV sources. A bundled gem since Ruby 3.4, so it must be declared.
 gem "csv", "~> 3.3"
+
+# Durable Active Job backend stored in the app's Postgres database.
+gem "solid_queue", "~> 1.7"
