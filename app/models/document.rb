@@ -13,19 +13,9 @@ class Document < ApplicationRecord
 
   scope :with_embeddings, -> { where.not(embedding: nil) }
 
-  # Database categories take precedence over legacy metadata tags.
-  scope :in_category, ->(key) {
-    terms = ResourceCategory.with_keys([key]).flat_map(&:terms).map { |term| term.strip.downcase }
-    categorized = joins(:categories).where("LOWER(TRIM(categories.name)) IN (?)", terms).select(:id)
-    legacy = where.not(id: joins(:categories).select(:id))
-      .where("metadata @> ?", {resource_categories: [key]}.to_json)
-    where(id: categorized).or(legacy)
+  scope :in_categories, ->(category_ids) {
+    joins(:categories).where(categories: {id: category_ids}).distinct
   }
-
-  def resource_category_keys
-    names = category_names
-    names.any? ? ResourceCategory.keys_for(names) : Array(metadata["resource_categories"])
-  end
 
   def category_names
     categories.map(&:name)

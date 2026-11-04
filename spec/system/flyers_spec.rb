@@ -1,18 +1,22 @@
 require "rails_helper"
 
 RSpec.describe "Flyers", type: :system do
+  let!(:food) { Category.create!(name: "Meals") }
+  let!(:shelter) { Category.create!(name: "Shelters") }
+  let!(:harm_reduction) { Category.create!(name: "Harm Reduction Resources") }
+
   before do
     driven_by(:rack_test)
   end
 
   it "lets a visitor choose categories and request a flyer from the home page" do
-    expect(FlyerGenerator).to receive(:call).with(categories: ["food", "harm_reduction"]).and_return(nil)
+    expect(FlyerGenerator).to receive(:call).with(categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s)).and_return(nil)
 
     visit root_path
     click_link "Make a printable flyer"
 
-    check "Food"
-    check "Harm reduction"
+    check "Meals"
+    check "Harm Reduction Resources"
     click_button "Generate printout"
 
     expect(page).to have_content("No resources matched those categories")
@@ -22,8 +26,8 @@ RSpec.describe "Flyers", type: :system do
     expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all-resources")
 
     visit new_flyer_path
-    expect(page).not_to have_checked_field("Food")
-    expect(page).not_to have_checked_field("Shelter & housing")
+    expect(page).not_to have_checked_field("Meals")
+    expect(page).not_to have_checked_field("Shelters")
     click_button "Generate printout"
 
     expect(page.response_headers["Content-Type"]).to include("application/pdf")

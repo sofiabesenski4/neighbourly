@@ -12,13 +12,13 @@ test("clearing every category requests and renders the complete guide", async ()
 
     const requests = [];
     const rendered = [];
-    let selected = ["food"];
+    let selected = ["17"];
 
     globalThis.fetch = async (url) => {
       requests.push(new URL(url));
       return {
         ok: true,
-        json: async () => ({ categories: [{ key: "food", resources: [] }] }),
+        json: async () => ({ categories: [{ key: "17", resources: [] }] }),
       };
     };
 
@@ -36,13 +36,13 @@ test("clearing every category requests and renders the complete guide", async ()
 
     assert.equal(requests.length, 2);
     assert.deepEqual(requests[0].searchParams.getAll("flyer[categories][]"), [
-      "food",
+      "17",
     ]);
     assert.deepEqual(
       requests[1].searchParams.getAll("flyer[categories][]"),
       [],
     );
-    assert.deepEqual(rendered.at(-1), [{ key: "food", resources: [] }]);
+    assert.deepEqual(rendered.at(-1), [{ key: "17", resources: [] }]);
   } finally {
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;
@@ -149,12 +149,12 @@ test("a delayed preview response cannot replace a newer selection", async () => 
 
     let releaseOldResponse;
     const rendered = [];
-    let selected = ["food"];
+    let selected = ["17"];
     globalThis.fetch = (url) => {
       const categories = new URL(url).searchParams.getAll(
         "flyer[categories][]",
       );
-      if (categories.includes("food")) {
+      if (categories.includes("17")) {
         return new Promise((resolve) => {
           releaseOldResponse = () =>
             resolve({
@@ -178,7 +178,7 @@ test("a delayed preview response cannot replace a newer selection", async () => 
     controller.render = (categories) => rendered.push(categories);
 
     const oldRequest = controller.refresh();
-    selected = ["health"];
+    selected = ["23"];
     await controller.refresh();
     releaseOldResponse();
     await oldRequest;

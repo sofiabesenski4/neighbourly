@@ -1,14 +1,20 @@
 # Shared input to the category preview and its PDF. This query never calls an
 # embedding service or a chat model.
-class ResourceCategorySearch
-  Section = Data.define(:category, :resources)
+class CategorySearch
+  Section = Data.define(:category, :resources) do
+    def name
+      category&.name || "Other resources"
+    end
+  end
 
   def self.call(categories:, scope: Document.all)
     selection = Flyer.new(categories: categories)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
     unfiltered = selection.categories.empty?
-    selected = unfiltered ? ResourceCategory.all : ResourceCategory.with_keys(selection.categories)
+    selected = Category.order(:name, :id)
+    selected = selected.where(id: selection.categories) unless unfiltered
+    selected = selected.to_a
 
     # A saved resource is printable without a search embedding. Keep closed
     # resources and accepted removals hidden until a publication workflow
@@ -19,7 +25,7 @@ class ResourceCategorySearch
       .select(:id, :source_id, :title, :content, :metadata)
 
     unless unfiltered
-      matching = selected.map { |category| Document.in_category(category.key) }.reduce(&:or)
+      matching = Document.in_categories(selection.categories)
       resources = resources.where(id: matching.select(:id))
     end
 
@@ -30,18 +36,14 @@ class ResourceCategorySearch
 
     sections = selected.map do |category|
       Section.new(category: category, resources: resources.select { |resource|
-        resource.resource_category_keys.include?(category.key)
+        resource.categories.include?(category)
       })
     end
 
     if unfiltered
-      known_keys = selected.map(&:key)
-      other_resources = resources.reject { |resource|
-        resource.resource_category_keys.intersect?(known_keys)
-      }
+      other_resources = resources.select { |resource| resource.categories.empty? }
       if other_resources.any?
-        category = ResourceCategory.new(key: "uncategorized", name: "Other resources", labels: [])
-        sections << Section.new(category: category, resources: other_resources)
+        sections << Section.new(category: nil, resources: other_resources)
       end
     end
 

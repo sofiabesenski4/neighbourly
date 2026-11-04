@@ -145,24 +145,27 @@ RSpec.describe Document, type: :model do
     end
   end
 
-  describe ".in_category" do
+  describe ".in_categories" do
     before do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
     end
 
-    it "returns the documents tagged with that category" do
-      meals = source.documents.create!(content: "Meals", external_id: "1", metadata: {resource_categories: ["food"]})
-      drop_in = source.documents.create!(content: "Drop-in", external_id: "2", metadata: {resource_categories: ["food", "hygiene"]})
-      source.documents.create!(content: "Legal clinic", external_id: "3", metadata: {resource_categories: ["legal"]})
-      source.documents.create!(content: "Untagged", external_id: "4", metadata: {categories: ["food"]})
+    it "matches any selected association and returns each document once" do
+      meals = Category.create!(name: "Meals")
+      showers = Category.create!(name: "Showers")
+      meal_program = source.documents.create!(content: "Meals", categories: [meals])
+      drop_in = source.documents.create!(content: "Drop-in", categories: [meals, showers])
+      source.documents.create!(content: "Untagged", metadata: {categories: ["Meals"]})
 
-      expect(Document.in_category("food")).to contain_exactly(meals, drop_in)
+      expect(Document.in_categories([meals.id, showers.id])).to contain_exactly(meal_program, drop_in)
     end
 
-    it "matches whole keys only" do
-      source.documents.create!(content: "Meals", external_id: "1", metadata: {resource_categories: ["food"]})
+    it "does not match names instead of category IDs" do
+      meals = Category.create!(name: "Meals")
+      source.documents.create!(content: "Meals", categories: [meals])
 
-      expect(Document.in_category("foo")).to be_empty
+      expect(Document.in_categories(["Meals"])).to be_empty
+      expect(Document.in_categories([])).to be_empty
     end
   end
 

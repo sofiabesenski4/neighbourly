@@ -36,11 +36,11 @@ class FlyersController < ApplicationController
       return
     end
 
-    @sections = ResourceCategorySearch.call(categories: @flyer.categories)
+    @sections = CategorySearch.call(categories: @flyer.categories)
     respond_to do |format|
       format.json do
         render json: {categories: @sections.map { |section|
-          {key: section.category.key, name: section.category.name,
+          {key: section.category&.id&.to_s, name: section.name,
            resources: section.resources.map { |resource| ResourceCard.new(resource).as_json }}
         }}
       end

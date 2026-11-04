@@ -124,12 +124,12 @@ class FlyerPdf
     continued = false
     heading_pending = true
     while remaining.any?
-      label = section.category.name + (continued ? " continued" : "")
+      label = section.name + (continued ? " continued" : "")
       available = @cursor - BOTTOM - (heading_pending ? heading_height(label) : 0)
       unless measurement(remaining.first, @width).height <= available
         if @cursor == @page_top
           draw_heading(label) if heading_pending
-          render_oversized(remaining.shift, section.category.name)
+          render_oversized(remaining.shift, section.name)
           heading_pending = false
           continued = true
         else

@@ -20,7 +20,7 @@ RSpec.describe ResourceCard do
   end
 
   it "uses the agreed labels, puts Intake after Notes, and prints only provided dates" do
-    fields = card(metadata: {categories: ["Meals"], address: "123 Main St", city: "Victoria",
+    fields = card(metadata: {description: "Meals", address: "123 Main St", city: "Victoria",
                              hours: "Noon", notes: "Call ahead", intake_info: "Walk in", last_updated_at: "2026-10-15"}).fields
 
     expect(fields.map { |field| field[:label] }).to eq(["Services", "Address", "Hours", "Notes", "Intake", "Last updated"])
@@ -34,11 +34,16 @@ RSpec.describe ResourceCard do
     expect(fields).to include({label: "Notes", value: "First line\nSecond line"}, {label: "Intake", value: "Call first"})
   end
 
-  it "labels the description Services and uses category labels when no description is saved" do
-    expect(card(metadata: {description: "Free hot meals", categories: ["Food support"]}).fields)
+  it "labels the saved description Services" do
+    expect(card(metadata: {description: "Free hot meals"}).fields)
       .to include({label: "Services", value: "Free hot meals"})
-    expect(card(metadata: {categories: ["Food support"]}).fields)
-      .to include({label: "Services", value: "Food support"})
+  end
+
+  it "ignores category metadata and content without mixing them into adjacent fields" do
+    fields = card(metadata: {categories: ["Meals"], resource_categories: ["food"]},
+      content: "Place\nNotes: Call ahead\nCategories: Shelters\nIntake: Walk in").fields
+
+    expect(fields).to contain_exactly({label: "Notes", value: "Call ahead"}, {label: "Intake", value: "Walk in"})
   end
 
   it "prefers metadata over old content and puts separate phone numbers on separate lines" do

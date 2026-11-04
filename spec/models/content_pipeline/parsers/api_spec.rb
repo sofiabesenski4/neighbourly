@@ -74,7 +74,7 @@ RSpec.describe ContentPipeline::Parsers::Api do
       expect(parser.parse(shelter_json).first[:metadata]).not_to have_key(:last_updated_at)
     end
 
-    it "groups taxonomies into resource categories" do
+    it "preserves source taxonomy names for database category assignment" do
       json = [{
         "id" => 1,
         "post_title" => "Drop-in Centre",
@@ -83,7 +83,6 @@ RSpec.describe ContentPipeline::Parsers::Api do
 
       chunk = parser.parse(json).first
 
-      expect(chunk[:metadata]).not_to have_key(:resource_categories)
       expect(chunk[:categories]).to eq(["Meals", "Showers", "Pet Friendly"])
     end
 

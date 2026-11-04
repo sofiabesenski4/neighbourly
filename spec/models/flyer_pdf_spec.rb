@@ -7,14 +7,14 @@ RSpec.describe FlyerPdf do
   end
 
   def reader_for(resources)
-    section = ResourceCategorySearch::Section.new(category: ResourceCategory.all.first, resources: resources)
+    section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
     bytes = described_class.new(sections: [section], printed_at: Time.zone.parse("2026-10-21 12:00:00")).render
     expect(bytes).to start_with("%PDF-")
     PDF::Reader.new(StringIO.new(bytes))
   end
 
   it "creates a real readable PDF with the print date and missing fields omitted" do
-    reader = reader_for([resource(categories: ["Meals"], notes: "Bring a bag", intake_info: "Walk in")])
+    reader = reader_for([resource(description: "Meals", notes: "Bring a bag", intake_info: "Walk in")])
     text = reader.pages.map(&:text).join("\n")
 
     expect(text).to include("Meal program", "Services:", "Notes:", "Bring a bag", "Intake:", "Walk in", "2026-10-21")
@@ -41,7 +41,7 @@ RSpec.describe FlyerPdf do
     resources = titles.zip([1, 12, 3, 8]).map { |title, lines|
       resource(title: title, notes: ("Details for #{title}. " * lines))
     }
-    section = ResourceCategorySearch::Section.new(category: ResourceCategory.all.first, resources: resources)
+    section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
     renderer = described_class.new(sections: [section])
     placements = []
     allow(renderer).to receive(:draw_card).and_wrap_original do |draw, entry, x, top, width|
@@ -69,7 +69,7 @@ RSpec.describe FlyerPdf do
     resources = titles.each_with_index.map { |title, index|
       resource(title: title, notes: "Opening hours and details. " * (index.even? ? 20 : 80))
     }
-    section = ResourceCategorySearch::Section.new(category: ResourceCategory.all.first, resources: resources)
+    section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
     renderer = described_class.new(sections: [section])
     printed_titles = []
     allow(renderer).to receive(:draw_card).and_wrap_original do |draw, entry, x, top, width|
@@ -89,9 +89,9 @@ RSpec.describe FlyerPdf do
 
   it "starts a new page instead of skipping a tall earlier card" do
     sections = [
-      ResourceCategorySearch::Section.new(category: ResourceCategory.all.first,
+      CategorySearch::Section.new(category: Category.new(name: "Food"),
         resources: [resource(title: "Intro")]),
-      ResourceCategorySearch::Section.new(category: ResourceCategory.with_keys(["health"]).first,
+      CategorySearch::Section.new(category: Category.new(name: "Health"),
         resources: [resource(title: "Alpha"), resource(title: "Beta")])
     ]
     renderer = described_class.new(sections: sections)
@@ -126,9 +126,9 @@ RSpec.describe FlyerPdf do
 
   it "does not label the first appearance of a new category as continued" do
     sections = [
-      ResourceCategorySearch::Section.new(category: ResourceCategory.all.first,
+      CategorySearch::Section.new(category: Category.new(name: "Food"),
         resources: [resource(notes: "Food details " * 400)]),
-      ResourceCategorySearch::Section.new(category: ResourceCategory.with_keys(["health"]).first,
+      CategorySearch::Section.new(category: Category.new(name: "Health"),
         resources: [resource(title: "Clinic", notes: "Clinic details " * 700)])
     ]
     bytes = described_class.new(sections: sections).render

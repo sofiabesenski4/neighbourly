@@ -10,11 +10,10 @@ class Flyer
 
   validate :categories_are_available
 
-  # Category key => label for every option offered on the flyer form. These
-  # are ResourceCategory keys, so each one matches the resources tagged with
-  # it (see Document.in_category).
+  # Use the same persisted categories as the resource form. String IDs match
+  # submitted checkbox values without coercing malformed input into an ID.
   def self.available_categories
-    ResourceCategory.all.to_h { |category| [category.key, category.name] }
+    Category.order(:name, :id).pluck(:id, :name).to_h.transform_keys(&:to_s)
   end
 
   def categories=(value)
