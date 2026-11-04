@@ -127,6 +127,36 @@ RSpec.describe Source, type: :model do
     end
   end
 
+  describe "page refreshes" do
+    let(:source) { Source.create!(name: "Uploaded", source_type: "csv", ingestion_status: :pending) }
+
+    it "refreshes pages showing the source when it changes" do
+      source
+
+      expect { source.update!(ingestion_status: :ingesting) }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with(source.to_gid_param, content: include("refresh"))
+    end
+
+    it "refreshes the sources list when a source is created" do
+      expect { source }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with("sources", content: include("refresh"))
+    end
+
+    it "refreshes the sources list when a source changes" do
+      source
+
+      expect { source.update!(ingestion_status: :failed) }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with("sources", content: include("refresh"))
+    end
+
+    it "refreshes the sources list when a source is deleted" do
+      source
+
+      expect { source.destroy! }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with("sources", content: include("refresh"))
+    end
+  end
+
   describe "associations" do
     it "destroys associated documents when destroyed" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))

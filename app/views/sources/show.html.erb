@@ -1,4 +1,6 @@
 <% content_for :title, @source.name %>
+<% turbo_refreshes_with method: :morph, scroll: :preserve %>
+<%= turbo_stream_from @source %>
 
 <div class="w-full">
   <div class="flex justify-between items-center">
@@ -29,7 +31,7 @@
       <p class="mt-1 text-sm"><%= @source.ingestion_error %></p>
     </div>
   <% elsif @source.ingestion_pending? || @source.ingestion_ingesting? %>
-    <p class="mt-6 text-sm text-gray-600">Documents appear here as they are ingested. Refresh to see progress.</p>
+    <p class="mt-6 text-sm text-gray-600">This page updates when ingestion finishes.</p>
   <% end %>
 
   <div class="mt-6">
