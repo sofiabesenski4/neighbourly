@@ -44,6 +44,12 @@ RSpec.describe ContentPipeline::Parsers::Csv do
       expect(parser.parse(csv).map { |chunk| chunk[:title] }).to eq(["Harbour Meals", "Northside Shelter"])
     end
 
+    it "only takes the title from a column named name or title as a whole word" do
+      chunks = parser.parse("Filename,Username,program_name,Job Title\nexport.csv,jdoe,Harbour Meals,Cook\nexport.csv,jdoe,,Cook\n")
+
+      expect(chunks.map { |chunk| chunk[:title] }).to eq(["Harbour Meals", "Cook"])
+    end
+
     it "falls back to the first present value for the title" do
       chunk = parser.parse("Address,Phone\n,250-555-0100\n").first
 
