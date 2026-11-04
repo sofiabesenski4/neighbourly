@@ -18,6 +18,21 @@ RSpec.describe "Live resource guide builder", type: :system do
     source.documents.create!(title: "Gamma noticeboard", content: "Noticeboard", metadata: {})
   end
 
+  it "loads a new document from the homepage before generating a PDF" do
+    visit root_path
+    page.execute_script("window.flyerNavigationSentinel = true")
+
+    click_link "Make a printable flyer"
+
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(page.evaluate_script("window.flyerNavigationSentinel")).to be_nil
+
+    click_button "Generate printout"
+
+    expect(page).to have_link("Open PDF", href: /\Ablob:/)
+    expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)
+  end
+
   it "updates cards and print availability when categories are selected and cleared" do
     visit new_flyer_path
 
