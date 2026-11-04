@@ -31,6 +31,8 @@ module ContentPipeline
         # Rows sharing an external_id would upsert the same document, so keep
         # the last one, which is the one that ends up stored.
         chunks.index_by { |chunk| chunk[:external_id] }.values
+      rescue CSV::MalformedCSVError => e
+        raise ParseError, "could not be read as CSV: #{e.message}"
       end
 
       private

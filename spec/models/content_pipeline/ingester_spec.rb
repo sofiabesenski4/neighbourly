@@ -133,6 +133,11 @@ RSpec.describe ContentPipeline::Ingester do
 
         expect { ingester.ingest(csv) }.not_to change(Document, :count)
       end
+
+      it "writes no documents when the file is malformed" do
+        expect { ingester.ingest("Name\n\"unclosed\n") }.to raise_error(ContentPipeline::Parsers::ParseError)
+        expect(Document.count).to eq(0)
+      end
     end
   end
 end

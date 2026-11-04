@@ -111,5 +111,10 @@ RSpec.describe ContentPipeline::Parsers::Csv do
 
       expect(chunk[:title]).to eq("Café Esperanza")
     end
+
+    it "raises a ParseError for malformed CSV" do
+      expect { parser.parse("Name,Notes\nHarbour,\"unclosed\n") }
+        .to raise_error(ContentPipeline::Parsers::ParseError, /could not be read as CSV/)
+    end
   end
 end
