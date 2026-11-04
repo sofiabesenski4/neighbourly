@@ -34,5 +34,15 @@ RSpec.describe "sources rake tasks" do
         .to change(Document, :count).by(2)
         .and output(/Ingested 1 documents from 'Source A'/).to_stdout
     end
+
+    it "skips sources with nothing to fetch" do
+      Rake::Task["sources:ingest_all"].reenable
+      Source.create!(name: "Fetched", url: "https://example.com/a", source_type: "api")
+      Source.create!(name: "Uploaded CSV", source_type: "csv")
+      Source.form_entry_source
+
+      expect { Rake::Task["sources:ingest_all"].invoke }
+        .to output("Ingested 1 documents from 'Fetched'\n").to_stdout
+    end
   end
 end

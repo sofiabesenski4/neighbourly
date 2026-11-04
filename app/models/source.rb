@@ -10,6 +10,9 @@ class Source < ApplicationRecord
   scope :html_sources, -> { where(source_type: "html") }
   scope :form_sources, -> { where(source_type: "form") }
   scope :csv_sources, -> { where(source_type: "csv") }
+  # Sources the pipeline can re-fetch: a parsed type with an origin URL.
+  # Form entries and URL-less uploads have nothing to fetch.
+  scope :fetchable, -> { where(source_type: %w[api html csv]).where.not(url: [nil, ""]) }
 
   def api?
     source_type == "api"
