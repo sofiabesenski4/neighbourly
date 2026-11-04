@@ -44,6 +44,8 @@ module ContentPipeline
         Parsers::Api.new(source)
       when "html"
         Parsers::Html.new(source)
+      when "csv"
+        Parsers::Csv.new(source)
       else
         raise ArgumentError, "Unknown source type: #{source.source_type}"
       end

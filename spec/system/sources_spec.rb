@@ -168,6 +168,24 @@ RSpec.describe "Sources", type: :system do
       end
     end
 
+    describe "uploading a CSV source" do
+      it "creates a source and ingests one document per row" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Drop-in Centres"
+        select "CSV (spreadsheet rows)", from: "Data type"
+
+        file = create_temp_file("centres.csv", "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n")
+        attach_file "Upload file", file.path
+
+        click_button "Upload and ingest"
+
+        expect(page).to have_content("Source 'Drop-in Centres' created and 2 documents ingested.")
+        expect(Source.last).to be_csv
+        expect(Document.find_by!(title: "Harbour Meals").metadata).to include("Address" => "100 Harbour St")
+      end
+    end
+
     describe "validation errors" do
       it "requires a file to be uploaded" do
         visit new_source_path
@@ -192,6 +210,19 @@ RSpec.describe "Sources", type: :system do
         click_button "Upload and ingest"
 
         expect(page).to have_content("File must be a .json file for API sources")
+      end
+
+      it "rejects a non-CSV file for a CSV source" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Wrong Type"
+        select "CSV (spreadsheet rows)", from: "Data type"
+
+        file = create_temp_file("data.json", [{"id" => 1}].to_json)
+        attach_file "Upload file", file.path
+        click_button "Upload and ingest"
+
+        expect(page).to have_content("a .csv file for CSV sources")
       end
 
       it "requires a source name" do
