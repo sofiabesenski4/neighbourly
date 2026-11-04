@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_000000) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -365,6 +365,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000000) do
     t.string "source_type", null: false
     t.datetime "updated_at", null: false
     t.string "url"
+    t.string "ingestion_status"
+    t.text "ingestion_error"
+    t.binary "upload_content"
     t.index ["url"], name: "index_sources_on_url", unique: true
   end
 
