@@ -1,7 +1,7 @@
 # Development uses Redis when REDIS_URL is set, as staging and production do.
 # Jobs run by Solid Queue workers can then refresh open pages.
 development:
-  adapter: <%= ENV["REDIS_URL"].present? ? "redis" : "async" %>
+  adapter: '<%= ENV["REDIS_URL"].present? ? "redis" : "async" %>'
   url: <%= ENV["REDIS_URL"] %>
   channel_prefix: neighbourly_resources_development
 
