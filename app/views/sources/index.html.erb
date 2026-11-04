@@ -1,4 +1,6 @@
 <% content_for :title, "Sources" %>
+<% turbo_refreshes_with method: :morph, scroll: :preserve %>
+<%= turbo_stream_from "sources" %>
 
 <div class="w-full">
   <div class="flex justify-between items-center">

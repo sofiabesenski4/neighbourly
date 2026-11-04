@@ -61,6 +61,14 @@ RSpec.describe "Sources", type: :system do
       expect(page).to have_content("1 document")
     end
 
+    it "subscribes the sources list to one refresh stream" do
+      2.times { |i| Source.create!(name: "Uploaded #{i}", source_type: "csv") }
+
+      visit sources_path
+
+      expect(page).to have_css("turbo-cable-stream-source", count: 1, visible: :all)
+    end
+
     it "shows an empty state when no sources exist" do
       visit sources_path
       expect(page).to have_content("No sources have been added yet.")
@@ -222,6 +230,14 @@ RSpec.describe "Sources", type: :system do
         expect(page).to have_content("Waiting to ingest")
         expect(page).to have_content("0 documents")
         expect(Source.last).to be_ingestion_pending
+      end
+
+      it "subscribes the source page to refreshes while the upload is ingested" do
+        upload_csv
+
+        expect(page).to have_css("turbo-cable-stream-source", visible: :all)
+        expect(page).to have_css("meta[name='turbo-refresh-method'][content='morph']", visible: :all)
+        expect(page).to have_content("This page updates when ingestion finishes.")
       end
 
       it "marks the source failed when its ingestion cannot be queued" do

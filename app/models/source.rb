@@ -1,6 +1,12 @@
 class Source < ApplicationRecord
   has_many :documents, dependent: :destroy
 
+  # Open source pages refresh when a source changes, so admins see ingestion
+  # start, finish or fail without reloading. The sources list listens on one
+  # "sources" stream rather than subscribing to every source on it.
+  broadcasts_refreshes
+  after_commit -> { broadcast_refresh_later_to "sources" }, on: [:update, :destroy]
+
   validates :name, presence: true
   validates :url, presence: true, unless: -> { form? || api? || csv? }
   validates :url, uniqueness: true, if: -> { url.present? }
