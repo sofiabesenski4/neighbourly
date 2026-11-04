@@ -79,6 +79,19 @@ RSpec.describe ContentPipeline::Parsers::Csv do
       end
     end
 
+    it "names blank headers by position and suffixes duplicate headers" do
+      chunk = parser.parse("Name,,Phone,Phone\nHarbour Meals,x,111,222\n").first
+
+      expect(chunk[:metadata].keys).to eq(["Name", "column_2", "Phone", "Phone (2)"])
+      expect(chunk[:metadata]).to include("Phone" => "111", "Phone (2)" => "222")
+    end
+
+    it "keeps cells beyond the last header under positional names" do
+      chunk = parser.parse("Name\nHarbour Meals,extra\n").first
+
+      expect(chunk[:metadata]).to eq("Name" => "Harbour Meals", "column_2" => "extra")
+    end
+
     it "skips rows with no values" do
       expect(parser.parse("Name,Phone\n,\nHarbour Meals,111\n , \n").size).to eq(1)
     end
