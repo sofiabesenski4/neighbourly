@@ -193,6 +193,63 @@ RSpec.describe "Rate limiting", type: :request do
     end
   end
 
+  describe "Flyer previews and printouts" do
+    before do
+      allow(CategorySearch).to receive(:call).and_return([])
+      allow(FlyerGenerator).to receive(:call).and_return("%PDF-flyer")
+    end
+
+    it "returns JSON and skips the search after 300 previews from one connection" do
+      expect(CategorySearch).to receive(:call).exactly(300).times.and_return([])
+
+      300.times { get preview_flyers_path(format: :json) }
+      expect(response).to have_http_status(:ok)
+
+      get preview_flyers_path(format: :json)
+
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.media_type).to eq("application/json")
+      expect(response.parsed_body.fetch("errors")).to include(/try again later/i)
+      expect(response.headers["Location"]).to be_nil
+    end
+
+    it "keeps previews and printouts on separate counters" do
+      300.times { get preview_flyers_path(format: :json) }
+
+      30.times { post flyers_path }
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to eq("%PDF-flyer")
+
+      post flyers_path
+      expect(response).to redirect_to(root_path)
+      expect(flash[:alert]).to match(/a lot of flyers/i)
+    end
+
+    it "does not let printouts consume the preview allowance" do
+      30.times { post flyers_path }
+
+      300.times { get preview_flyers_path(format: :json) }
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq("categories" => [])
+    end
+
+    it "allows another connection to preview and restores the allowance after an hour" do
+      300.times { get preview_flyers_path(format: :json) }
+
+      get preview_flyers_path(format: :json), env: {"REMOTE_ADDR" => "203.0.113.10"}
+      expect(response).to have_http_status(:ok)
+
+      get preview_flyers_path(format: :json)
+      expect(response).to have_http_status(:too_many_requests)
+
+      travel 1.hour + 1.second do
+        get preview_flyers_path(format: :json)
+        expect(response).to have_http_status(:ok)
+      end
+    end
+  end
+
   describe "POST /chats/:chat_id/messages" do
     let(:chat) { user.chats.create! }
     let(:params) { {message: {content: "hello"}} }

@@ -11,10 +11,16 @@ class FlyersController < ApplicationController
   # Flyers are open to anonymous users so outreach workers and neighbours can
   # print one without an account. Building a PDF will not be cheap, so keep a
   # per-IP ceiling that a shared library or shelter connection won't hit.
-  rate_limit to: 30, within: 1.hour,
+  rate_limit to: 30, within: 1.hour, name: "create",
     by: -> { request.remote_ip },
     with: -> { rate_limit_exceeded("We've made a lot of flyers for this connection. Please try again later.") },
     only: :create
+
+  # Allow ten live previews per printable guide without consuming the PDF quota.
+  rate_limit to: 300, within: 1.hour, name: "preview",
+    by: -> { request.remote_ip },
+    with: -> { render json: {errors: ["We've looked up a lot of resources for this connection. Please try again later."]}, status: :too_many_requests },
+    only: :preview, if: -> { request.format.json? }
 
   def new
     @flyer = Flyer.new(flyer_params)
