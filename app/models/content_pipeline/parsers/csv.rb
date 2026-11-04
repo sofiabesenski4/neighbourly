@@ -40,12 +40,22 @@ module ContentPipeline
         raw_content.dup.force_encoding(Encoding::UTF_8)
       end
 
+      # Blank headers get a positional name and repeated headers get a suffix,
+      # so no column's value is overwritten in metadata.
       def unique_headers(raw_headers)
-        raw_headers.map { |header| header.to_s.strip }
+        seen = Hash.new(0)
+        raw_headers.each_with_index.map do |header, index|
+          name = header.to_s.strip.presence || "column_#{index + 1}"
+          seen[name] += 1
+          (seen[name] > 1) ? "#{name} (#{seen[name]})" : name
+        end
       end
 
+      # A row with more cells than headers keeps its extra cells under
+      # positional names instead of dropping them.
       def row_fields(headers, values)
-        headers.each_with_index.to_h { |name, index| [name, values[index].to_s.strip.presence] }
+        names = headers + (headers.size...values.size).map { |index| "column_#{index + 1}" }
+        names.each_with_index.to_h { |name, index| [name, values[index].to_s.strip.presence] }
       end
 
       def title_for(fields)
