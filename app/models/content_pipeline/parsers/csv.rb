@@ -48,21 +48,37 @@ module ContentPipeline
       end
 
       # Blank headers get a positional name and repeated headers get a suffix,
-      # so no column's value is overwritten in metadata.
+      # so no column's value is overwritten in metadata. Every header written
+      # in the file is reserved first, so a generated name never takes one.
       def unique_headers(raw_headers)
-        seen = Hash.new(0)
-        raw_headers.each_with_index.map do |header, index|
-          name = header.to_s.strip.presence || "column_#{index + 1}"
-          seen[name] += 1
-          (seen[name] > 1) ? "#{name} (#{seen[name]})" : name
+        written = raw_headers.map { |header| header.to_s.strip.presence }
+        taken = Set.new(written.compact)
+        kept = Set.new
+
+        written.each_with_index.map do |name, index|
+          if name && kept.add?(name)
+            name
+          else
+            free_name(name || "column_#{index + 1}", taken)
+          end
         end
       end
 
       # A row with more cells than headers keeps its extra cells under
       # positional names instead of dropping them.
       def row_fields(headers, values)
-        names = headers + (headers.size...values.size).map { |index| "column_#{index + 1}" }
-        names.each_with_index.to_h { |name, index| [name, values[index].to_s.strip.presence] }
+        taken = Set.new(headers)
+        extras = (headers.size...values.size).map { |index| free_name("column_#{index + 1}", taken) }
+        (headers + extras).each_with_index.to_h { |name, index| [name, values[index].to_s.strip.presence] }
+      end
+
+      # Returns base, or base with the lowest free " (n)" suffix, and marks it taken.
+      def free_name(base, taken)
+        name = base
+        suffix = 1
+        name = "#{base} (#{suffix += 1})" while taken.include?(name)
+        taken << name
+        name
       end
 
       def title_for(fields)

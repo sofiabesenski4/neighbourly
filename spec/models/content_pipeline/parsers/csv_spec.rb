@@ -92,6 +92,20 @@ RSpec.describe ContentPipeline::Parsers::Csv do
       expect(chunk[:metadata]).to include("Phone" => "111", "Phone (2)" => "222")
     end
 
+    it "never gives a generated header the name of a header in the file" do
+      chunk = parser.parse("Name,Name,Name (2),,column_4\nA,B,C,D,E\n").first
+
+      expect(chunk[:metadata]).to eq(
+        "Name" => "A", "Name (3)" => "B", "Name (2)" => "C", "column_4 (2)" => "D", "column_4" => "E"
+      )
+    end
+
+    it "never gives an extra cell the name of a header in the file" do
+      chunk = parser.parse("Name,column_3\nA,B\nX,Y,Z\n").second
+
+      expect(chunk[:metadata]).to eq("Name" => "X", "column_3" => "Y", "column_3 (2)" => "Z")
+    end
+
     it "keeps cells beyond the last header under positional names" do
       chunk = parser.parse("Name\nHarbour Meals,extra\n").first
 
