@@ -28,7 +28,17 @@ RSpec.describe "Flyers", type: :request do
     it "preserves an explicit category selection in the form" do
       get new_flyer_path, params: {flyer: {categories: [health.id.to_s]}}
 
+      expect(response).to have_http_status(:ok)
       document = Nokogiri::HTML(response.body)
+      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
+    end
+
+    it "renders an error for unknown categories while preserving recognized selections" do
+      get new_flyer_path, params: {flyer: {categories: [health.id.to_s, "unknown"]}}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[role="alert"]').text).to include("Categories include unknown options: unknown")
       expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
     end
 

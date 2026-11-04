@@ -18,6 +18,9 @@ class FlyersController < ApplicationController
 
   def new
     @flyer = Flyer.new(flyer_params)
+    return if @flyer.valid?
+
+    render :new, status: :unprocessable_content
   end
 
   def preview
