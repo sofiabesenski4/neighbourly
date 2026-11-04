@@ -79,6 +79,13 @@ RSpec.describe Source, type: :model do
     it ".csv_sources returns only csv sources" do
       expect(Source.csv_sources.pluck(:name)).to eq(["CSV Source"])
     end
+
+    it ".fetchable returns only parsed sources with a url" do
+      Source.create!(name: "Linked CSV", url: "https://example.com/data.csv", source_type: "csv")
+      Source.form_entry_source
+
+      expect(Source.fetchable.pluck(:name)).to contain_exactly("API Source", "HTML Source", "Linked CSV")
+    end
   end
 
   describe "#api?, #html?, and #form?" do
