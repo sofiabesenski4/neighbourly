@@ -184,6 +184,22 @@ RSpec.describe "Sources", type: :system do
         expect(Source.last).to be_csv
         expect(Document.find_by!(title: "Harbour Meals").metadata).to include("Address" => "100 Harbour St")
       end
+
+      it "shows an error and keeps no source when the CSV is malformed" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Broken CSV"
+        select "CSV (spreadsheet rows)", from: "Data type"
+
+        file = create_temp_file("broken.csv", "Name,Notes\nHarbour,\"unclosed\n")
+        attach_file "Upload file", file.path
+
+        click_button "Upload and ingest"
+
+        expect(page).to have_content("File could not be read as CSV")
+        expect(page).to have_field("Source name", with: "Broken CSV")
+        expect(Source.count).to eq(0)
+      end
     end
 
     describe "validation errors" do

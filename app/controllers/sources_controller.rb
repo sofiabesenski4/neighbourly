@@ -40,6 +40,13 @@ class SourcesController < ApplicationController
     else
       render :new, status: :unprocessable_entity
     end
+  rescue ContentPipeline::Parsers::ParseError => e
+    # Parsing happens before any document is written, so removing the source
+    # leaves nothing behind and lets the admin fix the file and resubmit.
+    @source.destroy!
+    @source = Source.new(source_params.except(:file))
+    @source.errors.add(:file, e.message)
+    render :new, status: :unprocessable_entity
   end
 
   def destroy
