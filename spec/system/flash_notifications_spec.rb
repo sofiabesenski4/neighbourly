@@ -75,4 +75,24 @@ RSpec.describe "Flash notifications", type: :system do
     find("button[aria-label='Dismiss notification']").click
     expect(page).not_to have_css("[data-controller='flash']")
   end
+
+  it "keeps notifications below the shared header for members and admins on mobile and desktop" do
+    [false, true].each do |admin|
+      user.update!(admin: admin)
+      page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+        width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+      start_conversation
+
+      navigation = find("nav[aria-label='Main navigation']")
+      notification = find("[aria-label='Notifications']")
+      expect(notification.evaluate_script("this.getBoundingClientRect().top"))
+        .to be >= navigation.evaluate_script("this.getBoundingClientRect().bottom")
+
+      page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+      expect(notification.evaluate_script("this.getBoundingClientRect().top"))
+        .to be >= navigation.evaluate_script("this.getBoundingClientRect().bottom")
+    end
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
 end
