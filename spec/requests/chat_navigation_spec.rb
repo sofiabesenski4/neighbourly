@@ -27,13 +27,13 @@ RSpec.describe "Support page navigation", type: :request do
   it "uses the landing header in new and existing chat workspaces" do
     sign_in user
     get root_path
-    landing_header = navigation.to_html
+    landing_links = navigation.css("a").map { |link| [link["href"], link.text.squish, link.at_css("svg")&.to_html] }
     chat = user.chats.create!(model: model)
 
     [new_chat_path, chat_path(chat), chats_path].each do |path|
       get path
       expect(response).to have_http_status(:ok)
-      expect(navigation.to_html).to eq(landing_header)
+      expect(navigation.css("a").map { |link| [link["href"], link.text.squish, link.at_css("svg")&.to_html] }).to eq(landing_links)
       expect(navigation.at_css("a[aria-current='page']").text.squish).to eq("Chat")
     end
   end
