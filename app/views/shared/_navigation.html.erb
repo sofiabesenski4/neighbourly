@@ -1,6 +1,6 @@
 <nav aria-label="Main navigation" class="shrink-0 border-b border-stone-200 bg-white">
-  <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-    <div class="flex flex-wrap items-center gap-x-6 gap-y-3">
+  <div class="mx-auto max-w-7xl px-4 <%= content_for?(:landing_page) ? "py-2 sm:py-4" : "py-4" %> sm:px-6 lg:px-8">
+    <div class="flex flex-wrap items-center gap-x-6 <%= content_for?(:landing_page) ? "gap-y-1 sm:gap-y-3" : "gap-y-3" %>">
       <%= link_to root_path, class: "inline-flex min-h-11 shrink-0 items-center gap-2 text-xl font-semibold tracking-tight text-stone-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" do %>
         <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-sage-600 text-white">
           <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

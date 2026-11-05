@@ -28,7 +28,7 @@ RSpec.describe "Pages", type: :request do
         section = document.at_css("section[aria-labelledby='printout-heading']")
         expect(section).not_to be_nil
         expect(section.at_css("h2#printout-heading").text.squish).to eq("Prefer a paper copy?")
-        expect(section.text).to include("Make a paper guide with addresses, hours, and contact details.")
+        expect(section.text).to include("Print a guide with addresses, hours, and contacts.")
         link = section.at_css("a[href='#{new_flyer_path}']")
         expect(link.text.squish).to eq("Create printout")
         expect(link.at_css("svg[aria-hidden='true'][stroke='currentColor']")).to be_present
@@ -56,9 +56,11 @@ RSpec.describe "Pages", type: :request do
         expect(response.body).not_to include("verified community resources")
 
         document = Nokogiri::HTML(response.body)
-        features = document.at_css("section[aria-label='How Neighbourly helps']")
+        features = document.at_css("section[aria-labelledby='community-heading']")
         expect(features).not_to be_nil
-        expect(features.css("article").map { |article| [article.at_css("h2").text.squish, article.at_css("p").text.squish] })
+        expect(features.at_css("h2#community-heading").text.squish).to eq("About Neighbourly")
+        expect(features.css("a, button, input, textarea")).to be_empty
+        expect(features.css("article").map { |article| [article.at_css("h3").text.squish, article.at_css("p").text.squish] })
           .to eq([
             ["Ask in plain language", "Describe what you need and get relevant results from community resources."],
             ["Local organizations", "Information sourced from shelters, food banks, health centres, and other community services."],
