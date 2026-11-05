@@ -39,3 +39,6 @@ application.register("response-sync", ResponseSyncController);
 
 import CitationsController from "./citations_controller";
 application.register("citations", CitationsController);
+
+import FlyerBuilderController from "./flyer_builder_controller";
+application.register("flyer-builder", FlyerBuilderController);

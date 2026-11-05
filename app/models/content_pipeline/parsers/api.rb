@@ -84,6 +84,14 @@ module ContentPipeline
           full: beds&.dig("full"),
           age_range: age_range,
           gender: Array(record["gender"]).map { |g| g["value"] }.compact,
+          notes: record["notes"],
+          intake_info: record["intake_info"],
+          hours: record["hours"],
+          email: record["email"],
+          website: record["website"],
+          description: record["description"],
+          last_updated_at: record["last_updated_at"],
+          source_url: record["source_url"],
           closed: record["closed"]
         }.compact
       end

@@ -2,7 +2,7 @@ source "https://rubygems.org"
 ruby "4.0.4"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
-gem "rails", "~> 8.1.4"
+gem "rails", "~> 8.1.4", ">= 8.1.4.1"
 # The modern asset pipeline for Rails [https://github.com/rails/propshaft]
 gem "propshaft"
 # Use postgresql as the database for Active Record
@@ -87,6 +87,13 @@ gem "tailwindcss-rails", "~> 4.4"
 gem "ruby_llm", "~> 2.1"
 
 gem "neighbor", "~> 1.1"
+
+# Render resource cards directly from saved data, without a browser or LLM.
+gem "prawn", "~> 2.5"
+
+group :test do
+  gem "pdf-reader", "~> 2.15"
+end
 
 gem "dotenv-rails", groups: [:development, :test]
 
