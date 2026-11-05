@@ -1,0 +1,97 @@
+require "rails_helper"
+
+RSpec.describe "Landing question composer", type: :system do
+  let(:user) { User.create!(email: "question-composer@example.com", password: "password123") }
+  let(:model) { RubyLLM::Model.new(id: "claude-haiku-4-5", name: "Claude Haiku", provider: "anthropic") }
+
+  before do
+    driven_by(:selenium_chrome_headless)
+    page.current_window.resize_to(1280, 1000)
+    allow(Rails).to receive(:cache).and_return(ActiveSupport::Cache::MemoryStore.new)
+    allow(RubyLLM).to receive(:models).and_return(RubyLLM::Models.new([model]))
+    allow(RubyLLM.config).to receive(:default_model).and_return(model.id)
+    allow(RubyLLM.config).to receive(:anthropic_api_key).and_return("configured-for-test")
+    allow(ChatResponseJob).to receive(:perform_later)
+  end
+
+  it "fills and focuses each suggestion without submitting or opening another page" do
+    visit root_path
+    expect(page).to have_button("Sign in to start chat", disabled: true)
+
+    {
+      "Find food" => "Where can I get a free meal downtown?",
+      "Find shelter" => "Where can I find shelter tonight?",
+      "Find a shower" => "Where can I have a shower?"
+    }.each do |label, question|
+      click_button label
+      expect(page).to have_field("What are you looking for?", with: question)
+      expect(find_field("What are you looking for?")).to match_css(":focus")
+      expect(page).to have_current_path(root_path)
+    end
+    expect(page).to have_button("Sign in to start chat", disabled: false)
+    expect(ChatResponseJob).not_to have_received(:perform_later)
+  end
+
+  it "keeps a multiline question through a failed sign-in and sends it only after review" do
+    user
+    visit root_path
+    fill_in "What are you looking for?", with: "Find a meal"
+    find_field("What are you looking for?").send_keys(:enter, "near downtown")
+    question = "Find a meal\nnear downtown"
+    expect(page).to have_field("What are you looking for?", with: question)
+    click_button "Sign in to start chat"
+
+    expect(page).to have_current_path(new_user_session_path)
+    fill_in "Email address", with: user.email
+    fill_in "Password", with: "wrong-password"
+    click_button "Sign in", exact: true
+    expect(page).to have_content("Invalid email or password.")
+    fill_in "Password", with: "password123"
+    click_button "Sign in", exact: true
+
+    expect(page).to have_current_path(root_path)
+    expect(page).to have_field("What are you looking for?", with: question)
+    expect(ChatResponseJob).not_to have_received(:perform_later)
+    click_button "Start chat", exact: true
+
+    expect(page).to have_content("Chat was successfully created.")
+    expect(page).to have_current_path(chat_path(Chat.last))
+    expect(page).to have_content("Find a meal")
+    expect(Chat.last.messages.find_by!(role: "user").content).to eq(question)
+    expect(ChatResponseJob).to have_received(:perform_later).once
+  end
+
+  it "keeps the signed-in visitor's question editable after a failed start" do
+    login_as(user, scope: :user)
+    allow(RubyLLM.config).to receive(:anthropic_api_key).and_return(nil)
+    visit root_path
+    fill_in "What are you looking for?", with: "Where can I find a shower?"
+    click_button "Start chat", exact: true
+
+    expect(page).to have_content("Chat is temporarily unavailable. Please try again later.")
+    expect(page).to have_field("What are you looking for?", with: "Where can I find a shower?")
+    expect(find_field("What are you looking for?")["aria-invalid"]).to eq("true")
+    expect(page).to have_button("Start chat", disabled: false)
+    expect(ChatResponseJob).not_to have_received(:perform_later)
+  end
+
+  it "keeps the question controls readable and reachable on a narrow phone screen" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit root_path
+    click_button "Find food"
+
+    expect(find_field("What are you looking for?")).to match_css(":focus")
+    within("section[aria-label='Start a chat']") do
+      all("textarea, button").each do |element|
+        expect(element.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+      end
+      all("button").each do |button|
+        expect(button.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+      end
+    end
+    expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+end
