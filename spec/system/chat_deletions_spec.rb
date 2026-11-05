@@ -69,13 +69,18 @@ RSpec.describe "Conversation options", type: :system do
   it "supports keyboard access and Escape without deleting" do
     visit chat_path(chat)
     row = find("#chat_sidebar [data-chat-row='#{chat.id}']")
-    row.find_link("Meal options").send_keys(:tab)
+    link = row.find_link("Meal options")
+    # Establish the tab sequence's starting point before the composer can autofocus.
+    link.execute_script("this.focus()")
+    expect(row).to have_css("a:focus", text: "Meal options")
+    link.send_keys(:tab)
+    expect(row).to have_css("button[aria-haspopup='menu']:focus")
     page.driver.browser.switch_to.active_element.send_keys(:enter)
     expect(row).to have_css("[popover]:popover-open")
     expect(row).to have_css("[role='menuitem']:focus")
     row.find_button("Delete conversation").send_keys(:escape)
     expect(row).not_to have_css("[popover]:popover-open")
-    expect(row).to have_css("button[aria-expanded='false']")
+    expect(row).to have_css("button[aria-expanded='false']:focus")
     expect(Chat.exists?(chat.id)).to be(true)
   end
 
