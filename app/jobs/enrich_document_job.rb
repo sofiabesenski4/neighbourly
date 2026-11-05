@@ -8,9 +8,10 @@ class EnrichDocumentJob < ApplicationJob
   # then finds the row enriched and skips the paid call.
   limits_concurrency to: 1, key: ->(document) { document }, duration: 15.minutes
 
-  # Rate limits and outages pass, so wait them out rather than leave the row
-  # without a summary.
+  # Rate limits, outages and dropped connections pass, so wait them out
+  # rather than leave the row without a summary.
   retry_on RubyLLM::RateLimitError, RubyLLM::OverloadedError, RubyLLM::ServerError, RubyLLM::ServiceUnavailableError,
+    Faraday::TimeoutError, Faraday::ConnectionFailed,
     wait: :polynomially_longer, attempts: 5
   discard_on ActiveJob::DeserializationError
 
