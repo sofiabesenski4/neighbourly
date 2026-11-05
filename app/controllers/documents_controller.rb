@@ -21,7 +21,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-    if @document.save_with_category_names(build_categories)
+    if @document.save_with_category_names(selected_category_names)
       redirect_to sources_path, notice: "Resource '#{@document.title}' was created."
     else
       render :new, status: :unprocessable_entity
@@ -40,7 +40,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-    if @document.save_with_category_names(build_categories)
+    if @document.save_with_category_names(selected_category_names)
       redirect_to @document, notice: "Resource '#{@document.title}' was updated."
     else
       render :edit, status: :unprocessable_entity
@@ -63,7 +63,7 @@ class DocumentsController < ApplicationController
   def document_params
     params.require(:document).permit(
       :title, :description, :city, :address, :phone, :email,
-      :website, :hours, :categories, :age_min, :age_max, :gender, :notes
+      :website, :hours, :age_min, :age_max, :gender, :notes, category_ids: []
     )
   end
 
@@ -82,14 +82,14 @@ class DocumentsController < ApplicationController
       parts << "Age range: #{age_text}"
     end
     parts << "Gender: #{p[:gender]}" if p[:gender].present?
-    parts << "Categories: #{p[:categories]}" if p[:categories].present?
+    parts << "Categories: #{selected_category_names.join(", ")}" if selected_category_names.any?
     parts << "Description: #{p[:description]}" if p[:description].present?
     parts << "Notes: #{p[:notes]}" if p[:notes].present?
     parts.join("\n")
   end
 
-  def build_categories
-    document_params[:categories].to_s.split(",").map(&:strip).reject(&:blank?)
+  def selected_category_names
+    @selected_category_names ||= Category.where(id: Array(document_params[:category_ids]).compact_blank).order(:name).pluck(:name)
   end
 
   def build_metadata

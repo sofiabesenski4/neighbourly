@@ -26,7 +26,7 @@ RSpec.describe "Documents", type: :request do
         email: "info@example.org",
         website: "https://example.org",
         hours: "Mon-Sun 7am-11pm",
-        categories: "Shelters, Meals, Clothing",
+        category_ids: Category.where(name: ["Shelters", "Meals", "Clothing"]).ids,
         age_min: "19",
         age_max: "",
         gender: "all",
@@ -50,6 +50,13 @@ RSpec.describe "Documents", type: :request do
         expect(response.body).to include("Description of services")
         expect(response.body).to include("City")
         expect(response.body).to include("Hours of operation")
+      end
+
+      it "shows a checkbox for each category" do
+        get new_document_path
+        Category.find_each do |category|
+          assert_select "input[type=checkbox][name='document[category_ids][]'][value='#{category.id}']"
+        end
       end
     end
 
@@ -80,7 +87,7 @@ RSpec.describe "Documents", type: :request do
         expect(doc.content).to include("Address: 100 Harbour St")
         expect(doc.content).to include("Phone: 250-555-0100")
         expect(doc.content).to include("Hours: Mon-Sun 7am-11pm")
-        expect(doc.content).to include("Categories: Shelters, Meals, Clothing")
+        expect(doc.content).to include("Categories: Clothing, Meals, Shelters")
         expect(doc.content).to include("Age range: 19+")
         expect(doc.content).to include("Description: Drop-in centre offering meals and shelter")
       end
