@@ -6,7 +6,7 @@ env:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     services:
       postgres:
@@ -44,6 +44,15 @@ jobs:
 
       - name: Install JS dependencies and build assets
         run: yarn install --frozen-lockfile && yarn build
+
+      - name: Run JavaScript tests
+        run: yarn test-javascript
+
+      - name: Prepare headless browser tests
+        run: |
+          google-chrome --version
+          "$CHROMEWEBDRIVER/chromedriver" --version
+          echo "$CHROMEWEBDRIVER" >> "$GITHUB_PATH"
 
       - name: Set up database
         run: bin/rails db:schema:load

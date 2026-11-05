@@ -145,6 +145,30 @@ RSpec.describe Document, type: :model do
     end
   end
 
+  describe ".in_categories" do
+    before do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+    end
+
+    it "matches any selected association and returns each document once" do
+      meals = Category.create!(name: "Meals")
+      showers = Category.create!(name: "Showers")
+      meal_program = source.documents.create!(content: "Meals", categories: [meals])
+      drop_in = source.documents.create!(content: "Drop-in", categories: [meals, showers])
+      source.documents.create!(content: "Untagged", metadata: {categories: ["Meals"]})
+
+      expect(Document.in_categories([meals.id, showers.id])).to contain_exactly(meal_program, drop_in)
+    end
+
+    it "does not match names instead of category IDs" do
+      meals = Category.create!(name: "Meals")
+      source.documents.create!(content: "Meals", categories: [meals])
+
+      expect(Document.in_categories(["Meals"])).to be_empty
+      expect(Document.in_categories([])).to be_empty
+    end
+  end
+
   describe ".search_by_similarity" do
     it "returns documents ordered by cosine similarity" do
       vec_a = Array.new(1536, 0.0)

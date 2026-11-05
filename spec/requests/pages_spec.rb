@@ -18,6 +18,9 @@ RSpec.describe "Pages", type: :request do
         get root_path
 
         expect(response.body).to include(%(href="#{new_flyer_path}"))
+        flyer_links = Nokogiri::HTML(response.body).css(%(a[href="#{new_flyer_path}"]))
+        expect(flyer_links).not_to be_empty
+        expect(flyer_links.map { |link| link["data-turbo"] }.uniq).to eq(["false"])
       end
     end
 
@@ -39,6 +42,9 @@ RSpec.describe "Pages", type: :request do
         get root_path
 
         expect(response.body).to include(%(href="#{new_flyer_path}"))
+        flyer_links = Nokogiri::HTML(response.body).css(%(a[href="#{new_flyer_path}"]))
+        expect(flyer_links).not_to be_empty
+        expect(flyer_links.map { |link| link["data-turbo"] }.uniq).to eq(["false"])
       end
     end
   end

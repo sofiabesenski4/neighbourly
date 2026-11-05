@@ -54,6 +54,36 @@ RSpec.describe ContentPipeline::Parsers::Api do
       expect(chunk[:metadata][:city]).to eq("vancouver")
       expect(chunk[:metadata][:phone]).to eq(["604-555-1234"])
       expect(chunk[:metadata][:gender]).to eq(["men"])
+      expect(chunk[:categories]).to eq(["24 Hour", "Pet Friendly"])
+      expect(chunk[:metadata][:notes]).to eq("No drugs or alcohol")
+      expect(chunk[:metadata][:intake_info]).to eq("First come first served")
+    end
+
+    it "preserves supplied print fields without inventing missing values" do
+      record = JSON.parse(shelter_json).first.merge(
+        "hours" => "Every day, noon-1pm", "email" => "info@example.org",
+        "website" => "https://example.org", "description" => "A hot lunch",
+        "last_updated_at" => "2026-10-15", "source_url" => "https://example.org/guide"
+      )
+
+      metadata = parser.parse([record].to_json).first.fetch(:metadata)
+
+      %w[hours email website description last_updated_at source_url].each do |key|
+        expect(metadata[key.to_sym]).to eq(record[key])
+      end
+      expect(parser.parse(shelter_json).first[:metadata]).not_to have_key(:last_updated_at)
+    end
+
+    it "preserves source taxonomy names for database category assignment" do
+      json = [{
+        "id" => 1,
+        "post_title" => "Drop-in Centre",
+        "taxonomies" => [{"name" => "Meals"}, {"name" => "Showers"}, {"name" => "Pet Friendly"}]
+      }].to_json
+
+      chunk = parser.parse(json).first
+
+      expect(chunk[:categories]).to eq(["Meals", "Showers", "Pet Friendly"])
     end
 
     it "skips records without a post_title" do

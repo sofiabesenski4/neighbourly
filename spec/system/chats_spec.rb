@@ -124,4 +124,17 @@ RSpec.describe "Chats", type: :system do
       expect(page).to have_current_path(models_path)
     end
   end
+
+  context "when logged in as an admin" do
+    let(:admin) { User.create!(email: "chatadmin@example.com", password: "password123", admin: true) }
+
+    before { login_as(admin, scope: :user) }
+
+    it "links to the Models page" do
+      visit chats_path
+      click_link "Models"
+
+      expect(page).to have_current_path(models_path)
+    end
+  end
 end

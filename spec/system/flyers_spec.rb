@@ -1,27 +1,45 @@
 require "rails_helper"
 
 RSpec.describe "Flyers", type: :system do
+  let!(:food) { Category.create!(name: "Meals") }
+  let!(:shelter) { Category.create!(name: "Shelters") }
+  let!(:harm_reduction) { Category.create!(name: "Harm Reduction Resources") }
+
   before do
     driven_by(:rack_test)
   end
 
   it "lets a visitor choose categories and request a flyer from the home page" do
-    expect(FlyerGenerator).to receive(:call).with(categories: ["food", "substance_use"]).and_return(nil)
+    expect(FlyerGenerator).to receive(:call).with(categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s)).and_return(nil)
 
     visit root_path
     click_link "Make a printable flyer"
 
-    check "Food"
-    check "Substance use support"
-    click_button "Generate flyer"
+    check "Meals"
+    check "Harm Reduction Resources"
+    click_button "Generate printout"
 
-    expect(page).to have_content("Flyer generation is coming soon")
+    expect(page).to have_content("No resources matched those categories")
   end
 
-  it "asks the visitor to choose something when nothing is selected" do
-    visit new_flyer_path
-    click_button "Generate flyer"
+  it "lets a visitor print the complete guide without selecting filters" do
+    expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all-resources")
 
-    expect(page).to have_content("must include at least one type of information")
+    visit new_flyer_path
+    expect(page).not_to have_checked_field("Meals")
+    expect(page).not_to have_checked_field("Shelters")
+    click_button "Generate printout"
+
+    expect(page.response_headers["Content-Type"]).to include("application/pdf")
+    expect(page.body).to eq("%PDF-all-resources")
+  end
+
+  it "shows responsive Tailwind filter controls without the builder stylesheet" do
+    visit new_flyer_path
+
+    filters = find('aside[aria-label="Resource filters"]')
+    expect(filters[:class].split).to include("rounded-xl", "border-stone-200")
+    expect(first('label:has(input[data-flyer-builder-target="category"])')[:class].split).to include("has-checked:bg-sage-100")
+    expect(page).to have_no_css('link[href*="flyer_builder"]', visible: :all)
   end
 end

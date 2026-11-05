@@ -13,6 +13,10 @@ class Document < ApplicationRecord
 
   scope :with_embeddings, -> { where.not(embedding: nil) }
 
+  scope :in_categories, ->(category_ids) {
+    joins(:categories).where(categories: {id: category_ids}).distinct
+  }
+
   def category_names
     categories.map(&:name)
   end
