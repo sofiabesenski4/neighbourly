@@ -103,6 +103,38 @@ RSpec.describe ContentPipeline::Enricher do
     expect(document.reload.content).to start_with("Lunches.\n\n")
   end
 
+  it "finds the JSON object after prose that holds braces of its own" do
+    reply.replace("Fields used: {Program Name}. Result:\n{\"title\": \"Harbour Meals\", \"summary\": \"Lunches.\", \"categories\": []}\nDone {ok}.")
+
+    described_class.new(document).enrich!
+
+    expect(document.reload.content).to start_with("Lunches.\n\n")
+  end
+
+  it "raises InvalidResponse when the summary is not text" do
+    reply.replace({title: "Harbour Meals", summary: {text: "Lunches."}, categories: []}.to_json)
+
+    expect { described_class.new(document).enrich! }.to raise_error(described_class::InvalidResponse, /no summary/)
+  end
+
+  it "keeps the existing title when the model's title is not text" do
+    reply.replace({title: ["Harbour"], summary: "Lunches.", categories: []}.to_json)
+
+    described_class.new(document).enrich!
+
+    expect(document.reload.title).to eq("Harbour Meals")
+  end
+
+  it "saves nothing when another run enriched the row while the model was answering" do
+    allow(chat).to receive(:ask) do
+      Document.where(id: document.id).update_all(enriched_at: 1.minute.ago, content: "Earlier summary.")
+      instance_double(RubyLLM::Message, content: reply)
+    end
+
+    expect(described_class.new(document).enrich!).to be(false)
+    expect(document.reload.content).to eq("Earlier summary.")
+  end
+
   it "raises InvalidResponse and leaves the document alone when the reply is not JSON" do
     reply.replace("I cannot help with that.")
 

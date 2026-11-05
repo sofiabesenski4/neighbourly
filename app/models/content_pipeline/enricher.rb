@@ -21,10 +21,12 @@ module ContentPipeline
       @model = model || ENV["ENRICHMENT_MODEL"].presence || RubyLLM.config.default_model
     end
 
-    # Returns false without saving when the row changed while the model was
-    # answering, since the summary would describe the old row.
+    # Returns false without saving when the row changed or was enriched by
+    # another run while the model was answering. Either way this summary is
+    # stale or redundant.
     def enrich!
       metadata = @document.metadata
+      enriched_at = @document.enriched_at
       result = describe(metadata)
       content = [result[:summary], Parsers::Csv.render_fields(metadata)].join("\n\n")
       # Embedded here rather than on save, so a rate limit or outage raises
@@ -32,7 +34,7 @@ module ContentPipeline
       embedding = Embedder.embed(content)
 
       @document.with_lock do
-        if @document.metadata == metadata
+        if @document.metadata == metadata && @document.enriched_at == enriched_at
           @document.title = result[:title] if result[:title]
           @document.content = content
           @document.embedding = embedding
@@ -82,21 +84,41 @@ module ContentPipeline
       }
     end
 
-    # Models without structured output may wrap the JSON in prose or a code
-    # fence, so read the outermost object. Category names are matched to the
-    # real list and anything else is dropped.
+    # Category names are matched to the real list and anything else is
+    # dropped. A summary or title that is not text is treated as missing.
     def parse(content, categories)
-      data = content.is_a?(Hash) ? content.stringify_keys : JSON.parse(content.to_s[/\{.*\}/m].to_s)
-      summary = data["summary"].to_s.strip
+      data = content.is_a?(Hash) ? content.stringify_keys : json_object_in(content.to_s)
+      summary = data["summary"].is_a?(String) ? data["summary"].strip : ""
       raise InvalidResponse, "The model returned no summary." if summary.blank?
 
+      title = data["title"].is_a?(String) ? data["title"].squish.presence : nil
       by_name = categories.index_by(&:downcase)
       {
-        title: data["title"].to_s.squish.presence&.truncate(Parsers::Csv::MAX_TITLE_LENGTH),
+        title: title&.truncate(Parsers::Csv::MAX_TITLE_LENGTH),
         summary: summary.truncate(MAX_SUMMARY_LENGTH),
         categories: Array(data["categories"]).filter_map { |name| by_name[name.to_s.strip.downcase] }.uniq
       }
-    rescue JSON::ParserError
+    end
+
+    # Models without structured output may wrap the JSON in prose or a code
+    # fence, and the prose may hold braces of its own. Return the first span
+    # from a "{" to a "}" that parses as a JSON object.
+    def json_object_in(text)
+      closings = (0...text.length).select { |index| text[index] == "}" }.reverse
+      (0...text.length).each do |opening|
+        next unless text[opening] == "{"
+
+        closings.each do |closing|
+          break if closing < opening
+
+          value = begin
+            JSON.parse(text[opening..closing])
+          rescue JSON::ParserError
+            nil
+          end
+          return value if value.is_a?(Hash)
+        end
+      end
       raise InvalidResponse, "The model did not return JSON."
     end
   end
