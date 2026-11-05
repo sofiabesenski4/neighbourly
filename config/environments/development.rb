@@ -25,8 +25,14 @@ Rails.application.configure do
     config.action_controller.perform_caching = false
   end
 
-  # Change to :null_store to avoid any caching.
-  config.cache_store = :memory_store
+  # Use Redis when REDIS_URL is set, as staging and production do, so rate
+  # limits behave the same locally. Change :memory_store to :null_store to
+  # avoid any caching.
+  config.cache_store = if ENV["REDIS_URL"].present?
+    [:redis_cache_store, {url: ENV["REDIS_URL"], namespace: "neighbourly_resources:cache"}]
+  else
+    :memory_store
+  end
 
   # Store uploaded files on the local file system (see config/storage.yml for options).
   config.active_storage.service = :local
@@ -54,6 +60,10 @@ Rails.application.configure do
 
   # Highlight code that enqueued background job in logs.
   config.active_job.verbose_enqueue_logs = true
+
+  # Jobs run in-process by default. Set SOLID_QUEUE_IN_PUMA=1 to queue them in
+  # Solid Queue with workers inside Puma, as staging and production do.
+  config.active_job.queue_adapter = :solid_queue if ENV["SOLID_QUEUE_IN_PUMA"] == "1"
 
   # Highlight code that triggered redirect in logs.
   config.action_dispatch.verbose_redirect_logs = true

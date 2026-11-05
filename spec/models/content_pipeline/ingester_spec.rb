@@ -6,12 +6,14 @@ RSpec.describe ContentPipeline::Ingester do
   let(:fake_vector) { Array.new(1536) { rand(-1.0..1.0) } }
 
   let(:api_response) do
-    [{"id" => 1, "post_title" => "Test Shelter", "location" => {"city" => {"label" => "Vancouver"}}}].to_json
+    [{"id" => 1, "post_title" => "Test Shelter", "location" => {"city" => {"label" => "Vancouver"}},
+      "taxonomies" => [{"name" => "Food Banks"}, {"name" => "Shelters"}]}].to_json
   end
 
   before do
     allow_any_instance_of(ContentPipeline::Fetcher).to receive(:call).and_return(api_response)
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
+    %w[Food\ Banks Shelters].each { |name| Category.find_or_create_by!(name: name) }
   end
 
   describe "#call" do
@@ -22,8 +24,12 @@ RSpec.describe ContentPipeline::Ingester do
       expect(doc.title).to eq("Test Shelter")
       expect(doc.content).to include("Test Shelter")
       expect(doc.content).to include("City: Vancouver")
+      expect(doc.content).to include("Categories: Food Banks, Shelters")
+      expect(doc.category_names).to eq(["Food Banks", "Shelters"])
+      expect(doc.metadata).not_to have_key("categories")
       expect(doc.source).to eq(source)
       expect(doc.embedding).not_to be_nil
+      expect(ContentPipeline::Embedder).to have_received(:embed).with(doc.content)
     end
 
     it "updates the source's last_fetched_at timestamp" do
@@ -75,6 +81,15 @@ RSpec.describe ContentPipeline::Ingester do
     end
   end
 
+  describe "#parse" do
+    it "returns chunks without writing documents" do
+      chunks = nil
+
+      expect { chunks = ingester.parse([{"id" => 1, "post_title" => "Test"}].to_json) }.not_to change(Document, :count)
+      expect(chunks.map { |chunk| chunk[:title] }).to eq(["Test"])
+    end
+  end
+
   describe "#ingest" do
     it "parses raw content directly without fetching from URL" do
       raw_json = [{"id" => 99, "post_title" => "Uploaded Shelter"}].to_json
@@ -105,6 +120,32 @@ RSpec.describe ContentPipeline::Ingester do
         expect { ingester.ingest(html) }.to change(Document, :count).by(1)
 
         expect(Document.last.content).to include("Meals served daily")
+      end
+    end
+
+    context "with a CSV source" do
+      let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv") }
+      let(:csv) { "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n" }
+
+      it "creates one embedded document per row with the row in metadata" do
+        expect { ingester.ingest(csv) }.to change(Document, :count).by(2)
+
+        doc = source.documents.find_by!(title: "Harbour Meals")
+        expect(doc.metadata).to eq("Name" => "Harbour Meals", "Address" => "100 Harbour St")
+        expect(doc.content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
+        expect(doc.categories).to be_empty
+        expect(doc.embedding).not_to be_nil
+      end
+
+      it "does not duplicate documents when the same file is ingested again" do
+        ingester.ingest(csv)
+
+        expect { ingester.ingest(csv) }.not_to change(Document, :count)
+      end
+
+      it "writes no documents when the file is malformed" do
+        expect { ingester.ingest("Name\n\"unclosed\n") }.to raise_error(ContentPipeline::Parsers::ParseError)
+        expect(Document.count).to eq(0)
       end
     end
   end

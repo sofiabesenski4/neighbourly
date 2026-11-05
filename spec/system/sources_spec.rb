@@ -2,6 +2,8 @@ require "rails_helper"
 require "tmpdir"
 
 RSpec.describe "Sources", type: :system do
+  include ActiveJob::TestHelper
+
   before do
     driven_by(:rack_test)
   end
@@ -59,6 +61,14 @@ RSpec.describe "Sources", type: :system do
       expect(page).to have_content("1 document")
     end
 
+    it "subscribes the sources list to one refresh stream" do
+      2.times { |i| Source.create!(name: "Uploaded #{i}", source_type: "csv") }
+
+      visit sources_path
+
+      expect(page).to have_css("turbo-cable-stream-source", count: 1, visible: :all)
+    end
+
     it "shows an empty state when no sources exist" do
       visit sources_path
       expect(page).to have_content("No sources have been added yet.")
@@ -71,14 +81,15 @@ RSpec.describe "Sources", type: :system do
 
     it "shows form-created documents on the sources page" do
       form_source = Source.form_entry_source
-      form_source.documents.create!(title: "Manual Resource", content: "test", metadata: {city: "Victoria", categories: ["shelter"]})
+      Category.find_or_create_by!(name: "Shelters")
+      form_source.documents.create!(title: "Manual Resource", content: "test", category_names: ["Shelters"], metadata: {city: "Victoria"})
 
       visit sources_path
 
       expect(page).to have_content("Manual Resource")
       expect(page).to have_content("FORM")
       expect(page).to have_content("Victoria")
-      expect(page).to have_content("shelter")
+      expect(page).to have_content("Shelters")
     end
 
     describe "viewing a source" do
@@ -140,9 +151,10 @@ RSpec.describe "Sources", type: :system do
         file = create_temp_file("shelters.json", json_content)
         attach_file "Upload file", file.path
 
-        click_button "Upload and ingest"
+        perform_enqueued_jobs { click_button "Upload and ingest" }
 
-        expect(page).to have_content("Source 'Test Shelters' created and 1 documents ingested.")
+        expect(page).to have_content("Source 'Test Shelters' created. Its documents are being ingested in the background.")
+        expect(page).to have_content("1 document")
         expect(Source.last.name).to eq("Test Shelters")
         expect(Document.last.title).to eq("My Shelter")
       end
@@ -160,10 +172,102 @@ RSpec.describe "Sources", type: :system do
         file = create_temp_file("meals.html", html_content)
         attach_file "Upload file", file.path
 
+        perform_enqueued_jobs { click_button "Upload and ingest" }
+
+        expect(page).to have_content("Source 'Harbour Street Meals' created. Its documents are being ingested in the background.")
+        expect(page).to have_content("1 document")
+        expect(Document.last.content).to include("Free meals daily")
+      end
+    end
+
+    describe "uploading a CSV source" do
+      it "creates a source and ingests one document per row" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Drop-in Centres"
+        select "CSV (spreadsheet rows)", from: "Data type"
+
+        file = create_temp_file("centres.csv", "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n")
+        attach_file "Upload file", file.path
+
+        perform_enqueued_jobs { click_button "Upload and ingest" }
+
+        expect(page).to have_content("Source 'Drop-in Centres' created. Its documents are being ingested in the background.")
+        expect(page).to have_content("2 document")
+        expect(Source.last).to be_csv
+        expect(Document.find_by!(title: "Harbour Meals").metadata).to include("Address" => "100 Harbour St")
+      end
+
+      it "shows an error and keeps no source when the CSV is malformed" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Broken CSV"
+        select "CSV (spreadsheet rows)", from: "Data type"
+
+        file = create_temp_file("broken.csv", "Name,Notes\nHarbour,\"unclosed\n")
+        attach_file "Upload file", file.path
+
         click_button "Upload and ingest"
 
-        expect(page).to have_content("Source 'Harbour Street Meals' created and 1 documents ingested.")
-        expect(Document.last.content).to include("Free meals daily")
+        expect(page).to have_content("File could not be read as CSV")
+        expect(page).to have_field("Source name", with: "Broken CSV")
+        expect(Source.count).to eq(0)
+      end
+    end
+
+    describe "ingesting in the background" do
+      def upload_csv
+        visit new_source_path
+        fill_in "Source name", with: "Drop-in Centres"
+        select "CSV (spreadsheet rows)", from: "Data type"
+        attach_file "Upload file", create_temp_file("centres.csv", "Name\nHarbour Meals\n").path
+        click_button "Upload and ingest"
+      end
+
+      it "queues the upload and shows that it is waiting" do
+        expect { upload_csv }.to have_enqueued_job(IngestSourceJob)
+
+        expect(page).to have_content("Waiting to ingest")
+        expect(page).to have_content("0 documents")
+        expect(Source.last).to be_ingestion_pending
+      end
+
+      it "subscribes the source page to refreshes while the upload is ingested" do
+        upload_csv
+
+        expect(page).to have_css("turbo-cable-stream-source", visible: :all)
+        expect(page).to have_css("meta[name='turbo-refresh-method'][content='morph']", visible: :all)
+        expect(page).to have_content("This page updates when ingestion finishes.")
+      end
+
+      it "marks the source failed when its ingestion cannot be queued" do
+        allow(IngestSourceJob).to receive(:perform_later).and_return(false)
+        upload_csv
+
+        expect(page).to have_content("Source 'Drop-in Centres' was created, but its ingestion could not be started.")
+        expect(page).to have_content("Ingestion failed")
+        expect(page).to have_content("Ingestion could not be queued.")
+        expect(Source.last.upload_content).to be_present
+      end
+
+      it "marks the source failed when the queue raises" do
+        allow(IngestSourceJob).to receive(:perform_later).and_raise(SolidQueue::Job::EnqueueError, "database unavailable")
+        upload_csv
+
+        expect(page).to have_content("Ingestion could not be queued: database unavailable")
+        expect(Source.last).to be_ingestion_failed
+      end
+
+      it "shows the error when ingestion fails" do
+        allow(ContentPipeline::Embedder).to receive(:embed).and_raise(RubyLLM::Error, "embedding service unavailable")
+        upload_csv
+
+        expect { perform_enqueued_jobs }.to raise_error(ActiveRecord::RecordNotSaved)
+        visit source_path(Source.last)
+
+        expect(page).to have_content("Ingestion failed")
+        expect(page).to have_content("Ingestion stopped with an error")
+        expect(page).to have_content("Failed to generate embedding: embedding service unavailable")
       end
     end
 
@@ -191,6 +295,19 @@ RSpec.describe "Sources", type: :system do
         click_button "Upload and ingest"
 
         expect(page).to have_content("File must be a .json file for API sources")
+      end
+
+      it "rejects a non-CSV file for a CSV source" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Wrong Type"
+        select "CSV (spreadsheet rows)", from: "Data type"
+
+        file = create_temp_file("data.json", [{"id" => 1}].to_json)
+        attach_file "Upload file", file.path
+        click_button "Upload and ingest"
+
+        expect(page).to have_content("a .csv file for CSV sources")
       end
 
       it "requires a source name" do

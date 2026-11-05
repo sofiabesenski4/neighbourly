@@ -21,8 +21,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-
-    if @document.save
+    if @document.save_with_category_names(selected_category_names)
       redirect_to sources_path, notice: "Resource '#{@document.title}' was created."
     else
       render :new, status: :unprocessable_entity
@@ -41,8 +40,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
-
-    if @document.save
+    if @document.save_with_category_names(selected_category_names)
       redirect_to @document, notice: "Resource '#{@document.title}' was updated."
     else
       render :edit, status: :unprocessable_entity
@@ -53,10 +51,18 @@ class DocumentsController < ApplicationController
     authorize @document
     title = @document.title
     @document.destroy!
-    redirect_back fallback_location: sources_path, notice: "Resource '#{title}' was deleted.", status: :see_other
+    redirect_to referer_or_default_path, notice: "Resource '#{title}' was deleted.", status: :see_other
   end
 
   private
+
+  def referer_or_default_path
+    return sources_path if request.referer&.match?(/\/documents\/\d+/)
+
+    URI.parse(request.referer.to_s).path.presence || sources_path
+  rescue URI::InvalidURIError
+    sources_path
+  end
 
   def set_document
     @document = Document.find(params[:id])
@@ -65,7 +71,7 @@ class DocumentsController < ApplicationController
   def document_params
     params.require(:document).permit(
       :title, :description, :city, :address, :phone, :email,
-      :website, :hours, :categories, :age_min, :age_max, :gender, :notes
+      :website, :hours, :age_min, :age_max, :gender, :notes, category_ids: []
     )
   end
 
@@ -84,10 +90,14 @@ class DocumentsController < ApplicationController
       parts << "Age range: #{age_text}"
     end
     parts << "Gender: #{p[:gender]}" if p[:gender].present?
-    parts << "Categories: #{p[:categories]}" if p[:categories].present?
+    parts << "Categories: #{selected_category_names.join(", ")}" if selected_category_names.any?
     parts << "Description: #{p[:description]}" if p[:description].present?
     parts << "Notes: #{p[:notes]}" if p[:notes].present?
     parts.join("\n")
+  end
+
+  def selected_category_names
+    @selected_category_names ||= Category.where(id: Array(document_params[:category_ids]).compact_blank).order(:name).pluck(:name)
   end
 
   def build_metadata
@@ -106,7 +116,6 @@ class DocumentsController < ApplicationController
       }.compact
     end
     meta[:gender] = p[:gender].split(",").map(&:strip).reject(&:blank?) if p[:gender].present?
-    meta[:categories] = p[:categories].split(",").map(&:strip).reject(&:blank?) if p[:categories].present?
     meta[:description] = p[:description] if p[:description].present?
     meta[:notes] = p[:notes] if p[:notes].present?
     meta

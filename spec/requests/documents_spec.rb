@@ -10,6 +10,7 @@ RSpec.describe "Documents", type: :request do
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
+    ["Meals", "Shelters", "Clothing"].each { |name| Category.find_or_create_by!(name: name) }
   end
 
   let(:document) { form_source.documents.create!(title: "Test Shelter", content: "Test Shelter\nCity: Victoria") }
@@ -25,7 +26,7 @@ RSpec.describe "Documents", type: :request do
         email: "info@example.org",
         website: "https://example.org",
         hours: "Mon-Sun 7am-11pm",
-        categories: "shelter, meals, clothing",
+        category_ids: Category.where(name: ["Shelters", "Meals", "Clothing"]).ids,
         age_min: "19",
         age_max: "",
         gender: "all",
@@ -50,6 +51,13 @@ RSpec.describe "Documents", type: :request do
         expect(response.body).to include("City")
         expect(response.body).to include("Hours of operation")
       end
+
+      it "shows a checkbox for each category" do
+        get new_document_path
+        Category.find_each do |category|
+          assert_select "input[type=checkbox][name='document[category_ids][]'][value='#{category.id}']"
+        end
+      end
     end
 
     context "as regular user" do
@@ -73,12 +81,13 @@ RSpec.describe "Documents", type: :request do
 
         doc = Document.last
         expect(doc.title).to eq("Harbour Street Society")
+        expect(doc.category_names).to eq(["Clothing", "Meals", "Shelters"])
         expect(doc.content).to include("Harbour Street Society")
         expect(doc.content).to include("City: Victoria")
         expect(doc.content).to include("Address: 100 Harbour St")
         expect(doc.content).to include("Phone: 250-555-0100")
         expect(doc.content).to include("Hours: Mon-Sun 7am-11pm")
-        expect(doc.content).to include("Categories: shelter, meals, clothing")
+        expect(doc.content).to include("Categories: Clothing, Meals, Shelters")
         expect(doc.content).to include("Age range: 19+")
         expect(doc.content).to include("Description: Drop-in centre offering meals and shelter")
       end
@@ -93,7 +102,6 @@ RSpec.describe "Documents", type: :request do
         expect(meta["email"]).to eq("info@example.org")
         expect(meta["website"]).to eq("https://example.org")
         expect(meta["hours"]).to eq("Mon-Sun 7am-11pm")
-        expect(meta["categories"]).to eq(["shelter", "meals", "clothing"])
         expect(meta["age_range"]).to eq({"min" => 19})
         expect(meta["gender"]).to eq(["all"])
         expect(meta["notes"]).to eq("No referral needed")
@@ -209,6 +217,29 @@ RSpec.describe "Documents", type: :request do
 
       it "redirects to sources" do
         delete document_path(document)
+        expect(response).to redirect_to(sources_path)
+      end
+
+      it "redirects to sources when referer is the document page" do
+        document
+        delete document_path(document), headers: {"HTTP_REFERER" => document_url(document)}
+        expect(response).to redirect_to(sources_path)
+      end
+
+      it "redirects to sources index when referer is sources index" do
+        delete document_path(document), headers: {"HTTP_REFERER" => sources_path}
+        expect(response).to redirect_to(sources_path)
+      end
+
+      it "redirects to the source show page when referer is a source page" do
+        source = Source.create!(name: "Test Source", source_type: "api")
+        source.documents << document
+        delete document_path(document), headers: {"HTTP_REFERER" => source_url(source)}
+        expect(response).to redirect_to(source_url(source))
+      end
+
+      it "redirects to sources when referer is invalid" do
+        delete document_path(document), headers: {"HTTP_REFERER" => "not a valid url"}
         expect(response).to redirect_to(sources_path)
       end
     end

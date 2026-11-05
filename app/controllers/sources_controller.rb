@@ -29,17 +29,28 @@ class SourcesController < ApplicationController
     end
 
     unless valid_file_type?(file, @source.source_type)
-      @source.errors.add(:file, "must be a .json file for API sources or an .html file for HTML sources")
+      @source.errors.add(:file, "must be a .json file for API sources, an .html file for HTML sources, or a .csv file for CSV sources")
       render :new, status: :unprocessable_entity and return
     end
 
+    raw_content = file.read
+    # Parsing is quick next to embedding, so a malformed file is caught here
+    # and shown on the form instead of failing later in the background.
+    ContentPipeline::Ingester.new(@source).parse(raw_content)
+
+    @source.assign_attributes(upload_content: raw_content, ingestion_status: :pending)
     if @source.save
-      raw_content = file.read
-      count = ContentPipeline::Ingester.new(@source).ingest(raw_content)
-      redirect_to sources_path, notice: "Source '#{@source.name}' created and #{count} documents ingested."
+      if enqueue_ingestion(@source)
+        redirect_to @source, notice: "Source '#{@source.name}' created. Its documents are being ingested in the background."
+      else
+        redirect_to @source, alert: "Source '#{@source.name}' was created, but its ingestion could not be started."
+      end
     else
       render :new, status: :unprocessable_entity
     end
+  rescue ContentPipeline::Parsers::ParseError => e
+    @source.errors.add(:file, e.message)
+    render :new, status: :unprocessable_entity
   end
 
   def destroy
@@ -51,6 +62,19 @@ class SourcesController < ApplicationController
 
   private
 
+  # A source whose job was never queued would wait forever, so record the
+  # failure where the admin can see it. The upload is kept for a retry.
+  def enqueue_ingestion(source)
+    return true if IngestSourceJob.perform_later(source)
+
+    source.update!(ingestion_status: :failed, ingestion_error: "Ingestion could not be queued.")
+    false
+  rescue ActiveJob::EnqueueError, SolidQueue::Job::EnqueueError => e
+    Rails.error.report(e, context: {source_id: source.id})
+    source.update!(ingestion_status: :failed, ingestion_error: "Ingestion could not be queued: #{e.message}")
+    false
+  end
+
   def source_params
     params.require(:source).permit(:name, :url, :source_type, :css_selector, :file)
   end
@@ -60,6 +84,7 @@ class SourcesController < ApplicationController
     case source_type
     when "api" then extension == ".json"
     when "html" then extension.in?([".html", ".htm"])
+    when "csv" then extension == ".csv"
     else false
     end
   end

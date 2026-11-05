@@ -21,7 +21,7 @@ module ContentPipeline
     def ingest(raw_content)
       Rails.logger.info "[ContentPipeline] Ingesting source: #{@source.name} (#{@source.source_type})"
 
-      chunks = @parser.parse(raw_content)
+      chunks = parse(raw_content)
 
       Rails.logger.info "[ContentPipeline] Parsed #{chunks.size} chunks from #{@source.name}"
 
@@ -36,6 +36,12 @@ module ContentPipeline
       chunks.size
     end
 
+    # Parse raw content into document chunks without writing anything. Raises
+    # Parsers::ParseError when the content cannot be read.
+    def parse(raw_content)
+      @parser.parse(raw_content)
+    end
+
     private
 
     def parser_for(source)
@@ -44,6 +50,8 @@ module ContentPipeline
         Parsers::Api.new(source)
       when "html"
         Parsers::Html.new(source)
+      when "csv"
+        Parsers::Csv.new(source)
       else
         raise ArgumentError, "Unknown source type: #{source.source_type}"
       end
@@ -54,7 +62,7 @@ module ContentPipeline
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
-      document.save!
+      document.save_with_category_names!(chunk[:categories] || [])
     end
   end
 end

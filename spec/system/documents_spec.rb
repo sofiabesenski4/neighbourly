@@ -11,6 +11,7 @@ RSpec.describe "Documents", type: :system do
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
+    ["Meals", "Shelters", "Health Care"].each { |name| Category.find_or_create_by!(name: name) }
   end
 
   describe "authorization" do
@@ -37,7 +38,8 @@ RSpec.describe "Documents", type: :system do
         fill_in "Email", with: "info@example.org"
         fill_in "Website", with: "https://example.org"
         fill_in "Hours of operation", with: "Mon-Sun 7am-11pm"
-        fill_in "Categories", with: "shelter, meals"
+        check "Shelters"
+        check "Meals"
         fill_in "Minimum age", with: "19"
         fill_in "Maximum age", with: "65"
         fill_in "Gender", with: "all"
@@ -47,8 +49,8 @@ RSpec.describe "Documents", type: :system do
 
         expect(page).to have_content("Resource 'Harbour Street Society' was created.")
         expect(Document.last.title).to eq("Harbour Street Society")
+        expect(Document.last.category_names).to eq(["Meals", "Shelters"])
         expect(Document.last.metadata["city"]).to eq("Victoria")
-        expect(Document.last.metadata["categories"]).to eq(["shelter", "meals"])
         expect(Document.last.metadata["age_range"]).to eq({"min" => 19, "max" => 65})
       end
 
@@ -79,12 +81,12 @@ RSpec.describe "Documents", type: :system do
         doc = source.documents.create!(
           title: "Lantern House Society",
           content: "Lantern House Society\nCity: Victoria",
+          category_names: ["Shelters", "Health Care"],
           metadata: {
             city: "Victoria",
             address: "200 Lantern Way",
             phone: ["250-555-0101"],
             hours: "24/7",
-            categories: ["shelter", "health"],
             description: "Housing and health services"
           }
         )
@@ -96,7 +98,7 @@ RSpec.describe "Documents", type: :system do
         expect(page).to have_content("200 Lantern Way")
         expect(page).to have_content("250-555-0101")
         expect(page).to have_content("24/7")
-        expect(page).to have_content("shelter, health")
+        expect(page).to have_content("Health Care, Shelters")
         expect(page).to have_content("Housing and health services")
       end
     end
@@ -121,6 +123,24 @@ RSpec.describe "Documents", type: :system do
         doc.reload
         expect(doc.title).to eq("New Name")
         expect(doc.metadata["city"]).to eq("Nanaimo")
+      end
+
+      it "keeps all categories unchecked when the update is invalid" do
+        source = Source.form_entry_source
+        doc = source.documents.create!(
+          title: "Resource",
+          content: "Resource",
+          category_names: ["Shelters"]
+        )
+
+        visit edit_document_path(doc)
+        fill_in "Resource name", with: ""
+        fill_in "Description of services", with: ""
+        uncheck "Shelters"
+        click_button "Update resource"
+
+        expect(page).to have_unchecked_field("Shelters")
+        expect(doc.reload.category_names).to eq(["Shelters"])
       end
     end
   end

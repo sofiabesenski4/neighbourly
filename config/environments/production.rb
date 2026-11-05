@@ -59,8 +59,9 @@ Rails.application.configure do
     reconnect_attempts: 1
   }
 
-  # Replace the default in-process and non-durable queuing backend for Active Job.
-  # config.active_job.queue_adapter = :resque
+  # Keep jobs in Postgres so they survive restarts and deploys. Workers run
+  # inside Puma (see config/puma.rb).
+  config.active_job.queue_adapter = :solid_queue
 
   # Ignore bad email addresses and do not raise email delivery errors.
   # Set this to true and configure the email server for immediate delivery to raise delivery errors.

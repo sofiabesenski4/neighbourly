@@ -42,15 +42,27 @@ RSpec.describe Source, type: :model do
       expect(source).not_to be_valid
     end
 
-    it "only allows api, html, or form as source_type" do
+    it "only allows api, html, form, or csv as source_type" do
       expect(build_source(source_type: "api")).to be_valid
       expect(build_source(source_type: "html")).to be_valid
       expect(build_source(source_type: "form", url: nil)).to be_valid
+      expect(build_source(source_type: "csv")).to be_valid
       expect(build_source(source_type: "rss")).not_to be_valid
     end
 
     it "does not require a url for form sources" do
       source = build_source(source_type: "form", url: nil)
+      expect(source).to be_valid
+    end
+
+    it "only allows known ingestion statuses" do
+      expect(build_source(ingestion_status: nil)).to be_valid
+      expect(build_source(ingestion_status: "pending")).to be_valid
+      expect(build_source(ingestion_status: "queued")).not_to be_valid
+    end
+
+    it "does not require a url for csv sources" do
+      source = build_source(source_type: "csv", url: nil)
       expect(source).to be_valid
     end
   end
@@ -59,6 +71,7 @@ RSpec.describe Source, type: :model do
     before do
       Source.create!(name: "API Source", url: "https://example.com/api", source_type: "api")
       Source.create!(name: "HTML Source", url: "https://example.com/page", source_type: "html")
+      Source.create!(name: "CSV Source", source_type: "csv")
     end
 
     it ".api_sources returns only api sources" do
@@ -67,6 +80,17 @@ RSpec.describe Source, type: :model do
 
     it ".html_sources returns only html sources" do
       expect(Source.html_sources.pluck(:name)).to eq(["HTML Source"])
+    end
+
+    it ".csv_sources returns only csv sources" do
+      expect(Source.csv_sources.pluck(:name)).to eq(["CSV Source"])
+    end
+
+    it ".fetchable returns only parsed sources with a url" do
+      Source.create!(name: "Linked CSV", url: "https://example.com/data.csv", source_type: "csv")
+      Source.form_entry_source
+
+      expect(Source.fetchable.pluck(:name)).to contain_exactly("API Source", "HTML Source", "Linked CSV")
     end
   end
 
@@ -83,6 +107,8 @@ RSpec.describe Source, type: :model do
       expect(html_source.api?).to be false
       expect(form_source.form?).to be true
       expect(form_source.api?).to be false
+      expect(build_source(source_type: "csv", url: nil).csv?).to be true
+      expect(api_source.csv?).to be false
     end
   end
 
@@ -98,6 +124,36 @@ RSpec.describe Source, type: :model do
     it "returns the existing form source on subsequent calls" do
       Source.form_entry_source
       expect { Source.form_entry_source }.not_to change(Source, :count)
+    end
+  end
+
+  describe "page refreshes" do
+    let(:source) { Source.create!(name: "Uploaded", source_type: "csv", ingestion_status: :pending) }
+
+    it "refreshes pages showing the source when it changes" do
+      source
+
+      expect { source.update!(ingestion_status: :ingesting) }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with(source.to_gid_param, content: include("refresh"))
+    end
+
+    it "refreshes the sources list when a source is created" do
+      expect { source }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with("sources", content: include("refresh"))
+    end
+
+    it "refreshes the sources list when a source changes" do
+      source
+
+      expect { source.update!(ingestion_status: :failed) }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with("sources", content: include("refresh"))
+    end
+
+    it "refreshes the sources list when a source is deleted" do
+      source
+
+      expect { source.destroy! }
+        .to have_enqueued_job(Turbo::Streams::BroadcastStreamJob).with("sources", content: include("refresh"))
     end
   end
 
