@@ -1,13 +1,8 @@
 <% content_for :title, "Neighbourly Resources" %>
 
-<div class="flex flex-col items-center justify-center py-16 sm:py-24">
-  <div class="text-center max-w-2xl mx-auto">
-    <h1 class="text-4xl sm:text-5xl font-bold text-stone-900 tracking-tight">
-      Neighbourly Resources
-    </h1>
-    <p class="mt-6 text-lg text-stone-600 leading-relaxed">
-      An AI-powered assistant that helps you find community resources like shelters, meal programs, and support services in your area.
-    </p>
+<div class="flex flex-col items-center py-8 sm:py-12">
+  <div class="mx-auto w-full max-w-[50.5rem] text-center">
+    <%= render "hero" %>
     <div class="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
       <% if user_signed_in? %>
         <%= link_to "Ask anything", new_chat_path, class: "inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-colors" %>
