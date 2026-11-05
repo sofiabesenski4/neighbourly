@@ -8,6 +8,7 @@ export default class extends Controller {
     "count",
     "status",
     "generate",
+    "generateLabel",
     "previewError",
     "previewErrorMessage",
     "printError",
@@ -61,7 +62,7 @@ export default class extends Controller {
     this.printRequest?.abort();
     this.clearPrintout();
     this.forgetLocationChoice();
-    this.generateTarget.textContent = "Generate printout";
+    this.generateLabelTarget.textContent = "Generate printout";
   }
 
   filter() {
@@ -70,7 +71,7 @@ export default class extends Controller {
     this.previewRequest?.abort();
     this.printRequest?.abort();
     this.generating = false;
-    this.generateTarget.textContent = "Generate printout";
+    this.generateLabelTarget.textContent = "Generate printout";
     this.clearPrintout();
     this.printErrorTarget.hidden = true;
     this.setLoading();
@@ -382,13 +383,9 @@ export default class extends Controller {
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    const scope =
-      this.selectedCategories().length === 0
-        ? "All available resources · "
-        : "";
-    this.countTarget.textContent = `${scope}${ids.size} ${ids.size === 1 ? "resource" : "resources"} · ${total} ${total === 1 ? "card" : "cards"} across ${categories.length} ${categories.length === 1 ? "category" : "categories"}`;
+    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
     this.hasResults = total > 0;
-    this.statusTarget.textContent = "Live preview";
+    this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
     this.generateTarget.disabled = !this.hasResults || this.generating;
   }
@@ -427,7 +424,7 @@ export default class extends Controller {
     this.printErrorTarget.hidden = true;
     this.generating = true;
     this.generateTarget.disabled = true;
-    this.generateTarget.textContent = "Preparing printout…";
+    this.generateLabelTarget.textContent = "Preparing printout…";
     this.printRequest = new AbortController();
     try {
       const response = await fetch(this.formTarget.action, {
@@ -480,7 +477,7 @@ export default class extends Controller {
       if (revision === this.revision) {
         this.generating = false;
         this.generateTarget.disabled = !this.hasResults;
-        this.generateTarget.textContent = "Generate printout";
+        this.generateLabelTarget.textContent = "Generate printout";
       }
     }
   }

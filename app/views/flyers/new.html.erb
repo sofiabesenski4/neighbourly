@@ -6,7 +6,7 @@
      data-action="turbo:before-cache@document->flyer-builder#beforeCache">
   <header class="mb-7">
     <h1 class="font-semibold text-3xl text-stone-900">Build a resource guide</h1>
-    <p class="mt-2 text-stone-600" data-flyer-builder-target="subtitle">Choose what to include. Your guide updates as you go.</p>
+    <p class="mt-2 text-stone-600" data-flyer-builder-target="subtitle">Print a guide with addresses, hours, and contacts.</p>
   </header>
 
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
@@ -93,24 +93,20 @@
             <% end %>
           </div>
         </fieldset>
-        <p class="mt-6 pt-4 border-t border-stone-200 text-sm text-stone-600">
-          A resource in two selected categories appears in both sections.
-        </p>
       </aside>
 
       <section class="min-w-0" aria-labelledby="flyer-preview-heading">
         <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
-          <div>
-            <div class="flex items-center gap-3 flex-wrap">
-              <h2 id="flyer-preview-heading" tabindex="-1" class="font-semibold text-xl text-stone-900"
-                  data-flyer-builder-target="builderHeading">Your guide</h2>
-              <span class="text-sm text-sage-700" data-flyer-builder-target="status" role="status">Live preview</span>
-            </div>
-            <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="count" aria-live="polite">Loading resources…</p>
-          </div>
-          <%= form.button "Generate printout", type: :submit,
-                class: "rounded-lg px-4 py-2.5 bg-sage-600 hover:bg-sage-700 text-white font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
-                data: { flyer_builder_target: "generate" } %>
+          <h2 id="flyer-preview-heading" class="font-semibold text-xl text-stone-900" tabindex="-1" data-flyer-builder-target="builderHeading count" aria-live="polite">Loading resources…</h2>
+          <span class="sr-only" data-flyer-builder-target="status" role="status"></span>
+          <%= form.button type: :submit,
+                class: "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 bg-sage-600 hover:bg-sage-700 text-white font-medium cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
+                data: { flyer_builder_target: "generate" } do %>
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 8.25V3.75h10.5v4.5m-10.5 9H4.5A2.25 2.25 0 0 1 2.25 15V10.5A2.25 2.25 0 0 1 4.5 8.25h15a2.25 2.25 0 0 1 2.25 2.25V15a2.25 2.25 0 0 1-2.25 2.25h-2.25m-10.5-3h10.5v6H6.75v-6Zm10.5-3h.008v.008h-.008v-.008Z" />
+            </svg>
+            <span data-flyer-builder-target="generateLabel">Generate printout</span>
+          <% end %>
         </div>
 
         <div class="mb-5 rounded-lg bg-red-50 text-red-700 px-4 py-3" data-flyer-builder-target="previewError" role="alert" hidden>
@@ -130,7 +126,7 @@
           <p class="text-stone-800" role="status">Your printout is ready. It opens in a new tab, where you can print or save it.</p>
           <a class="mt-3 inline-block rounded-lg px-4 py-2.5 bg-sage-600 hover:bg-sage-700 text-white font-medium" data-flyer-builder-target="pdfLink" target="_blank" rel="noopener">Open printout</a>
         </div>
-        <noscript><p class="mt-5 text-stone-600">Live preview needs JavaScript. You can still select categories and generate a PDF.</p></noscript>
+        <noscript><p class="mt-5 text-stone-600">Preview needs JavaScript. You can still select categories and generate a PDF.</p></noscript>
       </section>
     </div>
     </div>
