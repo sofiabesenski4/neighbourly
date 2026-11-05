@@ -24,7 +24,14 @@
     <%= Sentry.get_trace_propagation_meta.html_safe if Rails.env.production? || Rails.env.staging? %>
   </head>
 
-  <body class="<%= content_for?(:chat_workspace) ? "h-dvh flex flex-col overflow-hidden bg-white" : "h-full bg-stone-50" %>">
+  <% body_classes = if content_for?(:chat_workspace)
+       "h-dvh flex flex-col overflow-hidden bg-white"
+     elsif content_for?(:landing_page)
+       "h-full bg-white"
+     else
+       "h-full bg-stone-50"
+     end %>
+  <body class="<%= body_classes %>">
     <!-- Navigation -->
     <% shared_navigation = content_for?(:landing_page) || content_for?(:chat_workspace) || %w[chats flyers].include?(controller_name) %>
     <% if shared_navigation %>

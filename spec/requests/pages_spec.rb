@@ -21,6 +21,21 @@ RSpec.describe "Pages", type: :request do
         expect(navigation.text).not_to include("Saved")
       end
 
+      it "explains paper guides and links directly to the printout builder" do
+        get root_path
+
+        document = Nokogiri::HTML(response.body)
+        section = document.at_css("section[aria-labelledby='printout-heading']")
+        expect(section).not_to be_nil
+        expect(section.at_css("h2#printout-heading").text.squish).to eq("Prefer a paper copy?")
+        expect(section.text).to include("Make a paper guide with addresses, hours, and contact details.")
+        link = section.at_css("a[href='#{new_flyer_path}']")
+        expect(link.text.squish).to eq("Create printout")
+        expect(link.at_css("svg[aria-hidden='true'][stroke='currentColor']")).to be_present
+        expect(document.css("a[href='#{new_flyer_path}']").map { |item| item["data-turbo"] }.uniq).to eq(["false"])
+        expect(document.at_css("main").text).not_to include("Make a printable flyer", "save your printout template")
+      end
+
       it "explains the page purpose with one main heading" do
         get root_path
 
@@ -63,15 +78,6 @@ RSpec.describe "Pages", type: :request do
         expect(response.body).to include("Sign in to start chat")
         expect(response.body).not_to include("Ask anything")
       end
-
-      it "links to the flyer generator" do
-        get root_path
-
-        expect(response.body).to include(%(href="#{new_flyer_path}"))
-        flyer_links = Nokogiri::HTML(response.body).css(%(a[href="#{new_flyer_path}"]))
-        expect(flyer_links).not_to be_empty
-        expect(flyer_links.map { |link| link["data-turbo"] }.uniq).to eq(["false"])
-      end
     end
 
     context "when signed in" do
@@ -88,15 +94,6 @@ RSpec.describe "Pages", type: :request do
         expect(response.body).to include("Start chat")
         expect(response.body).to include(%(href="#{new_chat_path}"))
         expect(response.body).not_to include("Get started")
-      end
-
-      it "links to the flyer generator" do
-        get root_path
-
-        expect(response.body).to include(%(href="#{new_flyer_path}"))
-        flyer_links = Nokogiri::HTML(response.body).css(%(a[href="#{new_flyer_path}"]))
-        expect(flyer_links).not_to be_empty
-        expect(flyer_links.map { |link| link["data-turbo"] }.uniq).to eq(["false"])
       end
     end
 

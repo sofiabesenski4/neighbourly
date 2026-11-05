@@ -70,6 +70,17 @@ RSpec.describe "Landing page", type: :system do
       expect(page).to have_content("Find food, shelter, health care, and everyday support nearby.")
     end
 
+    composer = find("section[aria-label='Start a chat']")
+    printout = find("section[aria-labelledby='printout-heading']")
+    link = printout.find_link("Create printout")
+    expect(link.evaluate_script("getComputedStyle(this).backgroundColor"))
+      .to eq(composer.find("button[type='submit']").evaluate_script("getComputedStyle(this).backgroundColor"))
+    features = find("section[aria-label='How Neighbourly helps']")
+    expect(printout.evaluate_script("this.getBoundingClientRect().top"))
+      .to be >= composer.evaluate_script("this.getBoundingClientRect().bottom")
+    expect(features.evaluate_script("this.getBoundingClientRect().top"))
+      .to be >= printout.evaluate_script("this.getBoundingClientRect().bottom")
+
     hero = find("section[aria-labelledby='home-heading']")
     expect(hero.evaluate_script("this.getBoundingClientRect().width")).to be <= 808
     expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
@@ -84,6 +95,11 @@ RSpec.describe "Landing page", type: :system do
     expect(hero).to have_css("h1", text: "What would help you today?")
     expect(hero).to have_content("Victoria, BC")
     expect(hero).to have_content("Find food, shelter, health care, and everyday support nearby.")
+
+    printout = find("section[aria-labelledby='printout-heading']")
+    link = printout.find_link("Create printout", href: new_flyer_path)
+    expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+    expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
 
     hero.all("h1, p").each do |element|
       expect(element.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
