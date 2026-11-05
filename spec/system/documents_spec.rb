@@ -38,7 +38,8 @@ RSpec.describe "Documents", type: :system do
         fill_in "Email", with: "info@example.org"
         fill_in "Website", with: "https://example.org"
         fill_in "Hours of operation", with: "Mon-Sun 7am-11pm"
-        fill_in "Categories", with: "Shelters, Meals"
+        check "Shelters"
+        check "Meals"
         fill_in "Minimum age", with: "19"
         fill_in "Maximum age", with: "65"
         fill_in "Gender", with: "all"
@@ -124,7 +125,7 @@ RSpec.describe "Documents", type: :system do
         expect(doc.metadata["city"]).to eq("Nanaimo")
       end
 
-      it "keeps a submitted empty categories value when the update is invalid" do
+      it "keeps all categories unchecked when the update is invalid" do
         source = Source.form_entry_source
         doc = source.documents.create!(
           title: "Resource",
@@ -135,10 +136,10 @@ RSpec.describe "Documents", type: :system do
         visit edit_document_path(doc)
         fill_in "Resource name", with: ""
         fill_in "Description of services", with: ""
-        fill_in "Categories", with: ""
+        uncheck "Shelters"
         click_button "Update resource"
 
-        expect(find_field("Categories").value).to eq("")
+        expect(page).to have_unchecked_field("Shelters")
         expect(doc.reload.category_names).to eq(["Shelters"])
       end
     end
