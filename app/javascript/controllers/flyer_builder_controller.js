@@ -344,6 +344,7 @@ export default class extends Controller {
     const ids = new Set();
     let total = 0;
     categories.forEach((category) => {
+      if (category.resources.length === 0) return;
       const section = document.createElement("section");
       section.className = "mt-7 first:mt-0";
       const heading = document.createElement("h3");
@@ -361,14 +362,7 @@ export default class extends Controller {
         total += 1;
         grid.append(this.card(resource));
       });
-      if (category.resources.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "text-stone-600";
-        empty.textContent = "No matching resources in this category.";
-        section.append(empty);
-      } else {
-        section.append(grid);
-      }
+      section.append(grid);
       fragment.append(section);
     });
     if (total === 0) {
