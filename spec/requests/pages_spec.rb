@@ -18,6 +18,22 @@ RSpec.describe "Pages", type: :request do
         expect(hero.text).to include("Victoria, BC")
         expect(hero.text).to include("Find food, shelter, health care, and everyday support nearby.")
       end
+
+      it "describes community features without claiming verification" do
+        get root_path
+
+        expect(response.body).not_to include("verified community resources")
+
+        document = Nokogiri::HTML(response.body)
+        features = document.at_css("section[aria-label='How Neighbourly helps']")
+        expect(features).not_to be_nil
+        expect(features.css("article").map { |article| [article.at_css("h2").text.squish, article.at_css("p").text.squish] })
+          .to eq([
+            ["Ask in plain language", "Describe what you need and get relevant results from community resources."],
+            ["Local organizations", "Information sourced from shelters, food banks, health centres, and other community services."],
+            ["Community moderated", "Users can flag outdated or incorrect information to keep results accurate and trustworthy."]
+          ])
+      end
     end
 
     context "when signed out" do
