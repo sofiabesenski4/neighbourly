@@ -110,6 +110,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_000000) do
     t.bigint "source_id", null: false
     t.string "title"
     t.datetime "updated_at", null: false
+    t.datetime "enriched_at"
     t.index ["source_id", "external_id"], name: "index_documents_on_source_id_and_external_id", unique: true
     t.index ["source_id"], name: "index_documents_on_source_id"
   end

@@ -14,6 +14,15 @@ RSpec.describe "Sources", type: :system do
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
+
+    # CSV rows are enriched after ingestion. Reply with a summary of the row.
+    chat = instance_double(RubyLLM::Chat)
+    allow(RubyLLM).to receive(:chat).and_return(chat)
+    allow(chat).to receive_messages(with_instructions: chat, with_schema: chat)
+    allow(chat).to receive(:ask) do |prompt|
+      name = JSON.parse(prompt[/^Row: (.*)$/, 1])["Name"]
+      instance_double(RubyLLM::Message, content: {title: name, summary: "#{name} is a local service.", categories: []}.to_json)
+    end
   end
 
   after do
@@ -198,7 +207,10 @@ RSpec.describe "Sources", type: :system do
         expect(page).to have_content("Source 'Drop-in Centres' created. Its documents are being ingested in the background.")
         expect(page).to have_content("2 document")
         expect(Source.last).to be_csv
-        expect(Document.find_by!(title: "Harbour Meals").metadata).to include("Address" => "100 Harbour St")
+        document = Document.find_by!(title: "Harbour Meals")
+        expect(document.metadata).to include("Address" => "100 Harbour St")
+        expect(document.content).to eq("Harbour Meals is a local service.\n\nName: Harbour Meals\nAddress: 100 Harbour St")
+        expect(document.enriched_at).to be_present
       end
 
       it "shows an error and keeps no source when the CSV is malformed" do

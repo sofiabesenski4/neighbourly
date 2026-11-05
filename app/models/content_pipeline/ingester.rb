@@ -59,6 +59,11 @@ module ContentPipeline
 
     def upsert_document(chunk)
       document = @source.documents.find_or_initialize_by(external_id: chunk[:external_id])
+      # An unchanged row keeps the summary and categories enrichment gave it.
+      # A changed row is written fresh and enriched again.
+      return if document.enriched_at? && document.metadata == chunk[:metadata]
+
+      document.enriched_at = nil
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
