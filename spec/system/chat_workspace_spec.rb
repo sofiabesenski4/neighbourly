@@ -16,13 +16,16 @@ RSpec.describe "Chat workspace", type: :system do
   let(:user) { User.create!(email: "workspace@example.com", password: "password123") }
   let(:chat) { user.chats.create! }
 
-  it "aligns navigation with the sidebar and opens Chat directly in the workspace" do
+  it "matches the landing header and opens Chat directly in the workspace" do
+    visit root_path
+    landing_brand = find("nav[aria-label='Main navigation']").find_link("neighbourly")
+    brand_position = landing_brand.evaluate_script("this.getBoundingClientRect().left")
     visit chat_path(chat)
 
-    brand = find("nav[aria-label='Main navigation']").find_link("Neighbourly Resources")
-    new_chat_link = find("#chat_sidebar").find_link("New chat")
+    brand = find("nav[aria-label='Main navigation']").find_link("neighbourly")
     expect(brand.evaluate_script("this.getBoundingClientRect().left"))
-      .to eq(new_chat_link.evaluate_script("this.getBoundingClientRect().left"))
+      .to eq(brand_position)
+    expect(page).to have_css("nav a[aria-current='page']", text: "Chat")
 
     within("nav[aria-label='Main navigation']") { click_link "Chat", exact: true }
     expect(page).to have_current_path(new_chat_path)
