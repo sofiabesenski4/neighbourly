@@ -137,6 +137,13 @@ RSpec.describe ContentPipeline::Ingester do
         expect(doc.embedding).not_to be_nil
       end
 
+      it "queues enrichment for each new row, whether uploaded or fetched from a URL" do
+        source.update!(url: "https://example.com/centres.csv")
+        allow_any_instance_of(ContentPipeline::Fetcher).to receive(:call).and_return(csv)
+
+        expect { ingester.call }.to have_enqueued_job(EnrichDocumentJob).exactly(2).times
+      end
+
       it "does not duplicate documents when the same file is ingested again" do
         ingester.ingest(csv)
 
@@ -154,6 +161,21 @@ RSpec.describe ContentPipeline::Ingester do
 
         it "keeps the enrichment when the row is unchanged" do
           expect { described_class.new(source).ingest(csv) }.not_to(change { document.reload.attributes })
+        end
+
+        it "clears enrichment that lands while a changed row is being replaced" do
+          document.update!(enriched_at: nil)
+          allow(source.documents).to receive(:find_or_initialize_by).and_wrap_original do |original, **attributes|
+            original.call(**attributes).tap do |loaded|
+              Document.where(id: loaded.id).update_all(enriched_at: Time.current, content: "Summary of the old row.")
+            end
+          end
+
+          described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St"))
+
+          expect(document.reload).to have_attributes(
+            content: "id: 1\nName: Harbour Meals\nAddress: 200 Harbour St", enriched_at: nil
+          )
         end
 
         it "rewrites the row and clears enrichment when the row changed" do
