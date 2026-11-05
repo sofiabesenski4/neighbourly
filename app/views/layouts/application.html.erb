@@ -28,7 +28,14 @@
     <!-- Navigation -->
     <% shared_navigation = content_for?(:landing_page) || content_for?(:chat_workspace) || %w[chats flyers].include?(controller_name) %>
     <% if shared_navigation %>
-      <%= render "shared/navigation", active_tab: (controller_name == "flyers" ? :printout : :chat) %>
+      <% active_tab = if content_for?(:landing_page)
+           nil
+         elsif controller_name == "flyers"
+           :printout
+         else
+           :chat
+         end %>
+      <%= render "shared/navigation", active_tab: active_tab %>
     <% else %>
       <%= render "layouts/navigation" %>
     <% end %>
