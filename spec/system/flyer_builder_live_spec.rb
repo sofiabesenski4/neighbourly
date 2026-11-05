@@ -41,6 +41,8 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("article h4", text: "Beta clinic")
     expect(page).to have_css("article h4", text: "Gamma noticeboard")
     expect(page).to have_css("h2#flyer-preview-heading", exact_text: "3 resources included")
+    expect(page).to have_no_css("h3", text: "Legal Support")
+    expect(page).to have_no_text("No matching resources in this category.")
     expect(page).to have_button("Generate printout", disabled: false)
 
     check "Meals"
@@ -50,6 +52,13 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("article h4", text: "Gamma noticeboard")
     expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_button("Generate printout", disabled: false)
+
+    check "Legal Support"
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_css("h3", text: "Meals")
+    expect(page).to have_no_css("h3", text: "Legal Support")
+    expect(page).to have_no_text("No matching resources in this category.")
+    uncheck "Legal Support"
 
     check "Health Care"
     expect(page).to have_css("article h4", text: "Beta clinic")
@@ -65,6 +74,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_text("No resources match the selected categories.")
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_css("h2#flyer-preview-heading", exact_text: "0 resources included")
+    expect(page).to have_no_css("h3")
   end
 
   it "does not let a delayed old preview replace the latest selection" do

@@ -119,6 +119,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.generating = false;
 
     controller.render([
+      { name: "Empty category", resources: [] },
       {
         name: "Food",
         resources: ["Alpha", "Bravo", "Charlie", "Delta"].map(
@@ -127,6 +128,11 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       },
     ]);
 
+    assert.equal(controller.cardsTarget.children.length, 1);
+    assert.equal(
+      controller.cardsTarget.children[0].children[0].textContent,
+      "Food",
+    );
     assert.equal(controller.countTarget.textContent, "4 resources included");
     const grid = controller.cardsTarget.children[0].children[1];
     assert.match(grid.className, /grid-cols-1/);
@@ -141,8 +147,14 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       { name: "Health", resources: [{ id: 1, title: "Alpha", fields: [] }] },
     ]);
     assert.equal(controller.countTarget.textContent, "1 resource included");
-    controller.render([]);
+    controller.render([{ name: "Empty category", resources: [] }]);
     assert.equal(controller.countTarget.textContent, "0 resources included");
+    assert.equal(controller.cardsTarget.children.length, 1);
+    assert.equal(
+      controller.cardsTarget.children[0].textContent,
+      "No resources are available to display.",
+    );
+    assert.equal(controller.generateTarget.disabled, true);
   } finally {
     globalThis.document = previousDocument;
   }
