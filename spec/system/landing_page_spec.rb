@@ -15,6 +15,7 @@ RSpec.describe "Landing page", type: :system do
     expect(navigation).to have_link("Printout", href: new_flyer_path)
     expect(navigation).to have_link("Sign in", href: new_user_session_path)
     expect(navigation).not_to have_link("Saved")
+    expect(navigation).to have_no_css("a[aria-current], a.bg-sage-100")
 
     navigation.find_link("neighbourly", exact: true).send_keys(:tab)
     expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Chat")
