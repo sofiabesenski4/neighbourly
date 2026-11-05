@@ -51,10 +51,18 @@ class DocumentsController < ApplicationController
     authorize @document
     title = @document.title
     @document.destroy!
-    redirect_back fallback_location: sources_path, notice: "Resource '#{title}' was deleted.", status: :see_other
+    redirect_to referer_or_default_path, notice: "Resource '#{title}' was deleted.", status: :see_other
   end
 
   private
+
+  def referer_or_default_path
+    return sources_path if request.referer&.match?(/\/documents\/\d+/)
+
+    URI.parse(request.referer.to_s).path.presence || sources_path
+  rescue URI::InvalidURIError
+    sources_path
+  end
 
   def set_document
     @document = Document.find(params[:id])

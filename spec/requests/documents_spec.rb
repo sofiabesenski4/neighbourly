@@ -219,6 +219,29 @@ RSpec.describe "Documents", type: :request do
         delete document_path(document)
         expect(response).to redirect_to(sources_path)
       end
+
+      it "redirects to sources when referer is the document page" do
+        document
+        delete document_path(document), headers: {"HTTP_REFERER" => document_url(document)}
+        expect(response).to redirect_to(sources_path)
+      end
+
+      it "redirects to sources index when referer is sources index" do
+        delete document_path(document), headers: {"HTTP_REFERER" => sources_path}
+        expect(response).to redirect_to(sources_path)
+      end
+
+      it "redirects to the source show page when referer is a source page" do
+        source = Source.create!(name: "Test Source", source_type: "api")
+        source.documents << document
+        delete document_path(document), headers: {"HTTP_REFERER" => source_url(source)}
+        expect(response).to redirect_to(source_url(source))
+      end
+
+      it "redirects to sources when referer is invalid" do
+        delete document_path(document), headers: {"HTTP_REFERER" => "not a valid url"}
+        expect(response).to redirect_to(sources_path)
+      end
     end
 
     context "as regular user" do
