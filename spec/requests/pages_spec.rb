@@ -13,7 +13,8 @@ RSpec.describe "Pages", type: :request do
         navigation = navigation.first
         expect(navigation.at_css("a[href='#{root_path}']").text.squish).to eq("neighbourly")
         expect(navigation.at_css("a[href='#{new_chat_path}']").text.squish).to eq("Chat")
-        expect(navigation.at_css("a[aria-current='page']").text.squish).to eq("Chat")
+        expect(navigation.css("a[aria-current]")).to be_empty
+        expect(navigation.css("a.bg-sage-100")).to be_empty
         printout = navigation.at_css("a[href='#{new_flyer_path}']")
         expect(printout.text.squish).to eq("Printout")
         expect(printout["data-turbo"]).to eq("false")
