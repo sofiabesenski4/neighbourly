@@ -25,11 +25,13 @@ module ContentPipeline
 
       Rails.logger.info "[ContentPipeline] Parsed #{chunks.size} chunks from #{@source.name}"
 
-      chunks.each_with_index do |chunk, index|
-        upsert_document(chunk)
+      written = chunks.each_with_index.filter_map do |chunk, index|
+        document = upsert_document(chunk)
         Rails.logger.info "[ContentPipeline] Embedded chunk #{index + 1}/#{chunks.size}"
+        document
       end
 
+      enqueue_enrichment(written) if @source.csv?
       @source.update!(last_fetched_at: Time.current)
 
       Rails.logger.info "[ContentPipeline] Finished ingesting #{@source.name}: #{chunks.size} documents"
@@ -43,6 +45,17 @@ module ContentPipeline
     end
 
     private
+
+    # CSV rows arrive as raw "Header: value" text. Each row this run wrote
+    # gets its own job to summarize and categorize it, so one slow or failed
+    # LLM call does not hold up the rest. Queued here so uploads and URL
+    # refreshes alike get enriched. Rows left waiting by earlier runs are
+    # caught up by sources:enrich.
+    def enqueue_enrichment(documents)
+      documents.each_slice(1000) do |batch|
+        ActiveJob.perform_all_later(batch.map { |document| EnrichDocumentJob.new(document) })
+      end
+    end
 
     def parser_for(source)
       case source.source_type
@@ -59,10 +72,26 @@ module ContentPipeline
 
     def upsert_document(chunk)
       document = @source.documents.find_or_initialize_by(external_id: chunk[:external_id])
+      return write_document(document, chunk) if document.new_record?
+
+      # Enrichment may save this row while it is being replaced. Locking
+      # reloads it, so a summary of the old row cannot survive on the new one.
+      document.with_lock { write_document(document, chunk) }
+    end
+
+    # Returns the document when it was written, or nil when an unchanged
+    # enriched row was kept as it was.
+    def write_document(document, chunk)
+      # An unchanged row keeps the summary and categories enrichment gave it.
+      # A changed row is written fresh and enriched again.
+      return if document.enriched_at? && document.metadata == chunk[:metadata]
+
+      document.enriched_at = nil
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
       document.save_with_category_names!(chunk[:categories] || [])
+      document
     end
   end
 end

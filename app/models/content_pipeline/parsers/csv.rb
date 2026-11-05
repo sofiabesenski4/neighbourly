@@ -13,6 +13,12 @@ module ContentPipeline
       TITLE_HEADER = /(?:\A|[^a-z])(?:name|title)(?:[^a-z]|\z)/i
       MAX_TITLE_LENGTH = 120
 
+      # One "Header: value" line per filled-in cell. Enrichment keeps these
+      # lines under the summary so exact details stay searchable.
+      def self.render_fields(fields)
+        fields.filter_map { |header, value| "#{header}: #{value}" if value.present? }.join("\n")
+      end
+
       def parse(raw_content)
         table = CSV.parse(normalize_encoding(raw_content), headers: true)
         headers = unique_headers(table.headers)
@@ -23,7 +29,7 @@ module ContentPipeline
 
           {
             title: title_for(fields),
-            content: content_for(fields),
+            content: self.class.render_fields(fields),
             external_id: external_id_for(fields),
             categories: [],
             metadata: fields
@@ -84,10 +90,6 @@ module ContentPipeline
       def title_for(fields)
         named = fields.find { |header, value| header.match?(TITLE_HEADER) && value.present? }&.last
         (named || fields.values.compact.first).truncate(MAX_TITLE_LENGTH)
-      end
-
-      def content_for(fields)
-        fields.filter_map { |header, value| "#{header}: #{value}" if value }.join("\n")
       end
 
       def external_id_for(fields)

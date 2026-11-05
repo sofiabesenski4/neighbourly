@@ -16,6 +16,34 @@ RSpec.describe IngestSourceJob do
     expect { described_class.perform_now(source) }.to change(source.documents, :count).by(2)
   end
 
+  it "queues enrichment for each row not yet enriched" do
+    described_class.perform_now(source)
+
+    expect(EnrichDocumentJob).to have_been_enqueued.exactly(2).times
+    source.documents.each { |document| expect(EnrichDocumentJob).to have_been_enqueued.with(document) }
+  end
+
+  it "does not queue enrichment again for rows already enriched" do
+    described_class.perform_now(source)
+    source.documents.update_all(enriched_at: Time.current)
+    source.update!(upload_content: csv, ingestion_status: :pending)
+    clear_enqueued_jobs
+
+    described_class.perform_now(source)
+
+    expect(EnrichDocumentJob).not_to have_been_enqueued
+  end
+
+  it "does not queue enrichment for sources other than CSV" do
+    html_source = Source.create!(name: "Shelters", source_type: "html", url: "https://example.com",
+      upload_content: "<html><body><h1>Shelters</h1><p>Open nightly.</p></body></html>", ingestion_status: :pending)
+
+    described_class.perform_now(html_source)
+
+    expect(html_source.documents).to exist
+    expect(EnrichDocumentJob).not_to have_been_enqueued
+  end
+
   it "marks the source succeeded and drops the stored upload" do
     described_class.perform_now(source)
 
