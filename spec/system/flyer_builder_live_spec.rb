@@ -34,6 +34,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_link "Make a printable flyer"
     click_button "Skip distances"
 
+    expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page.evaluate_script("window.flyerNavigationSentinel")).to be_nil
 
@@ -46,6 +47,28 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Open printout")
     expect(page).to have_no_css("iframe", visible: :all)
     expect(page).to have_css('button[data-flyer-builder-target="generate"] svg[fill="none"][stroke="currentColor"]')
+  end
+
+  it "keeps the landing header visible on a narrow printout screen" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit new_flyer_path
+
+    within("nav[aria-label='Main navigation']") do
+      expect(page).to have_link("neighbourly", href: root_path)
+      expect(page).to have_link("Chat", href: new_chat_path)
+      expect(page).to have_link("Printout", href: new_flyer_path)
+      expect(page).to have_link("Sign in", href: new_user_session_path)
+      expect(page).not_to have_button("Open main menu")
+      all("a").each do |link|
+        expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+        expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+      end
+    end
+    expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
+    expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
   it "updates cards and print availability when categories are selected and cleared" do

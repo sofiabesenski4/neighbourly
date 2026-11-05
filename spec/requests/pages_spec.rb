@@ -5,6 +5,21 @@ RSpec.describe "Pages", type: :request do
 
   describe "GET /" do
     shared_examples "a community-resource welcome" do
+      it "offers the landing navigation with real destinations" do
+        get root_path
+
+        navigation = Nokogiri::HTML(response.body).css("nav[aria-label='Main navigation']")
+        expect(navigation.length).to eq(1)
+        navigation = navigation.first
+        expect(navigation.at_css("a[href='#{root_path}']").text.squish).to eq("neighbourly")
+        expect(navigation.at_css("a[href='#{new_chat_path}']").text.squish).to eq("Chat")
+        expect(navigation.at_css("a[aria-current='page']").text.squish).to eq("Chat")
+        printout = navigation.at_css("a[href='#{new_flyer_path}']")
+        expect(printout.text.squish).to eq("Printout")
+        expect(printout["data-turbo"]).to eq("false")
+        expect(navigation.text).not_to include("Saved")
+      end
+
       it "explains the page purpose with one main heading" do
         get root_path
 
@@ -82,6 +97,36 @@ RSpec.describe "Pages", type: :request do
         expect(flyer_links).not_to be_empty
         expect(flyer_links.map { |link| link["data-turbo"] }.uniq).to eq(["false"])
       end
+    end
+
+    context "when signed in as an admin" do
+      let(:admin) { User.create!(email: "landing-admin@example.com", password: "password123", admin: true) }
+
+      it "keeps administration and account actions available" do
+        sign_in admin
+        get root_path
+
+        navigation = Nokogiri::HTML(response.body).at_css("nav[aria-label='Main navigation']")
+        expect(navigation.at_css("a[href='#{root_path}']").text.squish).to eq("neighbourly")
+        expect(navigation.at_css("a[href='#{users_path}']").text.squish).to eq("Users")
+        expect(navigation.at_css("a[href='#{sources_path}']").text.squish).to eq("Sources")
+        expect(navigation.at_css("a[href='#{reports_path}']").text.squish).to eq("Moderation")
+        sign_out_form = navigation.at_css("form[action='#{destroy_user_session_path}']")
+        expect(sign_out_form.at_css("input[name='_method']")["value"]).to eq("delete")
+        expect(sign_out_form.at_css("button").text.squish).to eq("Sign out")
+      end
+    end
+  end
+
+  describe "navigation outside the landing page" do
+    it "shares the landing brand and tabs with the printout page" do
+      get new_flyer_path
+
+      expect(response).to have_http_status(:ok)
+      navigation = Nokogiri::HTML(response.body).at_css("nav[aria-label='Main navigation']")
+      expect(navigation.at_css("a[href='#{root_path}']").text.squish).to eq("neighbourly")
+      expect(navigation.at_css("a[href='#{new_flyer_path}']").text.squish).to eq("Printout")
+      expect(navigation.at_css("a[aria-current='page']").text.squish).to eq("Printout")
     end
   end
 end

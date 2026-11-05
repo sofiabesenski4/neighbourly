@@ -5,6 +5,60 @@ RSpec.describe "Landing page", type: :system do
     driven_by(:selenium_chrome_headless)
   end
 
+  it "supports keyboard navigation from the landing page into the existing sign-in flow" do
+    page.current_window.resize_to(1280, 900)
+    visit root_path
+
+    navigation = find("nav[aria-label='Main navigation']")
+    expect(navigation).to have_link("neighbourly", href: root_path)
+    expect(navigation).to have_link("Chat", href: new_chat_path)
+    expect(navigation).to have_link("Printout", href: new_flyer_path)
+    expect(navigation).to have_link("Sign in", href: new_user_session_path)
+    expect(navigation).not_to have_link("Saved")
+
+    navigation.find_link("neighbourly", exact: true).send_keys(:tab)
+    expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Chat")
+    navigation.find_link("Chat", exact: true).send_keys(:enter)
+    expect(page).to have_current_path(new_user_session_path)
+    expect(page).to have_content("Sign in to your account")
+  end
+
+  it "keeps both navigation links visible on a narrow phone screen" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit root_path
+
+    navigation = find("nav[aria-label='Main navigation']")
+    expect(navigation).to have_link("neighbourly", href: root_path)
+    expect(navigation).to have_link("Chat", href: new_chat_path)
+    expect(navigation).to have_link("Printout", href: new_flyer_path)
+    expect(navigation).to have_link("Sign in", href: new_user_session_path)
+    expect(navigation).not_to have_button("Open main menu")
+
+    navigation.all("a").each do |link|
+      expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+      expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+    end
+    expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
+  it "lets signed-in visitors sign out from the landing navigation" do
+    user = User.create!(email: "landing-account@example.com", password: "password123")
+    login_as(user, scope: :user)
+    page.current_window.resize_to(1280, 900)
+    visit root_path
+
+    within("nav[aria-label='Main navigation']") do
+      expect(page).to have_content(user.email)
+      click_button "Sign out", exact: true
+    end
+
+    expect(page).to have_current_path(root_path)
+    expect(find("nav[aria-label='Main navigation']")).to have_link("Sign in", href: new_user_session_path)
+  end
+
   it "introduces community support without overflowing the desktop layout" do
     page.current_window.resize_to(1280, 900)
     visit root_path
