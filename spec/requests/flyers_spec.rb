@@ -15,7 +15,16 @@ RSpec.describe "Flyers", type: :request do
       Flyer.available_categories.each_value do |label|
         expect(response.body).to include(ERB::Util.html_escape(label))
       end
-      expect(response.body).to include('data-controller="flyer-builder"', "Generate printout", "Your guide")
+      expect(response.body).to include('data-controller="flyer-builder"', "Generate printout")
+      expect(response.body).not_to include("Choose what to include. Your guide updates as you go.",
+        "A resource in two selected categories appears in both sections.", "Your guide", "Live preview")
+      document = Nokogiri::HTML(response.body)
+      heading = document.at_css("h2#flyer-preview-heading[data-flyer-builder-target='count']")
+      expect(heading["aria-live"]).to eq("polite")
+      icon = document.at_css("button[data-flyer-builder-target='generate'] svg")
+      expect(icon["fill"]).to eq("none")
+      expect(icon["stroke"]).to eq("currentColor")
+      expect(icon["aria-hidden"]).to eq("true")
     end
 
     it "allows only local PDF blobs to be embedded on the builder screen" do

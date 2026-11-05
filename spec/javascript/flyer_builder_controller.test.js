@@ -127,6 +127,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       },
     ]);
 
+    assert.equal(controller.countTarget.textContent, "4 resources included");
     const grid = controller.cardsTarget.children[0].children[1];
     assert.match(grid.className, /grid-cols-1/);
     assert.match(grid.className, /lg:grid-cols-2/);
@@ -135,6 +136,13 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       grid.children.map((card) => card.children[0].textContent),
       ["Alpha", "Bravo", "Charlie", "Delta"],
     );
+    controller.render([
+      { name: "Food", resources: [{ id: 1, title: "Alpha", fields: [] }] },
+      { name: "Health", resources: [{ id: 1, title: "Alpha", fields: [] }] },
+    ]);
+    assert.equal(controller.countTarget.textContent, "1 resource included");
+    controller.render([]);
+    assert.equal(controller.countTarget.textContent, "0 resources included");
   } finally {
     globalThis.document = previousDocument;
   }

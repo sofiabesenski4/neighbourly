@@ -30,6 +30,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Generate printout"
 
     expect(page).to have_link("Open PDF", href: /\Ablob:/)
+    expect(page).to have_css('button[data-flyer-builder-target="generate"] svg[fill="none"][stroke="currentColor"]')
     expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)
   end
 
@@ -39,29 +40,31 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_css("article h4", text: "Beta clinic")
     expect(page).to have_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("All available resources · 3 resources · 3 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "3 resources included")
     expect(page).to have_button("Generate printout", disabled: false)
 
     check "Meals"
+    expect(page).to have_css('button[data-flyer-builder-target="generate"] svg[fill="none"][stroke="currentColor"]')
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_no_css("article h4", text: "Beta clinic")
     expect(page).to have_no_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("1 resource · 1 card")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_button("Generate printout", disabled: false)
 
     check "Health Care"
     expect(page).to have_css("article h4", text: "Beta clinic")
-    expect(page).to have_text("2 resources · 2 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
 
     uncheck "Meals"
     uncheck "Health Care"
     expect(page).to have_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("All available resources · 3 resources · 3 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "3 resources included")
     expect(page).to have_button("Generate printout", disabled: false)
 
     check "Legal Support"
     expect(page).to have_text("No resources match the selected categories.")
     expect(page).to have_button("Generate printout", disabled: true)
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "0 resources included")
   end
 
   it "does not let a delayed old preview replace the latest selection" do
@@ -97,14 +100,14 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     check "Health Care"
     expect(page).to have_css("article h4", text: "Beta clinic")
-    expect(page).to have_text("2 resources · 2 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
 
     page.execute_script("window.heldPreviewResponses.shift()()")
     page.evaluate_async_script("setTimeout(arguments[0], 50)")
 
     expect(page).to have_no_css("article h4", text: "Stale result")
     expect(page).to have_css("article h4", text: "Beta clinic")
-    expect(page).to have_text("2 resources · 2 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
   end
 
   it "disables printing after a preview failure and recovers when retried" do
@@ -117,7 +120,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     JAVASCRIPT
 
     check "Meals"
-    expect(page).to have_text("Preview unavailable")
+    expect(page).to have_text("We couldn't update your guide. Check your connection and try again.")
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
 
@@ -134,7 +137,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     visit new_flyer_path
 
-    expect(page).to have_text("Preview unavailable")
+    expect(page).to have_text("We couldn't update your guide. Check your connection and try again.")
     expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_no_text("Private connection detail")
@@ -149,6 +152,6 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_no_css("article h4", text: "Beta clinic")
     expect(page).to have_no_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("1 resource · 1 card")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
   end
 end
