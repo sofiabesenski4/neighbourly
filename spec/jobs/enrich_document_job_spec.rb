@@ -56,6 +56,12 @@ RSpec.describe EnrichDocumentJob do
     expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
   end
 
+  it "retries later when the connection to the model times out" do
+    allow(enricher).to receive(:enrich!).and_raise(Faraday::TimeoutError, "timed out")
+
+    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+  end
+
   it "retries later when the model is rate limited" do
     allow(enricher).to receive(:enrich!).and_raise(RubyLLM::RateLimitError, "slow down")
 

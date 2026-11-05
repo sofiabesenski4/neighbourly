@@ -25,12 +25,13 @@ module ContentPipeline
 
       Rails.logger.info "[ContentPipeline] Parsed #{chunks.size} chunks from #{@source.name}"
 
-      chunks.each_with_index do |chunk, index|
-        upsert_document(chunk)
+      written = chunks.each_with_index.filter_map do |chunk, index|
+        document = upsert_document(chunk)
         Rails.logger.info "[ContentPipeline] Embedded chunk #{index + 1}/#{chunks.size}"
+        document
       end
 
-      enqueue_enrichment if @source.csv?
+      enqueue_enrichment(written) if @source.csv?
       @source.update!(last_fetched_at: Time.current)
 
       Rails.logger.info "[ContentPipeline] Finished ingesting #{@source.name}: #{chunks.size} documents"
@@ -45,13 +46,14 @@ module ContentPipeline
 
     private
 
-    # CSV rows arrive as raw "Header: value" text. Each new or changed row gets
-    # its own job to summarize and categorize it, so one slow or failed LLM call
-    # does not hold up the rest. Queued here so uploads and URL refreshes alike
-    # get enriched.
-    def enqueue_enrichment
-      @source.documents.where(enriched_at: nil).find_in_batches do |documents|
-        ActiveJob.perform_all_later(documents.map { |document| EnrichDocumentJob.new(document) })
+    # CSV rows arrive as raw "Header: value" text. Each row this run wrote
+    # gets its own job to summarize and categorize it, so one slow or failed
+    # LLM call does not hold up the rest. Queued here so uploads and URL
+    # refreshes alike get enriched. Rows left waiting by earlier runs are
+    # caught up by sources:enrich.
+    def enqueue_enrichment(documents)
+      documents.each_slice(1000) do |batch|
+        ActiveJob.perform_all_later(batch.map { |document| EnrichDocumentJob.new(document) })
       end
     end
 
@@ -77,6 +79,8 @@ module ContentPipeline
       document.with_lock { write_document(document, chunk) }
     end
 
+    # Returns the document when it was written, or nil when an unchanged
+    # enriched row was kept as it was.
     def write_document(document, chunk)
       # An unchanged row keeps the summary and categories enrichment gave it.
       # A changed row is written fresh and enriched again.
@@ -87,6 +91,7 @@ module ContentPipeline
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
       document.save_with_category_names!(chunk[:categories] || [])
+      document
     end
   end
 end

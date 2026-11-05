@@ -51,10 +51,35 @@ RSpec.describe "sources rake tasks" do
 
     it "enriches CSV documents not yet enriched and reports failures without stopping" do
       expect { Rake::Task["sources:enrich"].invoke }
-        .to output(/Enriching 2 documents.*Finished enriching. 1 failed./m).to_stdout
+        .to output(/Enriching 2 documents.*Finished enriching. 1 failed, 0 skipped/m).to_stdout
         .and output(/Document #{failing.id} was not enriched: The model did not return JSON./).to_stderr
 
       expect(enriched).to eq([pending])
+    end
+
+    it "skips rows another run enriched after the task loaded them" do
+      allow(ContentPipeline::Enricher).to receive(:new) do |document|
+        Document.where(id: [pending.id, failing.id]).update_all(enriched_at: Time.current)
+        instance_double(ContentPipeline::Enricher, enrich!: false)
+      end
+
+      expect { Rake::Task["sources:enrich"].invoke }.to output(/0 failed, 2 skipped/).to_stdout
+    end
+
+    it "counts a source deleted mid-run as a failure and carries on" do
+      allow(ContentPipeline::Enricher).to receive(:new) do |document|
+        instance_double(ContentPipeline::Enricher).tap do |enricher|
+          allow(enricher).to receive(:enrich!) do
+            raise ActiveRecord::RecordNotFound, "Couldn't find Document" if document == pending
+            enriched << document
+            true
+          end
+        end
+      end
+
+      expect { Rake::Task["sources:enrich"].invoke }
+        .to output(/1 failed/).to_stdout.and output(/Document #{pending.id} was not enriched/).to_stderr
+      expect(enriched).to eq([failing])
     end
 
     it "limits enrichment to one source when given an ID" do

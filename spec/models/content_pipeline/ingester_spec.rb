@@ -144,6 +144,15 @@ RSpec.describe ContentPipeline::Ingester do
         expect { ingester.call }.to have_enqueued_job(EnrichDocumentJob).exactly(2).times
       end
 
+      it "queues enrichment only for rows this ingestion wrote" do
+        ingester.ingest(csv)
+        source.documents.find_by!(title: "Harbour Meals").update!(enriched_at: Time.current)
+        stale = source.documents.create!(content: "Name: Gone", external_id: "gone", metadata: {"Name" => "Gone"})
+
+        expect { described_class.new(source).ingest(csv) }.to have_enqueued_job(EnrichDocumentJob).exactly(:once)
+        expect(EnrichDocumentJob).not_to have_been_enqueued.with(stale)
+      end
+
       it "does not duplicate documents when the same file is ingested again" do
         ingester.ingest(csv)
 

@@ -12,15 +12,20 @@ namespace :sources do
     sources = sources.where(id: args[:source_id]) if args[:source_id]
     documents = Document.where(source: sources, enriched_at: nil)
     failed = 0
+    skipped = 0
 
     puts "Enriching #{documents.count} documents"
     documents.find_each do |document|
-      ContentPipeline::Enricher.new(document).enrich!
-    rescue RubyLLM::Error, ContentPipeline::Enricher::InvalidResponse, ActiveRecord::RecordNotSaved => e
+      # A queued job may have enriched the row since this batch was loaded.
+      next skipped += 1 if document.reload.enriched_at?
+
+      skipped += 1 unless ContentPipeline::Enricher.new(document).enrich!
+    rescue RubyLLM::Error, Faraday::Error, ContentPipeline::Enricher::InvalidResponse,
+      ActiveRecord::RecordNotSaved, ActiveRecord::RecordNotFound => e
       failed += 1
       warn "Document #{document.id} was not enriched: #{e.message}"
     end
-    puts "Finished enriching. #{failed} failed."
+    puts "Finished enriching. #{failed} failed, #{skipped} skipped because they changed or were enriched meanwhile."
   end
 
   desc "Ingest all sources that have a URL to fetch"
