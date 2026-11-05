@@ -1,4 +1,6 @@
 Rails.application.routes.draw do
+  post "start-chat", to: "chats#create", as: :start_chat, defaults: {entrypoint: "landing"}
+
   resources :chats do
     resources :messages, only: [:create]
     resources :chat_responses, only: [] do
