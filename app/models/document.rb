@@ -9,7 +9,8 @@ class Document < ApplicationRecord
 
   validates :content, presence: true
 
-  before_save :generate_embedding, if: :content_changed?
+  # Skipped when the caller already embedded the new content.
+  before_save :generate_embedding, if: -> { content_changed? && !embedding_changed? }
 
   scope :with_embeddings, -> { where.not(embedding: nil) }
 

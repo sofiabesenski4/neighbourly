@@ -26,11 +26,19 @@ module ContentPipeline
     def enrich!
       metadata = @document.metadata
       result = describe(metadata)
+      content = [result[:summary], Parsers::Csv.render_fields(metadata)].join("\n\n")
+      # Embedded here rather than on save, so a rate limit or outage raises
+      # its own error and the job retries it.
+      embedding = Embedder.embed(content)
 
       @document.with_lock do
         if @document.metadata == metadata
           @document.title = result[:title] if result[:title]
-          @document.content = [result[:summary], Parsers::Csv.render_fields(metadata)].join("\n\n")
+          @document.content = content
+          @document.embedding = embedding
+          # Marked changed even if equal to the old vector, so saving does not
+          # embed the content a second time.
+          @document.embedding_will_change!
           @document.enriched_at = Time.current
           @document.save_with_category_names!(result[:categories])
         else
