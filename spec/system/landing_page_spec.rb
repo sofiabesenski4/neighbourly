@@ -75,7 +75,7 @@ RSpec.describe "Landing page", type: :system do
     link = printout.find_link("Create printout")
     expect(link.evaluate_script("getComputedStyle(this).backgroundColor"))
       .to eq(composer.find("button[type='submit']").evaluate_script("getComputedStyle(this).backgroundColor"))
-    features = find("section[aria-label='How Neighbourly helps']")
+    features = find("section[aria-labelledby='community-heading']")
     expect(printout.evaluate_script("this.getBoundingClientRect().top"))
       .to be >= composer.evaluate_script("this.getBoundingClientRect().bottom")
     expect(features.evaluate_script("this.getBoundingClientRect().top"))
@@ -113,10 +113,12 @@ RSpec.describe "Landing page", type: :system do
     page.current_window.resize_to(1280, 900)
     visit root_path
 
-    features = find("section[aria-label='How Neighbourly helps']")
+    features = find("section[aria-labelledby='community-heading']")
     articles = features.all("article", count: 3)
-    expect(articles.map { |article| article.find("h2").text })
+    expect(articles.map { |article| article.find("h3").text })
       .to eq(["Ask in plain language", "Local organizations", "Community moderated"])
+    expect(find("section[aria-labelledby='printout-heading']").evaluate_script("this.getBoundingClientRect().bottom"))
+      .to be <= page.evaluate_script("window.innerHeight")
     expect(features).to have_content("Describe what you need and get relevant results from community resources.")
     expect(features).not_to have_content("verified")
 
@@ -126,6 +128,9 @@ RSpec.describe "Landing page", type: :system do
     articles.each do |article|
       expect(article.find("p").evaluate_script("getComputedStyle(this).textAlign")).to eq("left")
     end
+    page.scroll_to(:bottom)
+    expect(articles.last.find("p").evaluate_script("this.getBoundingClientRect().bottom"))
+      .to be <= page.evaluate_script("window.innerHeight")
   end
 
   it "stacks the features within a narrow phone screen" do
@@ -133,14 +138,19 @@ RSpec.describe "Landing page", type: :system do
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
     visit root_path
 
-    features = find("section[aria-label='How Neighbourly helps']")
+    features = find("section[aria-labelledby='community-heading']")
     articles = features.all("article", count: 3)
     positions = articles.map { |article| article.evaluate_script("this.getBoundingClientRect().top") }
     expect(positions).to eq(positions.sort.uniq)
+    expect(find("section[aria-labelledby='printout-heading']").evaluate_script("this.getBoundingClientRect().bottom"))
+      .to be <= page.evaluate_script("window.innerHeight")
     articles.each do |article|
-      expect(article.find("h2")).to be_visible
+      expect(article.find("h3")).to be_visible
       expect(article.find("p").evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
     end
+    page.scroll_to(:bottom)
+    expect(articles.last.find("p").evaluate_script("this.getBoundingClientRect().bottom"))
+      .to be <= page.evaluate_script("window.innerHeight")
     expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
   ensure
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
