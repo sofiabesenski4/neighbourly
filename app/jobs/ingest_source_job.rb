@@ -16,6 +16,7 @@ class IngestSourceJob < ApplicationJob
 
     source.update!(ingestion_status: :ingesting, ingestion_error: nil)
     ContentPipeline::Ingester.new(source).ingest(source.upload_content)
+    enqueue_enrichment(source) if source.csv?
     source.update!(ingestion_status: :succeeded, upload_content: nil)
   rescue => e
     # Reload first: a document that failed to save is still in the in-memory
@@ -25,6 +26,15 @@ class IngestSourceJob < ApplicationJob
   end
 
   private
+
+  # CSV rows arrive as raw "Header: value" text. Each new or changed row gets
+  # its own job to summarize and categorize it, so one slow or failed LLM call
+  # does not hold up the rest.
+  def enqueue_enrichment(source)
+    source.documents.where(enriched_at: nil).find_in_batches do |documents|
+      ActiveJob.perform_all_later(documents.map { |document| EnrichDocumentJob.new(document) })
+    end
+  end
 
   # A document that fails to save raises a generic "Failed to save the record".
   # Its validation errors say why, such as the embedding service being down.
