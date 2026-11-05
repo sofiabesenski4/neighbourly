@@ -39,12 +39,12 @@ RSpec.describe "Pages", type: :request do
     context "when signed out" do
       include_examples "a community-resource welcome"
 
-      it "shows the sign up and sign in links" do
+      it "offers sign-in to start a question" do
         get root_path
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include(new_user_registration_path)
         expect(response.body).to include(new_user_session_path)
+        expect(response.body).to include("Sign in to start chat")
         expect(response.body).not_to include("Ask anything")
       end
 
@@ -65,11 +65,11 @@ RSpec.describe "Pages", type: :request do
 
       include_examples "a community-resource welcome"
 
-      it "shows only the new chat button" do
+      it "offers a direct chat start for signed-in visitors" do
         get root_path
 
         expect(response).to have_http_status(:ok)
-        expect(response.body).to include("Ask anything")
+        expect(response.body).to include("Start chat")
         expect(response.body).to include(%(href="#{new_chat_path}"))
         expect(response.body).not_to include("Get started")
       end
