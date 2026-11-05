@@ -22,7 +22,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit root_path
     page.execute_script("window.flyerNavigationSentinel = true")
 
-    click_link "Make a printable flyer"
+    find_link("Create printout").send_keys(:enter)
 
     expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
     expect(page).to have_css("article h4", text: "Alpha meals")

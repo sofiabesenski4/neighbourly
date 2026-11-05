@@ -1,0 +1,21 @@
+<section aria-labelledby="printout-heading" class="mt-8 flex flex-col items-start gap-4 border-t border-stone-200 pt-5 text-left sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+  <div class="flex items-start gap-3">
+    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sage-100 text-sage-700">
+      <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6Z" />
+        <path d="M18 12h.01" />
+      </svg>
+    </span>
+    <div>
+      <h2 id="printout-heading" class="text-base font-semibold text-stone-900">Prefer a paper copy?</h2>
+      <p class="mt-1 text-sm leading-relaxed text-stone-600">Make a paper guide with addresses, hours, and contact details.</p>
+    </div>
+  </div>
+  <%= link_to new_flyer_path, data: { turbo: false },
+        class: "ml-12 inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-sage-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sage-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 sm:ml-0" do %>
+    Create printout
+    <svg aria-hidden="true" class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12h16m-6-6 6 6-6 6" />
+    </svg>
+  <% end %>
+</section>

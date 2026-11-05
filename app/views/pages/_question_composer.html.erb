@@ -14,7 +14,7 @@
           placeholder: "Where can I get a free meal downtown?",
           aria: { invalid: @landing_question.errors.any?, describedby: ("landing-question-error" if @landing_question.errors.any?) },
           data: { composer_target: "input", action: "input->composer#resize" },
-          class: "mt-2 block min-h-28 max-h-64 w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-base leading-6 text-stone-900 placeholder:text-stone-500 focus:outline-none" %>
+          class: "mt-2 block min-h-20 max-h-64 w-full resize-none overflow-y-auto border-0 bg-transparent p-0 text-base leading-6 text-stone-900 placeholder:text-stone-500 focus:outline-none" %>
     <div class="mt-4 flex flex-col items-start gap-3 sm:flex-row sm:items-center">
       <% unless user_signed_in? %>
         <p class="text-sm text-stone-600">Sign in to save your chat.</p>
