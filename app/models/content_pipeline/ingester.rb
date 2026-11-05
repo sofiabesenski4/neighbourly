@@ -30,6 +30,7 @@ module ContentPipeline
         Rails.logger.info "[ContentPipeline] Embedded chunk #{index + 1}/#{chunks.size}"
       end
 
+      enqueue_enrichment if @source.csv?
       @source.update!(last_fetched_at: Time.current)
 
       Rails.logger.info "[ContentPipeline] Finished ingesting #{@source.name}: #{chunks.size} documents"
@@ -43,6 +44,16 @@ module ContentPipeline
     end
 
     private
+
+    # CSV rows arrive as raw "Header: value" text. Each new or changed row gets
+    # its own job to summarize and categorize it, so one slow or failed LLM call
+    # does not hold up the rest. Queued here so uploads and URL refreshes alike
+    # get enriched.
+    def enqueue_enrichment
+      @source.documents.where(enriched_at: nil).find_in_batches do |documents|
+        ActiveJob.perform_all_later(documents.map { |document| EnrichDocumentJob.new(document) })
+      end
+    end
 
     def parser_for(source)
       case source.source_type
@@ -59,6 +70,14 @@ module ContentPipeline
 
     def upsert_document(chunk)
       document = @source.documents.find_or_initialize_by(external_id: chunk[:external_id])
+      return write_document(document, chunk) if document.new_record?
+
+      # Enrichment may save this row while it is being replaced. Locking
+      # reloads it, so a summary of the old row cannot survive on the new one.
+      document.with_lock { write_document(document, chunk) }
+    end
+
+    def write_document(document, chunk)
       # An unchanged row keeps the summary and categories enrichment gave it.
       # A changed row is written fresh and enriched again.
       return if document.enriched_at? && document.metadata == chunk[:metadata]

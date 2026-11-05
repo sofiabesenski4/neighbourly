@@ -35,6 +35,27 @@ RSpec.describe EnrichDocumentJob do
     expect(enricher).not_to have_received(:enrich!)
   end
 
+  it "runs after chat replies" do
+    expect(described_class.new(document).priority).to be > ChatResponseJob.new(1, "hi").priority.to_i
+  end
+
+  it "runs one job per document at a time" do
+    expect(described_class.concurrency_limit).to eq(1)
+    expect(described_class.new(document).concurrency_key).to eq(described_class.new(Document.find(document.id)).concurrency_key)
+  end
+
+  it "retries later when embedding the summary is rate limited" do
+    chat = instance_double(RubyLLM::Chat)
+    allow(ContentPipeline::Enricher).to receive(:new).and_call_original
+    allow(RubyLLM).to receive(:chat).and_return(chat)
+    allow(chat).to receive_messages(with_instructions: chat, with_schema: chat,
+      ask: instance_double(RubyLLM::Message, content: {title: "Harbour Meals", summary: "Lunches.", categories: []}.to_json))
+    document
+    allow(ContentPipeline::Embedder).to receive(:embed).and_raise(RubyLLM::RateLimitError, "slow down")
+
+    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+  end
+
   it "retries later when the model is rate limited" do
     allow(enricher).to receive(:enrich!).and_raise(RubyLLM::RateLimitError, "slow down")
 
