@@ -143,6 +143,28 @@ RSpec.describe ContentPipeline::Ingester do
         expect { ingester.ingest(csv) }.not_to change(Document, :count)
       end
 
+      context "when a row was already enriched" do
+        let(:csv) { "id,Name,Address\n1,Harbour Meals,100 Harbour St\n" }
+        let(:document) { source.documents.find_by!(external_id: "1") }
+
+        before do
+          ingester.ingest(csv)
+          document.update!(title: "Harbour Community Meals", content: "Free lunches.", enriched_at: Time.current)
+        end
+
+        it "keeps the enrichment when the row is unchanged" do
+          expect { described_class.new(source).ingest(csv) }.not_to(change { document.reload.attributes })
+        end
+
+        it "rewrites the row and clears enrichment when the row changed" do
+          described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St"))
+
+          expect(document.reload).to have_attributes(
+            title: "Harbour Meals", content: "id: 1\nName: Harbour Meals\nAddress: 200 Harbour St", enriched_at: nil
+          )
+        end
+      end
+
       it "writes no documents when the file is malformed" do
         expect { ingester.ingest("Name\n\"unclosed\n") }.to raise_error(ContentPipeline::Parsers::ParseError)
         expect(Document.count).to eq(0)
