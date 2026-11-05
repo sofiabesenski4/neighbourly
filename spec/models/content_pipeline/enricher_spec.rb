@@ -34,6 +34,23 @@ RSpec.describe ContentPipeline::Enricher do
     expect(ContentPipeline::Embedder).to have_received(:embed).with(/\AFree hot lunches/)
   end
 
+  it "embeds the new content once and stores that embedding" do
+    allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.25))
+
+    described_class.new(document).enrich!
+
+    expect(ContentPipeline::Embedder).to have_received(:embed).with(/\AFree hot lunches/).once
+    expect(document.reload.embedding.first).to eq(0.25)
+  end
+
+  it "raises the embedding service's error and leaves the document alone when embedding fails" do
+    document
+    allow(ContentPipeline::Embedder).to receive(:embed).and_raise(RubyLLM::RateLimitError, "slow down")
+
+    expect { described_class.new(document).enrich! }.to raise_error(RubyLLM::RateLimitError)
+    expect(document.reload.enriched_at).to be_nil
+  end
+
   it "assigns only categories that exist, matching names without regard to case" do
     described_class.new(document).enrich!
 

@@ -9,7 +9,8 @@ class Document < ApplicationRecord
 
   validates :content, presence: true
 
-  before_save :generate_embedding, if: :content_changed?
+  # Skipped when the caller already embedded the new content.
+  before_save :generate_embedding, if: -> { content_changed? && !embedding_changed? }
 
   # Together these keep a resource's coordinates in step with its address. They
   # live on the model so that every way of saving a resource gets the same
