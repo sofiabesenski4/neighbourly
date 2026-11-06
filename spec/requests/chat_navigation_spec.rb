@@ -69,9 +69,11 @@ RSpec.describe "Support page navigation", type: :request do
     end
   end
 
-  it "continues to require sign-in before entering the workspace" do
+  it "opens the guest workspace with the PDF frame policy" do
     get new_chat_path
 
-    expect(response).to redirect_to(new_user_session_path)
+    expect(response).to have_http_status(:ok)
+    csp = response.headers.fetch("Content-Security-Policy")
+    expect(csp).to include("frame-src blob:", "object-src 'none'", "script-src 'self'")
   end
 end

@@ -10,7 +10,7 @@ class ChatTitleJob < ApplicationJob
 
   def perform(chat_id)
     chat = Chat.find(chat_id)
-    return if chat.title.present?
+    return if chat.guest? || chat.title.present?
 
     messages = chat.messages.where(role: %w[user assistant]).where.not(content: [nil, ""]).order(:id).limit(6).to_a
     return unless messages.any? { |message| message.role == "user" } && messages.any? { |message| message.role == "assistant" }

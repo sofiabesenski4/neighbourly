@@ -34,7 +34,7 @@ RSpec.describe "Chat account navigation", type: :system do
       click_button "Sign out"
     end
     expect(page).to have_current_path(root_path)
-    expect(page).to have_button("Sign in to start chat", disabled: true)
+    expect(page).to have_button("Start chat", disabled: true)
   ensure
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end

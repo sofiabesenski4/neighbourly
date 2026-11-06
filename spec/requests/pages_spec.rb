@@ -72,12 +72,12 @@ RSpec.describe "Pages", type: :request do
     context "when signed out" do
       include_examples "a community-resource welcome"
 
-      it "offers sign-in to start a question" do
+      it "offers direct chat and keeps sign-in available" do
         get root_path
 
         expect(response).to have_http_status(:ok)
         expect(response.body).to include(new_user_session_path)
-        expect(response.body).to include("Sign in to start chat")
+        expect(response.body).to include("Start chat")
         expect(response.body).not_to include("Ask anything")
       end
     end

@@ -8,7 +8,7 @@
   <% @recent_chats.each do |recent_chat| %>
     <% active = chat.persisted? && recent_chat.id == chat.id %>
     <div class="conversation-row group relative flex items-center rounded-lg <%= active ? "bg-stone-200" : "hover:bg-stone-200" %>" data-chat-row="<%= recent_chat.id %>" data-controller="conversation-menu">
-      <%= link_to chat_title(recent_chat), recent_chat,
+      <%= link_to chat_title(recent_chat), conversation_path(recent_chat),
           aria: { current: active ? "page" : nil }, data: { chat_title: recent_chat.id },
           class: "min-w-0 flex-1 truncate rounded-lg px-3 py-2 text-sm #{active ? "text-stone-900 font-medium" : "text-stone-700"}" %>
       <button type="button" aria-label="Conversation options for <%= chat_title(recent_chat) %>" aria-haspopup="menu" aria-expanded="false" data-conversation-menu-target="trigger" class="conversation-menu-trigger mr-1 rounded-md p-2 text-stone-500 hover:bg-stone-300 focus-visible:outline-sage-600">
@@ -29,4 +29,6 @@
   <% end %>
 </nav>
 
-<%= link_to "All chats", chats_path, class: "mt-4 block rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-200 hover:text-stone-800" %>
+<% if user_signed_in? %>
+  <%= link_to "All chats", chats_path, class: "mt-4 block rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-200 hover:text-stone-800" %>
+<% end %>

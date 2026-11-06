@@ -1,16 +1,17 @@
 class ChatResponsesController < ApplicationController
-  before_action :authenticate_user!
+  include ChatAccess
+
   before_action :set_chat
   before_action :set_chat_response, except: :latest
   after_action :verify_authorized
 
   # Retrying spends the same API budget as sending another message.
   rate_limit to: 10, within: 1.minute,
-    by: -> { current_user.id },
+    by: :chat_budget_key,
     with: -> { rate_limit_exceeded("You're sending messages faster than we can answer them. Please wait a moment.") },
     only: :retry_response, name: "burst", scope: "chat_replies"
   rate_limit to: 100, within: 1.hour,
-    by: -> { current_user.id },
+    by: :chat_budget_key,
     with: -> { rate_limit_exceeded("You've sent a lot of messages in the past hour. Please try again later.") },
     only: :retry_response, name: "sustained", scope: "chat_replies"
 
@@ -19,10 +20,15 @@ class ChatResponsesController < ApplicationController
     when :queued
       respond_to do |format|
         format.turbo_stream { render_status }
-        format.html { redirect_to @chat, status: :see_other }
+        format.html { redirect_to conversation_path(@chat), status: :see_other }
       end
     when :unavailable
-      render_error("The model used for this reply is unavailable. Choose an available model and send your question again.", :unprocessable_content)
+      message = if @chat.guest?
+        "Chat is temporarily unavailable. Please try again later."
+      else
+        "The model used for this reply is unavailable. Choose an available model and send your question again."
+      end
+      render_error(message, :unprocessable_content)
     else
       render_error("Only the latest failed reply can be retried when no response is running.", :conflict)
     end
@@ -35,7 +41,7 @@ class ChatResponsesController < ApplicationController
     end
     respond_to do |format|
       format.turbo_stream { render_status }
-      format.html { redirect_to @chat, status: :see_other }
+      format.html { redirect_to conversation_path(@chat), status: :see_other }
     end
   end
 
@@ -51,14 +57,16 @@ class ChatResponsesController < ApplicationController
       format.turbo_stream do
         render partial: "chat_responses/snapshot", formats: [:html], locals: {chat: @chat, response: latest_response, responses: responses}
       end
-      format.html { redirect_to @chat }
+      format.html { redirect_to conversation_path(@chat) }
     end
   end
 
   private
 
   def set_chat
-    @chat = Chat.find(params[:chat_id])
+    @chat = find_chat(params[:chat_id])
+    return unless @chat
+
     authorize @chat, (action_name == "latest") ? :show? : :update?
   end
 
@@ -72,7 +80,7 @@ class ChatResponsesController < ApplicationController
       format.html do
         flash.now[:alert] = message
         @message = @chat.messages.build
-        @recent_chats = current_user.chats.order(created_at: :desc, id: :desc).limit(30).includes(:first_user_message)
+        set_recent_chats
         render "chats/show", status: status
       end
     end
