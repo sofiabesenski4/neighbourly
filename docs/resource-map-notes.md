@@ -7,6 +7,31 @@ decisions we put off. Add to it as work goes on, and remove entries once resolve
 **Goal:** on the printout, show resources on a map with distance and estimated
 travel time from the user's location.
 
+## Plan
+
+Done on this branch: geocoding on save, the backfill task, distance and walking time on
+printed cards, and the location screen before the builder, with distances in the preview.
+
+Still to do, each as one commit that's reviewed before it's made:
+
+1. **Build the map tiles.** A script in `script/` cuts Greater Victoria from OpenStreetMap
+   data (`osmium`), makes vector tiles (`tilemaker`) and renders PNGs once with
+   `tileserver-gl` in Docker, in a plain grey style such as Positron. Zoom 11–16, at double
+   resolution, with zoom 16 for the urban core only. Saved to `vendor/map_tiles/{z}/{x}/{y}.png`
+   with a `manifest.json`. Ask before installing any tools, and decide on Git LFS first.
+2. **Print a map with pins numbered to match the cards.** The map is the guide's own final
+   page, with an area-wide view, a scale bar ("1 km ≈ 12 min walk"), a number-to-name list and
+   "© OpenStreetMap contributors". Each resource gets one number for the whole guide, shown
+   in its card header. Resources at the same spot share a pin ("3, 7"). Resources with no
+   coordinates go in a "Not shown on map" list. Drawn with Prawn, no network calls.
+3. **Point to off-map resources from the map's edge.** An arrow and distance where the line
+   from the map's centre crosses the border. Nearby edge markers merge.
+4. **Centre the map on the chosen location.** Fit the most detailed zoom to the area, and
+   add a "You are here" marker. Pins and tiles share one world-pixel coordinate system, using
+   the Web Mercator formulas, so pins line up exactly.
+
+The design mockup and proposal are older than this plan. Where they differ, this plan wins.
+
 ## Decisions to revisit
 
 | Decision | Current choice | Why it may change |
@@ -95,6 +120,9 @@ travel time from the user's location.
   of date.
 - Some addresses contain notes, such as "(around back)" and "(location may change)".
   The geocoder ignored these in testing, but they stay in the printed address as is.
+- Most sample resources don't land in a category. When imported into development, 13 of
+  the 20 printed under "Other resources", because their labels (such as "Emergency shelter")
+  aren't exact names in the categories table. Real imports may need a mapping.
 - Rainbow Kitchen is listed under Victoria, but the geocoder places it in Esquimalt.
   The match looks right, but the printed city would be wrong.
 
@@ -108,6 +136,44 @@ travel time from the user's location.
 - Prawn has no public clipping method, so cropping tiles needs a small low-level PDF
   operator.
 - Every map page must credit "© OpenStreetMap contributors".
+
+### Choosing a location
+
+- Coordinates are rounded to about 100 m and kept in the page, so the preview and printout
+  share one lookup and show the same distances. If the geocoder is down on the first
+  screen, the preview shows no distances but printing tries the lookup again, so in that
+  one case a printout could have distances that the preview didn't.
+- The preview's location goes in a POST body so it stays out of URLs and web server logs.
+- Both screens share one URL and switch in the browser, which keeps addresses out of the
+  URL and history. The browser's Back button leaves the page rather than going back a
+  screen, so people need the Change button.
+- The builder shows briefly before JavaScript hides it on a slow load, because without
+  JavaScript both screens need to show.
+
+### Device location
+
+- A Mac can fail after permission is granted. Chrome on the development Mac got permission,
+  then logged `CoreLocationProvider: kCLErrorLocationUnknown`, meaning macOS couldn't work
+  out a position at that moment. Google Maps couldn't find the Mac either. The page shows
+  "We couldn't find your location". It appeared to start working after the UVic VPN was
+  turned off, so people on a VPN may hit this. Chrome's own Sensors panel can supply a
+  fake position to test the flow.
+- Brave couldn't get a location when tried on desktop. It's known for not using Google's
+  location service the way Chrome does, though the exact reason wasn't confirmed. People
+  there see the "couldn't find your location" message and can type a place.
+- Accuracy varies. Laptops estimate from Wi-Fi and can be off by a neighbourhood or
+  more. The page shows the browser's reported accuracy and warns from 1 km up, but
+  that figure is itself an estimate.
+- It's the device's location, not necessarily the reader's. An outreach worker or
+  library computer printing for someone else should type a place instead.
+- The location isn't limited to this region. Someone outside Greater Victoria gets very
+  long distances, and the map (not built yet) will need to decide what to do with them.
+- A browser may remember the permission for the next person on a shared computer. We
+  don't keep the location, but the next person can use the button without a prompt.
+- Chrome may send nearby Wi-Fi networks to Google to work out the position. That's
+  between the person and their browser, and the page mentions it.
+- The real permission prompt is not tested. The browser specs set the permission
+  directly, because a test can't click the browser's own prompt. It needs a manual try.
 
 ## Left out of scope
 

@@ -19,11 +19,18 @@ RSpec.describe "Live resource guide builder", type: :system do
     source.documents.create!(title: "Gamma noticeboard", content: "Noticeboard", metadata: {})
   end
 
+  # Most examples here are about the second screen, so they skip the location one.
+  def visit_builder
+    visit new_flyer_path
+    click_button "Skip distances"
+  end
+
   it "loads a new document from the homepage before generating a PDF" do
     visit root_path
     page.execute_script("window.flyerNavigationSentinel = true")
 
     click_link "Make a printable flyer"
+    click_button "Skip distances"
 
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page.evaluate_script("window.flyerNavigationSentinel")).to be_nil
@@ -35,7 +42,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   end
 
   it "updates cards and print availability when categories are selected and cleared" do
-    visit new_flyer_path
+    visit_builder
 
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_css("article h4", text: "Beta clinic")
@@ -66,7 +73,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   end
 
   it "does not let a delayed old preview replace the latest selection" do
-    visit new_flyer_path
+    visit_builder
     expect(page).to have_css("article h4", text: "Alpha meals")
 
     page.execute_script <<~JAVASCRIPT
@@ -109,7 +116,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   end
 
   it "disables printing after a preview failure and recovers when retried" do
-    visit new_flyer_path
+    visit_builder
     expect(page).to have_css("article h4", text: "Alpha meals")
 
     page.execute_script <<~JAVASCRIPT
@@ -133,7 +140,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   it "shows the retry state when the preview database is unavailable" do
     allow(CategorySearch).to receive(:call).and_raise(ActiveRecord::ConnectionNotEstablished, "Private connection detail")
 
-    visit new_flyer_path
+    visit_builder
 
     expect(page).to have_text("Preview unavailable")
     expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
@@ -141,11 +148,11 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_text("Private connection detail")
   end
 
-  # Drives the "Near" box in real Chrome, so the builder's JavaScript runs. Only the
+  # Drives the first screen in real Chrome, so the builder's JavaScript runs. Only the
   # outside geocoder is faked. It runs inside the test's own server, so the fake
   # applies to the requests Chrome sends. The server-side rules are covered in more
   # detail in spec/requests/flyers_spec.rb. This checks the page and server work together.
-  describe "the Near box" do
+  describe "the location screen" do
     let(:point) { GeoPoint.new(lat: 48.42, lng: -123.36) }
 
     before do
@@ -178,58 +185,114 @@ RSpec.describe "Live resource guide builder", type: :system do
       PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
     end
 
-    it "prints distances from the location that was entered" do
-      expect(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC").and_return(point)
-
+    def visit_location_screen
       visit new_flyer_path
-      expect(page).to have_css("article h4", text: "Alpha meals")
+      expect(page).to have_button("Skip distances")
       capture_printout
-      fill_in "Near", with: "919 Pandora Ave"
+    end
+
+    def continue_with_place(place)
+      fill_in "Enter a place", with: place
+      click_button "Continue"
+    end
+
+    it "asks where to measure from before showing the categories and preview" do
+      visit_location_screen
+
+      expect(page).to have_text("Where should we measure distances from?")
+      expect(page).to have_button("Use my location")
+      expect(page).to have_no_field("Meals", type: "checkbox")
+      expect(page).to have_no_button("Generate printout")
+    end
+
+    it "keeps the location controls out of the second screen" do
+      visit_location_screen
+      click_button "Skip distances"
+
+      expect(page).to have_css("article h4", text: "Alpha meals")
+      expect(page).to have_field("Meals", type: "checkbox")
+      expect(page).to have_no_button("Use my location")
+      expect(page).to have_no_field("Enter a place")
+    end
+
+    it "prints no distances after skipping" do
+      visit_location_screen
+      click_button "Skip distances"
+      expect(page).to have_text("Distances won't be shown")
+      expect(page).to have_css("article h4", text: "Alpha meals")
+      expect(page).to have_no_css("article", text: "Distance:")
+
+      click_button "Generate printout"
+
+      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(printed_text).to include("Alpha meals")
+      expect(printed_text).not_to include("Distance")
+    end
+
+    it "prints distances from a typed place, then uses the chosen categories" do
+      # Once only: the printout reuses the coordinates from checking the place.
+      expect(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC").once.and_return(point)
+
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
+
+      expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      expect(page).to have_css("article", text: "Distance: 1.1 km, about 13 min walk")
+      check "Meals"
+      expect(page).to have_text("1 resource · 1 card")
+      expect(page).to have_css("article", text: "Distance: 1.1 km, about 13 min walk")
       click_button "Generate printout"
 
       expect(page).to have_link("Open PDF", href: /\Ablob:/)
       expect(printed_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km, about 13 min walk")
     end
 
-    it "generates the printout when Enter is pressed in the box" do
+    it "continues when Enter is pressed in the box, without printing yet" do
       allow(Geocoder).to receive(:locate).and_return(point)
 
-      visit new_flyer_path
-      expect(page).to have_button("Generate printout", disabled: false)
-      find_field("Near").send_keys("919 Pandora Ave", :return)
+      visit_location_screen
+      find_field("Enter a place").send_keys("919 Pandora Ave", :return)
 
-      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      expect(page).to have_no_link("Open PDF")
       expect(page).to have_current_path(new_flyer_path)
     end
 
-    it "shows what to try when the location can't be found, then lets the person retry" do
+    it "stays on this screen when a place can't be found, then lets the person retry" do
       allow(Geocoder).to receive(:locate).and_return(nil)
 
-      visit new_flyer_path
-      expect(page).to have_button("Generate printout", disabled: false)
-      fill_in "Near", with: "Central Library"
-      click_button "Generate printout"
+      visit_location_screen
+      continue_with_place("Central Library")
 
-      expect(page).to have_css("[data-flyer-builder-target='printError']", text: "We couldn't find that location")
-      expect(page).to have_no_link("Open PDF")
-      expect(page).to have_field("Near", with: "Central Library")
-      expect(page).to have_button("Generate printout", disabled: false)
+      expect(page).to have_css("[data-flyer-builder-target='placeError']", text: "We couldn't find that location")
+      expect(page).to have_field("Enter a place", with: "Central Library")
+      expect(page).to have_no_button("Generate printout")
 
       allow(Geocoder).to receive(:locate).and_return(point)
-      fill_in "Near", with: "919 Pandora Ave"
-      expect(page).to have_no_css("[data-flyer-builder-target='printError']")
-      click_button "Generate printout"
+      fill_in "Enter a place", with: "919 Pandora Ave"
+      expect(page).to have_no_css("[data-flyer-builder-target='placeError']")
+      click_button "Continue"
 
-      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_text("Distances from: 919 Pandora Ave.")
     end
 
-    it "explains missing distances on the printout when the geocoder is down" do
+    it "asks for a place when the box is empty" do
+      expect(Geocoder).not_to receive(:locate)
+
+      visit_location_screen
+      click_button "Continue"
+
+      expect(page).to have_css("[data-flyer-builder-target='placeError']", text: "Enter a street address")
+      expect(page).to have_no_button("Generate printout")
+    end
+
+    it "lets the person carry on and explains missing distances when the geocoder is down" do
       allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable, "HTTP 503")
 
-      visit new_flyer_path
-      expect(page).to have_button("Generate printout", disabled: false)
-      capture_printout
-      fill_in "Near", with: "919 Pandora Ave"
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
+
+      expect(page).to have_text("We can't check 919 Pandora Ave right now")
       click_button "Generate printout"
 
       expect(page).to have_link("Open PDF", href: /\Ablob:/)
@@ -237,44 +300,175 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(printed_text).not_to include("Distance:")
     end
 
-    # A printout made for the old location has the wrong distances. The preview isn't
+    # A printout made for the old location has the wrong distances. Categories aren't
     # affected, because the location only changes the printout.
-    it "discards a finished printout when the location changes, keeping the preview" do
+    it "goes back with Change, discarding the printout and keeping the categories" do
       allow(Geocoder).to receive(:locate).and_return(point)
 
-      visit new_flyer_path
-      expect(page).to have_css("article h4", text: "Alpha meals")
-      fill_in "Near", with: "919 Pandora Ave"
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
+      check "Meals"
+      expect(page).to have_text("1 resource · 1 card")
       click_button "Generate printout"
       expect(page).to have_link("Open PDF", href: /\Ablob:/)
 
-      find_field("Near").send_keys(" West")
+      click_button "Change"
 
+      expect(page).to have_text("Where should we measure distances from?")
+      expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
       expect(page).to have_no_link("Open PDF")
       expect(page).to have_no_css('iframe[title="Printable resource guide"]', visible: :all)
-      expect(page).to have_css("article h4", text: "Alpha meals")
-      expect(page).to have_text("Live preview")
+
+      click_button "Skip distances"
+
+      expect(page).to have_checked_field("Meals")
+      expect(page).to have_text("1 resource · 1 card")
+      expect(page).to have_no_css("article", text: "Distance:")
       expect(page).to have_button("Generate printout", disabled: false)
     end
 
-    it "cancels a printout still being prepared when the location changes" do
-      allow(Geocoder).to receive(:locate) do
-        sleep 1
-        point
-      end
+    it "updates the preview's distances when the location changes" do
+      allow(Geocoder).to receive(:locate).and_return(point)
 
-      visit new_flyer_path
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
+      expect(page).to have_css("article", text: "Distance: 1.1 km")
+
+      allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.41, lng: -123.36))
+      click_button "Change"
+      continue_with_place("535 Ellice St")
+
+      expect(page).to have_text("Distances from: 535 Ellice St.")
+      expect(page).to have_css("article", text: "Distance: 2.2 km")
+    end
+
+    # The location may be someone's home, so it must not end up in a URL.
+    it "doesn't put the location in the preview's URL" do
+      allow(Geocoder).to receive(:locate).and_return(point)
+      visit_location_screen
+      page.execute_script <<~JAVASCRIPT
+        window.previewUrls = [];
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = (input, options) => {
+          window.previewUrls.push(String(input));
+          return originalFetch(input, options);
+        };
+      JAVASCRIPT
+
+      continue_with_place("919 Pandora Ave")
+      expect(page).to have_css("article", text: "Distance: 1.1 km")
+
+      urls = page.evaluate_script("window.previewUrls")
+      expect(urls.join).to include("/flyers/preview")
+      expect(urls.join).not_to match(/48\.42|123\.36|Pandora/)
+    end
+
+    it "cancels a printout still being prepared when Change is pressed" do
+      allow(Geocoder).to receive(:locate).and_return(point)
+
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
       expect(page).to have_button("Generate printout", disabled: false)
-      fill_in "Near", with: "919 Pandora Ave"
+
+      allow(FlyerGenerator).to receive(:call).and_wrap_original do |generate, **options|
+        sleep 1
+        generate.call(**options)
+      end
       click_button "Generate printout"
       expect(page).to have_button("Preparing printout…", disabled: true)
-
-      find_field("Near").send_keys(" West")
+      click_button "Change"
+      click_button "Skip distances"
 
       expect(page).to have_button("Generate printout", disabled: false)
       # Long enough for the slow reply to have arrived if it hadn't been cancelled.
       page.evaluate_async_script("setTimeout(arguments[0], 1500)")
       expect(page).to have_no_link("Open PDF")
+    end
+
+    # Uses Chrome's real location API and permission system. Chrome's developer tools
+    # protocol sets the answers a person or device would give, since a test can't click
+    # the browser's own permission prompt. The prompt itself isn't covered here.
+    context "with Use my location" do
+      def set_location_permission(setting)
+        page.driver.browser.execute_cdp("Browser.setPermission",
+          permission: {name: "geolocation"}, setting: setting, origin: page.server_url)
+      end
+
+      def set_device_position(latitude:, longitude:, accuracy: 50)
+        page.driver.browser.execute_cdp("Emulation.setGeolocationOverride",
+          latitude: latitude, longitude: longitude, accuracy: accuracy)
+      end
+
+      after do
+        page.driver.browser.execute_cdp("Emulation.clearGeolocationOverride")
+        page.driver.browser.execute_cdp("Browser.resetPermissions")
+      end
+
+      it "moves on and prints distances, without printing the coordinates" do
+        expect(Geocoder).not_to receive(:locate)
+        visit_location_screen
+        set_location_permission("granted")
+        set_device_position(latitude: 48.4201, longitude: -123.3602)
+
+        click_button "Use my location"
+
+        expect(page).to have_text("Distances from your location (accurate to about 50 m).")
+        expect(page).to have_css("article", text: "Distance: 1.1 km, about 13 min walk")
+        expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
+        expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
+
+        click_button "Generate printout"
+        expect(page).to have_link("Open PDF", href: /\Ablob:/)
+        expect(printed_text).to include("Distances are from your location", "Distance: 1.1 km")
+        expect(printed_text).not_to include("48.42", "123.36")
+      end
+
+      it "warns on the second screen when the device's location is rough" do
+        visit_location_screen
+        set_location_permission("granted")
+        set_device_position(latitude: 48.42, longitude: -123.36, accuracy: 3000)
+
+        click_button "Use my location"
+
+        expect(page).to have_text("may be off by about 3 km")
+        expect(page).to have_button("Change")
+      end
+
+      it "stays on this screen and offers typing a place when location access is turned off" do
+        allow(Geocoder).to receive(:locate).and_return(point)
+        visit_location_screen
+        set_location_permission("denied")
+
+        click_button "Use my location"
+
+        expect(page).to have_css("[data-flyer-builder-target='locationStatus']", text: "Location access is turned off")
+        expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("")
+        expect(page).to have_no_button("Generate printout")
+
+        continue_with_place("919 Pandora Ave")
+        expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      end
+
+      it "replaces a typed place, and is replaced by one after using Change" do
+        allow(Geocoder).to receive(:locate).and_return(point)
+        visit_location_screen
+        set_location_permission("granted")
+        set_device_position(latitude: 48.42, longitude: -123.36)
+
+        continue_with_place("919 Pandora Ave")
+        expect(page).to have_text("Distances from: 919 Pandora Ave.")
+        click_button "Change"
+        click_button "Use my location"
+
+        expect(page).to have_text("Distances from your location")
+        expect(find_field("Enter a place", visible: :all).value).to eq("")
+
+        click_button "Change"
+        continue_with_place("535 Ellice St")
+
+        expect(page).to have_text("Distances from: 535 Ellice St.")
+        expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.42")
+      end
     end
   end
 
@@ -282,6 +476,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit preview_flyers_path(flyer: {categories: [food.id.to_s]})
 
     expect(page).to have_current_path(new_flyer_path, ignore_query: true)
+    click_button "Skip distances"
     expect(page).to have_checked_field("Meals")
     expect(page).to have_no_checked_field("Health Care")
     expect(page).to have_css("article h4", text: "Alpha meals")

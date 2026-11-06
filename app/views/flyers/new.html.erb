@@ -2,6 +2,7 @@
 
 <div data-controller="flyer-builder"
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
+     data-flyer-builder-locate-url-value="<%= locate_flyers_path(format: :json) %>"
      data-action="turbo:before-cache@document->flyer-builder#beforeCache">
   <header class="mb-7">
     <h1 class="font-semibold text-3xl text-stone-900">Build a resource guide</h1>
@@ -19,6 +20,63 @@
         </ul>
       </div>
     <% end %>
+
+    <%# Two screens in one form, so the browser sends both when printing. The Stimulus
+        controller shows one at a time and switches between them without a page load,
+        which keeps a typed address out of the URL and browser history. Without
+        JavaScript, both show as one long form, which still works. %>
+    <section class="mb-8 max-w-2xl rounded-xl border border-stone-200 bg-white p-6"
+             aria-labelledby="flyer-location-heading"
+             data-flyer-builder-target="locationStep">
+      <h2 id="flyer-location-heading" tabindex="-1" class="font-semibold text-xl text-stone-900"
+          data-flyer-builder-target="locationHeading">Where should we measure distances from?</h2>
+      <p class="mt-2 text-stone-600">
+        Your printout can show how far away each resource is, with a walking time. This is optional, and your location isn't saved.
+      </p>
+
+      <%# The buttons here are shown by the controller, since they need JavaScript. %>
+      <button type="button" hidden
+              class="mt-5 min-h-11 w-full cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700"
+              data-flyer-builder-target="useLocation"
+              data-action="flyer-builder#useMyLocation">Use my location</button>
+      <p class="mt-2 text-sm text-stone-800" role="status" data-flyer-builder-target="locationStatus" hidden></p>
+      <p class="mt-2 text-xs text-stone-600" data-flyer-builder-target="locationNote" hidden>
+        Your browser may use a location service, such as Google's or Apple's, to find you. We only use the result to work out distances.
+      </p>
+
+      <div class="mt-6">
+        <%= form.label :near, "Enter a place", class: "font-medium text-stone-900" %>
+        <p id="flyer-near-hint" class="mt-1 mb-2 text-sm text-stone-600">A street address or intersection.</p>
+        <%= form.text_field :near, maxlength: 200, autocomplete: "off",
+              placeholder: "e.g. 919 Pandora Ave or Douglas St and Yates St",
+              aria: { describedby: "flyer-near-hint" },
+              class: "block w-full rounded-[7px] border border-stone-400 px-3 py-2 text-base text-stone-900 focus:outline-sage-600",
+              data: { flyer_builder_target: "near",
+                      action: "input->flyer-builder#locationChanged keydown.enter->flyer-builder#confirmPlace:prevent" } %>
+        <p class="mt-2 text-sm text-red-700" role="alert" data-flyer-builder-target="placeError" hidden></p>
+        <button type="button" hidden
+                class="mt-3 min-h-11 cursor-pointer rounded-lg border border-sage-600 px-4 py-2 font-medium text-sage-800 hover:bg-sage-50 disabled:cursor-not-allowed disabled:opacity-50"
+                data-flyer-builder-target="confirmPlaceButton"
+                data-action="flyer-builder#confirmPlace">Continue</button>
+      </div>
+
+      <button type="button" hidden
+              class="mt-6 min-h-11 cursor-pointer font-medium text-sage-800 underline"
+              data-flyer-builder-target="skipLocation"
+              data-action="flyer-builder#skipLocation">Skip distances</button>
+
+      <%= form.hidden_field :lat, autocomplete: "off", data: { flyer_builder_target: "lat" } %>
+      <%= form.hidden_field :lng, autocomplete: "off", data: { flyer_builder_target: "lng" } %>
+    </section>
+
+    <div data-flyer-builder-target="builderStep">
+    <p class="mb-5 flex flex-wrap items-center gap-x-3 rounded-lg border border-stone-200 bg-white px-4 py-3 text-stone-800"
+       data-flyer-builder-target="locationSummaryRow" hidden>
+      <span data-flyer-builder-target="locationSummary"></span>
+      <button type="button"
+              class="min-h-11 cursor-pointer font-medium text-sage-800 underline"
+              data-action="flyer-builder#changeLocation">Change</button>
+    </p>
 
     <div class="grid grid-cols-1 gap-5 items-start sm:grid-cols-[215px_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-7">
       <aside class="rounded-xl border border-stone-200 bg-white px-4 py-5 sm:[@media(min-height:800px)]:sticky sm:[@media(min-height:800px)]:top-6" aria-label="Resource filters">
@@ -38,24 +96,14 @@
         <p class="mt-6 pt-4 border-t border-stone-200 text-sm text-stone-600">
           A resource in two selected categories appears in both sections.
         </p>
-        <div class="mt-6 pt-4 border-t border-stone-200">
-          <%= form.label :near, "Near", class: "font-semibold text-lg text-stone-900" %>
-          <p id="flyer-near-hint" class="mt-1 mb-3 text-sm text-stone-600">
-            Optional. A street address or intersection, used to show distances and walking times on the printout. It isn't saved.
-          </p>
-          <%= form.text_field :near, maxlength: 200, autocomplete: "off",
-                placeholder: "e.g. Douglas St and Yates St",
-                aria: { describedby: "flyer-near-hint" },
-                class: "block w-full rounded-[7px] border border-stone-400 px-3 py-2 text-base text-stone-900 focus:outline-sage-600",
-                data: { action: "input->flyer-builder#locationChanged" } %>
-        </div>
       </aside>
 
       <section class="min-w-0" aria-labelledby="flyer-preview-heading">
         <div class="flex items-start justify-between gap-4 flex-wrap mb-6">
           <div>
             <div class="flex items-center gap-3 flex-wrap">
-              <h2 id="flyer-preview-heading" class="font-semibold text-xl text-stone-900">Your guide</h2>
+              <h2 id="flyer-preview-heading" tabindex="-1" class="font-semibold text-xl text-stone-900"
+                  data-flyer-builder-target="builderHeading">Your guide</h2>
               <span class="text-sm text-sage-700" data-flyer-builder-target="status" role="status">Live preview</span>
             </div>
             <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="count" aria-live="polite">Loading resources…</p>
@@ -84,6 +132,7 @@
         </div>
         <noscript><p class="mt-5 text-stone-600">Live preview needs JavaScript. You can still select categories and generate a PDF.</p></noscript>
       </section>
+    </div>
     </div>
   <% end %>
 </div>

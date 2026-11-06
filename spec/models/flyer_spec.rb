@@ -41,6 +41,39 @@ RSpec.describe Flyer, type: :model do
     end
   end
 
+  # Coordinates from "Use my location", submitted through hidden form fields as text.
+  describe "device location" do
+    it "is optional, and treats blank fields as no location" do
+      flyer = Flyer.new(lat: "", lng: " ")
+
+      expect(flyer).to be_valid
+      expect(flyer.coordinates).to be_nil
+    end
+
+    it "reads coordinates, rounded to about 100 m" do
+      expect(Flyer.new(lat: "48.42711", lng: "-123.35776").coordinates)
+        .to eq(GeoPoint.new(lat: 48.427, lng: -123.358))
+    end
+
+    it "rejects one coordinate without the other" do
+      expect(Flyer.new(lat: "48.42")).not_to be_valid
+      expect(Flyer.new(lng: "-123.35")).not_to be_valid
+    end
+
+    it "rejects text that isn't a number" do
+      flyer = Flyer.new(lat: "north", lng: "-123.35")
+
+      expect(flyer).not_to be_valid
+      expect(flyer.errors.full_messages.join).to include("couldn't read your device's location")
+    end
+
+    it "rejects positions that don't exist" do
+      expect(Flyer.new(lat: "91", lng: "-123.35")).not_to be_valid
+      expect(Flyer.new(lat: "48.42", lng: "181")).not_to be_valid
+      expect(Flyer.new(lat: "Infinity", lng: "-123.35")).not_to be_valid
+    end
+  end
+
   it "rejects categories that are not offered" do
     flyer = Flyer.new(categories: [meals.id.to_s, "spaceships"])
 

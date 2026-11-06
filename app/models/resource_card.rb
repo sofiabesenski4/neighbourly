@@ -11,9 +11,9 @@ class ResourceCard
 
   attr_reader :document
 
-  # The origin is optional, and only the printout passes one. Without it, or when the
-  # resource's location isn't known, the card simply has no Distance row, like any
-  # other missing field.
+  # The origin is optional. The preview and printout pass the same one, so they show
+  # the same distances. Without it, or when the resource's location isn't known, the
+  # card simply has no Distance row, like any other missing field.
   def initialize(document, origin: nil)
     @document = document
     @origin = origin

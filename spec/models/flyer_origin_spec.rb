@@ -44,6 +44,27 @@ RSpec.describe FlyerOrigin do
     end
   end
 
+  describe ".from_coordinates" do
+    it "measures from known coordinates without calling the geocoder" do
+      expect(Geocoder).not_to receive(:locate)
+
+      origin = described_class.from_coordinates(point)
+
+      expect(origin.point).to eq(point)
+      expect(origin).to be_located
+    end
+
+    # This label is printed. The coordinates mustn't be, so that a printout left
+    # behind doesn't show someone's exact position.
+    it "has a label that doesn't reveal the coordinates" do
+      expect(described_class.from_coordinates(point).label).to eq("your location")
+    end
+
+    it "uses the typed place as its label when there is one" do
+      expect(described_class.from_coordinates(point, label: "919 Pandora Ave").label).to eq("919 Pandora Ave")
+    end
+  end
+
   describe ".query_for" do
     it "assumes Victoria when no city is given" do
       expect(described_class.query_for("919 Pandora Ave")).to eq("919 Pandora Ave, Victoria, BC")
