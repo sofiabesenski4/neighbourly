@@ -9,5 +9,7 @@ Rails.application.config.filter_parameters += [
   # asking where to sleep tonight should not have that sitting in a log file.
   :content, :prompt, :details,
   # The place someone measures a printout's distances from may be their home.
-  :near
+  # Plain names here match anywhere in a parameter's name, so "lat" would also hide
+  # names like "template". The pattern matches only these exact names.
+  :near, /\A(lat|lng)\z/
 ]

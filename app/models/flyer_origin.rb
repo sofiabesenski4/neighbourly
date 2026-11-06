@@ -22,6 +22,14 @@ FlyerOrigin = Data.define(:label, :point) do
     point.present?
   end
 
+  # An origin whose coordinates are already known, so nothing is sent to the geocoder.
+  # They come from "Use my location", or from the first screen's check of a typed place,
+  # which supplies its text as the label. The coordinates themselves aren't printed, so
+  # a printout left behind doesn't show someone's exact position.
+  def self.from_coordinates(point, label: nil)
+    new(label: label || "your location", point: point)
+  end
+
   def self.locate(text)
     point = Geocoder.locate(query_for(text))
     new(label: text, point: point) if point

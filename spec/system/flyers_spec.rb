@@ -45,7 +45,7 @@ RSpec.describe "Flyers", type: :system do
     allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
 
     visit new_flyer_path
-    fill_in "Near", with: "Douglas St and Yates St"
+    fill_in "Enter a place", with: "Douglas St and Yates St"
     click_button "Generate printout"
 
     text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
@@ -56,11 +56,11 @@ RSpec.describe "Flyers", type: :system do
     allow(Geocoder).to receive(:locate).and_return(nil)
 
     visit new_flyer_path
-    fill_in "Near", with: "Central Library"
+    fill_in "Enter a place", with: "Central Library"
     click_button "Generate printout"
 
     expect(page).to have_content("We couldn't find that location")
-    expect(page).to have_field("Near", with: "Central Library")
+    expect(page).to have_field("Enter a place", with: "Central Library")
   end
 
   it "shows responsive Tailwind filter controls without the builder stylesheet" do

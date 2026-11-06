@@ -19,6 +19,13 @@ class FlyersController < ApplicationController
     with: -> { rate_limit_exceeded("We've made a lot of flyers for this connection. Please try again later.") },
     only: :create
 
+  # Each check calls the geocoder for an anonymous visitor, so this also stops the site
+  # being used as a free way into that service. It allows for corrections per printout.
+  rate_limit to: 60, within: 1.hour, name: "locate",
+    by: -> { request.remote_ip },
+    with: -> { render json: {errors: ["We've checked a lot of places for this connection. Please try again later."]}, status: :too_many_requests },
+    only: :locate
+
   # Allow ten live previews per printable guide without consuming the PDF quota.
   rate_limit to: 300, within: 1.hour, name: "preview",
     by: -> { request.remote_ip },
@@ -53,7 +60,7 @@ class FlyersController < ApplicationController
       format.json do
         render json: {categories: @sections.map { |section|
           {key: section.category&.id&.to_s, name: section.name,
-           resources: section.resources.map { |resource| ResourceCard.new(resource).as_json }}
+           resources: section.resources.map { |resource| ResourceCard.new(resource, origin: coordinates_origin).as_json }}
         }}
       end
     end
@@ -70,6 +77,27 @@ class FlyersController < ApplicationController
     end
   end
 
+  # Checks a typed place on the first screen, before the person chooses categories.
+  # `located` is false when the geocoder is down: the place might be fine, and the page
+  # lets the person carry on, because the guide can still print. Otherwise the page
+  # keeps the coordinates for the preview and printout, so it needn't look up again.
+  def locate
+    @flyer = Flyer.new(flyer_params)
+    unless @flyer.valid?
+      render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
+      return
+    end
+
+    origin = @flyer.near && FlyerOrigin.locate(@flyer.near)
+    if origin&.located?
+      render json: {located: true, lat: origin.point.lat.round(3), lng: origin.point.lng.round(3)}
+    elsif origin
+      render json: {located: false}
+    else
+      render json: {errors: [NEAR_NOT_FOUND]}, status: :unprocessable_content
+    end
+  end
+
   def create
     @flyer = Flyer.new(flyer_params)
 
@@ -78,7 +106,7 @@ class FlyersController < ApplicationController
       return
     end
 
-    origin = @flyer.near && FlyerOrigin.locate(@flyer.near)
+    origin = printout_origin
     if @flyer.near && origin.nil?
       @flyer.errors.add(:base, NEAR_NOT_FOUND)
       render_invalid_flyer
@@ -116,8 +144,21 @@ class FlyersController < ApplicationController
   # Landmarks like "Central Library" and shorthand like "Douglas & Yates" don't get a
   # trustworthy match from the geocoder, so this shows the forms that do work.
   NEAR_NOT_FOUND = "We couldn't find that location. Try a street address or intersection, " \
-    "like 919 Pandora Ave or Douglas St and Yates St, or leave it blank."
+    "like 919 Pandora Ave or Douglas St and Yates St."
   private_constant :NEAR_NOT_FOUND
+
+  # Where the printout measures distances from, if anywhere. Coordinates are used when
+  # the page has them. A typed place alone is looked up here: that's the form without
+  # JavaScript, or a place the first screen couldn't check during an outage.
+  def printout_origin
+    coordinates_origin || (@flyer.near && FlyerOrigin.locate(@flyer.near))
+  end
+
+  # The origin from submitted coordinates, which never calls the geocoder. The preview
+  # only uses this, so that changing categories can't send anything to an outside service.
+  def coordinates_origin
+    FlyerOrigin.from_coordinates(@flyer.coordinates, label: @flyer.near) if @flyer.coordinates
+  end
 
   # Builder pages expect a JSON error for their PDF request. A form submitted
   # without JavaScript gets the page again, showing the errors.
@@ -134,19 +175,19 @@ class FlyersController < ApplicationController
     return unless params.key?(:flyer)
 
     input = params[:flyer]
-    unexpected = input.is_a?(ActionController::Parameters) ? input.keys - ["categories", "near"] : []
-    near_valid = input.is_a?(ActionController::Parameters) && (input[:near].nil? || input[:near].is_a?(String))
+    unexpected = input.is_a?(ActionController::Parameters) ? input.keys - ["categories", "near", "lat", "lng"] : []
+    not_text = input.is_a?(ActionController::Parameters) ? %w[near lat lng].find { |key| !input[key].nil? && !input[key].is_a?(String) } : nil
     valid = input.is_a?(ActionController::Parameters) &&
       unexpected.empty? &&
-      near_valid &&
+      not_text.nil? &&
       (input[:categories].nil? || (input[:categories].is_a?(Array) && input[:categories].all? { |value| value.is_a?(String) }))
     return if valid
 
     @flyer = Flyer.new
     if unexpected.any?
       @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}")
-    elsif input.is_a?(ActionController::Parameters) && !near_valid
-      @flyer.errors.add(:near, "must be text")
+    elsif not_text
+      @flyer.errors.add(not_text, "must be text")
     else
       @flyer.errors.add(:categories, "must be provided as a list")
     end
@@ -159,6 +200,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:near, categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:near, :lat, :lng, categories: []) : {}
   end
 end

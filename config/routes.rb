@@ -24,7 +24,9 @@ Rails.application.routes.draw do
   end
   resources :chats
   resources :flyers, only: [:new, :create] do
-    get :preview, on: :collection
+    # POST is for a preview with a location, which shouldn't appear in a URL.
+    match :preview, on: :collection, via: [:get, :post]
+    post :locate, on: :collection
   end
 
   # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
