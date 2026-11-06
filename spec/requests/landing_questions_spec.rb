@@ -19,19 +19,19 @@ RSpec.describe "Landing questions", type: :request do
     Nokogiri::HTML5(response.body).at_css("textarea[name='chat[prompt]']").text
   end
 
-  it "offers a labelled question field and an honest sign-in action without a model picker" do
+  it "offers a labelled question field and starts chat without a model picker" do
     get root_path
 
     html = Nokogiri::HTML5(response.body)
     form = html.at_css("form[action='#{start_chat_path}']")
     expect(form.at_css("label").text).to eq("What are you looking for?")
     expect(form.at_css("textarea")["placeholder"]).to eq("Where can I get a free meal downtown?")
-    expect(form.at_css("button[type='submit']").text.squish).to eq("Sign in to start chat")
+    expect(form.at_css("button[type='submit']").text.squish).to eq("Start chat")
     expect(html.css("select")).to be_empty
     expect(response.body).not_to include("No account needed", "Please leave out names and personal details")
   end
 
-  it "rejects a blank question before asking a guest to sign in" do
+  it "rejects a blank question without starting a guest chat" do
     expect { post start_chat_path, params: {chat: {prompt: " \n "}} }.not_to change(Chat, :count)
 
     expect(response).to have_http_status(:unprocessable_content)
@@ -55,49 +55,21 @@ RSpec.describe "Landing questions", type: :request do
     expect(submitted_question).to eq(long_question)
   end
 
-  it "keeps a guest question through a failed sign-in and returns it for review after sign-in" do
-    user
-    expect { post start_chat_path, params: {chat: {prompt: question}} }.not_to change(Chat, :count)
-    expect(response).to redirect_to(new_user_session_path)
-    expect(request.session[:landing_question_token]).to be_present
+  it "keeps a guest's failed question on the error page and clears it on refresh" do
+    allow(RubyLLM.config).to receive(:anthropic_api_key).and_return(nil)
+    post start_chat_path, params: {chat: {prompt: question}}, headers: {"X-Neighbourly-Guest-Token" => SecureRandom.hex(32)}
+    expect(response).to have_http_status(:service_unavailable)
+    expect(submitted_question).to eq(question)
     expect(request.session.to_hash.values).not_to include(question)
-    expect(response.location).not_to include("meal", "prompt")
-    follow_redirect!
+    expect(request.session[:landing_question_token]).to be_nil
 
-    post user_session_path, params: {user: {email: user.email, password: "wrong-password"}}
-    expect(response).to have_http_status(:unprocessable_content)
-    post user_session_path, params: {user: {email: user.email, password: "password123"}}
-    expect(response).to redirect_to(root_path)
-    follow_redirect!
-
-    expect(submitted_question).to eq(question)
-    expect(response.body).to include("Start chat")
-    expect(ChatResponseJob).not_to have_received(:perform_later)
-    expect(Chat.count).to eq(0)
-  end
-
-  it "also preserves the question when the visitor creates an account" do
-    post start_chat_path, params: {chat: {prompt: question}}
-    get new_user_registration_path
-    post user_registration_path, params: {user: {email: "new-neighbour@example.com", password: "password123", password_confirmation: "password123"}}
-
-    expect(response).to redirect_to(root_path)
-    follow_redirect!
-    expect(submitted_question).to eq(question)
-    expect(ChatResponseJob).not_to have_received(:perform_later)
-  end
-
-  it "keeps the question private to the visitor's session" do
-    post start_chat_path, params: {chat: {prompt: question}}
-    other_visitor = open_session
-    other_visitor.get root_path
-
-    expect(Nokogiri::HTML5(other_visitor.response.body).at_css("textarea[name='chat[prompt]']").text).to eq("")
     get root_path
-    expect(submitted_question).to eq(question)
+    expect(submitted_question).to eq("")
   end
 
-  it "expires unsent questions after thirty minutes" do
+  it "expires signed-in visitors' unsent questions after thirty minutes" do
+    sign_in user
+    allow(RubyLLM.config).to receive(:anthropic_api_key).and_return(nil)
     post start_chat_path, params: {chat: {prompt: question}}
     travel 31.minutes do
       get root_path
@@ -161,11 +133,12 @@ RSpec.describe "Landing questions", type: :request do
   end
 
   it "keeps the entered text on screen if temporary draft storage is unavailable" do
+    sign_in user
     allow(Rails.cache).to receive(:write).and_return(false)
     post start_chat_path, params: {chat: {prompt: question}}
 
     expect(response).to have_http_status(:service_unavailable)
-    expect(Nokogiri::HTML5(response.body).text).to include("We couldn't keep your question while you sign in. Please try again.")
+    expect(Nokogiri::HTML5(response.body).text).to include("We couldn't keep your question. Please try again.")
     expect(submitted_question).to eq(question)
     expect(ChatResponseJob).not_to have_received(:perform_later)
   end

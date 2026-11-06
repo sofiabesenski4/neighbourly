@@ -1,9 +1,6 @@
 class FlyersController < ApplicationController
-  # Only this screen embeds locally generated PDF blobs for the print dialog.
-  # The application's default policy continues to disallow embedded content.
-  # Entry links use data-turbo="false" so a full document load applies this
-  # response's policy. A Turbo visit retains the previous document's CSP and
-  # would block the PDF iframe when arriving from another screen.
+  # A direct visit applies this document's PDF policy. Active guest chats can
+  # switch to Printout within their existing document, which permits blob frames.
   content_security_policy do |policy|
     policy.frame_src :blob
     policy.object_src :blob

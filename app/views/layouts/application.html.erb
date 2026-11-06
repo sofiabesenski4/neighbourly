@@ -1,4 +1,7 @@
 <!DOCTYPE html>
+<% guest_chat_page = !user_signed_in? && (content_for?(:landing_page) || content_for?(:chat_workspace)) %>
+<% printout_page = controller_name == "flyers" %>
+<% guest_support_page = guest_chat_page || (printout_page && !user_signed_in?) %>
 <html class="h-full">
   <head>
     <title><%= content_for(:title) || "Neighbourly Resources" %></title>
@@ -8,6 +11,13 @@
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
+    <% if guest_chat_page || printout_page %>
+      <%# Turbo must load a new document when crossing the PDF frame policy boundary. %>
+      <meta name="support-document-policy" content="pdf-frame" data-turbo-track="reload">
+    <% end %>
+    <% if guest_chat_page %>
+      <meta name="turbo-cache-control" content="no-cache">
+    <% end %>
 
     <%= yield :head %>
 
@@ -31,7 +41,7 @@
      else
        "h-full bg-stone-50"
      end %>
-  <body class="<%= body_classes %>">
+  <body class="<%= body_classes %>" data-guest-chat-page="<%= guest_chat_page %>" data-guest-support-page="<%= guest_support_page %>" <% if guest_support_page %>data-turbo-prefetch="false"<% end %>>
     <!-- Navigation -->
     <% shared_navigation = content_for?(:landing_page) || content_for?(:chat_workspace) || %w[chats flyers].include?(controller_name) %>
     <% if shared_navigation %>
@@ -51,6 +61,9 @@
 
     <!-- Main Content -->
     <main class="<%= content_for?(:chat_workspace) ? "flex-1 min-h-0 overflow-hidden" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 #{content_for?(:landing_page) ? "py-2 sm:pt-6" : "py-8"}" %>">
+      <% if guest_chat_page %>
+        <noscript><p class="p-3 text-sm text-stone-700">Enable JavaScript to use guest chat.</p></noscript>
+      <% end %>
       <%= yield %>
     </main>
   </body>

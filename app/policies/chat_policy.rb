@@ -2,11 +2,15 @@
 
 class ChatPolicy < ApplicationPolicy
   def index?
-    user.present?
+    user.is_a?(User)
   end
 
   def show?
-    admin? || owner?
+    if user.is_a?(GuestChatSession)
+      user.owns?(record)
+    else
+      !record.guest? && (admin? || owner?)
+    end
   end
 
   def create?
@@ -18,7 +22,7 @@ class ChatPolicy < ApplicationPolicy
   end
 
   def update?
-    admin? || owner?
+    show?
   end
 
   def edit?
@@ -26,7 +30,7 @@ class ChatPolicy < ApplicationPolicy
   end
 
   def destroy?
-    admin? || owner?
+    show?
   end
 
   private
@@ -37,8 +41,10 @@ class ChatPolicy < ApplicationPolicy
 
   class Scope < ApplicationPolicy::Scope
     def resolve
-      if user&.admin?
-        scope.all
+      if user.is_a?(GuestChatSession)
+        user.chats(scope)
+      elsif user&.admin?
+        scope.where.not(user_id: nil)
       elsif user.present?
         scope.where(user_id: user.id)
       else

@@ -8,9 +8,19 @@ class ApplicationController < ActionController::Base
 
   before_action :enforce_basic_auth
 
+  # A signed-out support document can visit the Printout tab without unloading
+  # the guest chat key. Permit the generated PDF frame on that document only.
+  content_security_policy if: :guest_support_controller? do |policy|
+    policy.frame_src :blob
+  end
+
   rescue_from Pundit::NotAuthorizedError, with: :user_not_authorized
 
   private
+
+  def guest_support_controller?
+    %w[pages chats messages chat_responses].include?(controller_path) && !user_signed_in?
+  end
 
   def enforce_basic_auth
     return if ENV["BASIC_AUTH_ENABLED"] == "false"
