@@ -43,12 +43,13 @@ class FlyersController < ApplicationController
     end
 
     if request.format.html?
-      destination = @flyer.categories.empty? ? new_flyer_path : new_flyer_path(flyer: {categories: @flyer.categories})
+      filters = @flyer.filters.compact_blank
+      destination = filters.empty? ? new_flyer_path : new_flyer_path(flyer: filters)
       redirect_to destination
       return
     end
 
-    @sections = CategorySearch.call(categories: @flyer.categories)
+    @sections = CategorySearch.call(**@flyer.filters)
     respond_to do |format|
       format.json do
         render json: {categories: @sections.map { |section|
@@ -106,12 +107,14 @@ class FlyersController < ApplicationController
       return
     end
 
-    pdf = FlyerGenerator.call(categories: @flyer.categories, origin: origin)
+    pdf = FlyerGenerator.call(**@flyer.filters, origin: origin)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
     else
-      message = if @flyer.categories.empty?
+      message = if @flyer.query.present?
+        "No resources match your search."
+      elsif @flyer.categories.empty?
         "No resources are available to print."
       else
         "No resources matched those categories. Try another selection."
@@ -168,19 +171,18 @@ class FlyersController < ApplicationController
     return unless params.key?(:flyer)
 
     input = params[:flyer]
-    unexpected = input.is_a?(ActionController::Parameters) ? input.keys - ["categories", "near", "lat", "lng"] : []
-    not_text = input.is_a?(ActionController::Parameters) ? %w[near lat lng].find { |key| !input[key].nil? && !input[key].is_a?(String) } : nil
-    valid = input.is_a?(ActionController::Parameters) &&
-      unexpected.empty? &&
-      not_text.nil? &&
-      (input[:categories].nil? || (input[:categories].is_a?(Array) && input[:categories].all? { |value| value.is_a?(String) }))
-    return if valid
+    supported = input.is_a?(ActionController::Parameters)
+    unexpected = supported ? input.keys - %w[categories query sort near lat lng] : []
+    categories = input[:categories] if supported
+    valid_categories = categories.nil? || (categories.is_a?(Array) && categories.all?(String))
+    invalid_fields = supported ? %w[query sort near lat lng].select { |field| input.key?(field) && !input[field].is_a?(String) } : []
+    return if supported && unexpected.empty? && valid_categories && invalid_fields.empty?
 
     @flyer = Flyer.new
     if unexpected.any?
       @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}")
-    elsif not_text
-      @flyer.errors.add(not_text, "must be text")
+    elsif invalid_fields.any?
+      invalid_fields.each { |field| @flyer.errors.add(field, "must be provided as text") }
     else
       @flyer.errors.add(:categories, "must be provided as a list")
     end
@@ -193,6 +195,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:near, :lat, :lng, categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: []) : {}
   end
 end
