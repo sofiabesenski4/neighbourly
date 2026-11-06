@@ -132,22 +132,43 @@ RSpec.describe "Landing question composer", type: :system do
     expect(ChatResponseJob).not_to have_received(:perform_later)
   end
 
-  it "keeps the question controls readable and reachable on a narrow phone screen" do
+  it "sends a question from the compact composer on a narrow phone screen" do
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
     visit root_path
-    click_button "Find food"
-
-    expect(find_field("What are you looking for?")).to match_css(":focus")
     within("section[aria-label='Start a chat']") do
-      all("textarea, button").each do |element|
-        expect(element.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
-      end
-      all("button").each do |button|
-        expect(button.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
-      end
+      expect(page).to have_no_css("[aria-label='Suggested questions']")
+      input = find_field("What are you looking for?")
+      send_button = find("button[type='submit']:disabled")
+      expect(send_button.text).to be_empty
+      expect(send_button.evaluate_script("this.getBoundingClientRect().width")).to be >= 44
+      expect(send_button.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+      expect(send_button.evaluate_script("this.getBoundingClientRect().left"))
+        .to be >= input.evaluate_script("this.getBoundingClientRect().right")
+      expect(send_button.evaluate_script("this.getBoundingClientRect().top"))
+        .to be < input.evaluate_script("this.getBoundingClientRect().bottom")
+
+      input.set("Find a meal near downtown")
+      expect(page).to have_css("button[type='submit']:enabled")
     end
     expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+    find("section[aria-label='Start a chat'] button[type='submit']").click
+    expect(page).to have_content("Guest chat")
+    expect(page).to have_content("Find a meal near downtown")
+    expect(ChatResponseJob).to have_received(:perform_later).once
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
+  it "restores the text button and suggestions at 640 px" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 640, height: 800, deviceScaleFactor: 1, mobile: false)
+    visit root_path
+
+    expect(page).to have_button("Start chat", disabled: true)
+    expect(page).to have_button("Find food")
+    expect(page).to have_button("Find shelter")
+    expect(page).to have_button("Find a shower")
   ensure
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
