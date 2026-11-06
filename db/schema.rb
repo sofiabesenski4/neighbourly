@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -83,10 +83,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_04_000100) do
     t.datetime "created_at", null: false
     t.bigint "ruby_llm_model_id"
     t.datetime "updated_at", null: false
-    t.bigint "user_id", null: false
+    t.bigint "user_id"
     t.string "title"
+    t.string "guest_session_digest"
+    t.index ["guest_session_digest"], name: "index_chats_on_guest_session_digest"
     t.index ["ruby_llm_model_id"], name: "index_chats_on_ruby_llm_model_id"
     t.index ["user_id"], name: "index_chats_on_user_id"
+    t.check_constraint "(user_id IS NULL) <> (guest_session_digest IS NULL)", name: "chats_have_one_owner"
   end
 
   create_table "document_messages", force: :cascade do |t|

@@ -1,5 +1,6 @@
 Rails.application.routes.draw do
   post "start-chat", to: "chats#create", as: :start_chat, defaults: {entrypoint: "landing"}
+  get "guest-chats/:id", to: "chats#show", as: :guest_chat, defaults: {guest_entry: true}
 
   resources :chats do
     resources :messages, only: [:create]

@@ -5,7 +5,7 @@ RSpec.describe "Landing page", type: :system do
     driven_by(:selenium_chrome_headless)
   end
 
-  it "supports keyboard navigation from the landing page into the existing sign-in flow" do
+  it "supports keyboard navigation from the landing page into guest chat" do
     page.current_window.resize_to(1280, 900)
     visit root_path
 
@@ -20,8 +20,8 @@ RSpec.describe "Landing page", type: :system do
     navigation.find_link("neighbourly", exact: true).send_keys(:tab)
     expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Chat")
     navigation.find_link("Chat", exact: true).send_keys(:enter)
-    expect(page).to have_current_path(new_user_session_path)
-    expect(page).to have_content("Sign in to your account")
+    expect(page).to have_current_path(new_chat_path)
+    expect(page).to have_content("Guest chat")
   end
 
   it "keeps both navigation links visible on a narrow phone screen" do

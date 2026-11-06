@@ -11,7 +11,7 @@
       <% end %>
 
       <div class="order-last flex w-full gap-1 sm:order-none sm:w-auto">
-        <%= link_to new_chat_path, aria: { current: ("page" if active_tab == :chat) },
+        <%= link_to new_chat_path, aria: { current: ("page" if active_tab == :chat) }, data: { guest_chat_return: true },
               class: ["inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600",
                       active_tab == :chat ? "bg-sage-100 text-sage-700 hover:bg-sage-200" : "text-stone-700 hover:bg-sage-50"] do %>
           <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -19,7 +19,7 @@
           </svg>
           Chat
         <% end %>
-        <%= link_to new_flyer_path, data: { turbo: false }, aria: { current: ("page" if active_tab == :printout) },
+        <%= link_to new_flyer_path, data: { turbo: false, guest_printout_link: true }, aria: { current: ("page" if active_tab == :printout) },
               class: ["inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600",
                       active_tab == :printout ? "bg-sage-100 text-sage-700 hover:bg-sage-200" : "text-stone-700 hover:bg-sage-50"] do %>
           <svg aria-hidden="true" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

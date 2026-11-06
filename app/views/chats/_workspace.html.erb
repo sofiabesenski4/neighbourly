@@ -22,6 +22,9 @@
         <svg aria-hidden="true" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16" /></svg>
       </button>
       <h1 data-chat-title="<%= chat.id %>" class="min-w-0 flex-1 truncate text-sm font-medium text-stone-700"><%= chat_title(chat) %></h1>
+      <% unless user_signed_in? %>
+        <p class="w-full text-xs text-stone-600">Guest chat. Refreshing or closing this tab ends access to your conversation.</p>
+      <% end %>
     </header>
 
     <div class="relative min-h-0 flex-1">
