@@ -5,10 +5,18 @@ class ResourceCard
   CONTENT_LABELS = ["City", "Address", "Phone", "Email", "Website", "Hours",
     "Age range", "Gender", "Categories", "Description", "Notes", "Intake", "Beds"].freeze
 
+  # Assumes about 5 km/h, a common estimate for walking. Many people using these
+  # guides may be slower, which is why the printout calls this an estimate.
+  WALKING_MINUTES_PER_KM = 12
+
   attr_reader :document
 
-  def initialize(document)
+  # The origin is optional, and only the printout passes one. Without it, or when the
+  # resource's location isn't known, the card simply has no Distance row, like any
+  # other missing field.
+  def initialize(document, origin: nil)
     @document = document
+    @origin = origin
   end
 
   def title
@@ -22,6 +30,7 @@ class ResourceCard
       ["Services", value("description", "Description") || text(document.category_names)],
       ["Address", address && [address, city].compact.join(", ")],
       ["City", (city unless address)],
+      ["Distance", distance],
       ["Hours", value("hours", "Hours")],
       ["Phone", value("phone", "Phone", separator: "\n")],
       ["Email", value("email", "Email")],
@@ -42,6 +51,25 @@ class ResourceCard
   end
 
   private
+
+  # Like "1.2 km, about 15 min walk (straight-line)". Calculated from saved
+  # coordinates with no network call. The label says straight-line because the real
+  # route is longer, especially around water.
+  def distance
+    return unless @origin&.located? && document.coordinates
+
+    km = @origin.point.distance_km_to(document.coordinates)
+    length = (km < 0.1) ? "Under 0.1 km" : "#{format("%.1f", km)} km"
+    "#{length}, about #{walking_time(km)} walk (straight-line)"
+  end
+
+  def walking_time(km)
+    minutes = [(km * WALKING_MINUTES_PER_KM).round, 1].max
+    return "#{minutes} min" if minutes < 60
+
+    hours, leftover = minutes.divmod(60)
+    leftover.zero? ? "#{hours} hr" : "#{hours} hr #{leftover} min"
+  end
 
   def value(key, legacy_label = nil, separator: ", ")
     text(document.metadata[key], separator: separator) || (text(content_fields[legacy_label], separator: separator) if legacy_label)

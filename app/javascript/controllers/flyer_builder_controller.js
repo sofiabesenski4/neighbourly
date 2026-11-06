@@ -49,6 +49,15 @@ export default class extends Controller {
     this.debounce = setTimeout(() => this.refresh(), 300);
   }
 
+  // A printout made for the previous location would show the wrong distances, so
+  // it's discarded as soon as the location changes. The preview stays as it is,
+  // because the location only affects the printout.
+  locationChanged() {
+    this.printRequest?.abort();
+    this.clearPrintout();
+    this.printErrorTarget.hidden = true;
+  }
+
   async refresh() {
     clearTimeout(this.debounce);
     const revision = ++this.revision;

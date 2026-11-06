@@ -17,6 +17,30 @@ RSpec.describe Flyer, type: :model do
     expect(flyer.categories).to be_empty
   end
 
+  # The place to measure distances from. It's only a text check here: the lookup
+  # happens when printing, so that validating never calls an outside service.
+  describe "near" do
+    it "is optional" do
+      expect(Flyer.new.near).to be_nil
+      expect(Flyer.new).to be_valid
+    end
+
+    it "treats blank text as no location and trims the rest" do
+      expect(Flyer.new(near: "   ").near).to be_nil
+      expect(Flyer.new(near: " 919 Pandora Ave ").near).to eq("919 Pandora Ave")
+    end
+
+    it "rejects unreasonably long text" do
+      expect(Flyer.new(near: "a" * 201)).not_to be_valid
+    end
+
+    it "doesn't look anything up while validating" do
+      expect(Geocoder).not_to receive(:locate)
+
+      Flyer.new(near: "919 Pandora Ave").valid?
+    end
+  end
+
   it "rejects categories that are not offered" do
     flyer = Flyer.new(categories: [meals.id.to_s, "spaceships"])
 

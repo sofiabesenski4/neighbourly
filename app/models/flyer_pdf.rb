@@ -15,8 +15,9 @@ class FlyerPdf
   Entry = Data.define(:key, :title, :rows)
   Measure = Data.define(:height, :header_height, :row_heights)
 
-  def initialize(sections:, printed_at: Time.current)
+  def initialize(sections:, origin: nil, printed_at: Time.current)
     @sections = sections
+    @origin = origin
     @printed_at = printed_at
     @pdf = Prawn::Document.new(page_size: "LETTER", margin: MARGIN, compress: true)
     fonts = Rails.root.join("app/assets/fonts/dejavu")
@@ -49,7 +50,7 @@ class FlyerPdf
   end
 
   def entry_for(document)
-    card = ResourceCard.new(document)
+    card = ResourceCard.new(document, origin: @origin)
     title = clean(card.title)
     rows = card.fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
@@ -80,11 +81,30 @@ class FlyerPdf
   end
 
   def new_page
+    first_page = !@started
     @pdf.start_new_page if @started
     @started = true
     @pdf.text("Greater Victoria resource guide", size: 23, style: :bold)
+    if first_page && @origin
+      @pdf.move_down(4)
+      @pdf.text(origin_note, size: SECONDARY_SIZE)
+    end
     @pdf.move_down(12)
     @cursor = @page_top = @pdf.cursor
+  end
+
+  # Says what the distances on the cards mean, or why they're missing. Without this,
+  # a reader couldn't tell what the numbers are measured from, or that a guide with
+  # no distances wasn't what the person asked for.
+  def origin_note
+    place = clean(@origin.label)
+    if @origin.located?
+      "Distances are from #{place}. Walking times assume about 5 km/h in a straight " \
+        "line, so real routes may take longer."
+    else
+      "Distances aren't shown because we couldn't look up #{place} when this was " \
+        "printed. Please try again later."
+    end
   end
 
   def heading_height(label)
