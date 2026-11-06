@@ -100,6 +100,44 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("h3")
   end
 
+  it "searches and applies draft filters from the mobile toolbar" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit new_flyer_path
+
+    expect(page).to have_no_text("Build your resource guide")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
+    find("button[aria-label='Filters']").click
+    within("dialog") do
+      check "Meals"
+      find("button[aria-label='Close filters']").click
+    end
+    expect(page).to have_css("article h4", text: "Beta clinic")
+
+    find("button[aria-label='Filters']").click
+    within("dialog") do
+      expect(page).to have_unchecked_field("Meals")
+      check "Meals"
+      check "Health Care"
+      select "Resource name Z–A", from: "Sort order"
+      click_button "Apply filters"
+    end
+    expect(page).to have_no_css("dialog[open]")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
+    expect(all("article h4").map(&:text)).to eq(["Beta clinic", "Alpha meals"])
+    expect(page).to have_no_text("Gamma noticeboard")
+
+    fill_in "Search resources", with: "clinic"
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_no_text("Alpha meals")
+    fill_in "Search resources", with: "no such resource"
+    expect(page).to have_text("No resources match your search.")
+    expect(page).to have_button("Generate printout", disabled: true)
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "does not let a delayed old preview replace the latest selection" do
     visit new_flyer_path
     expect(page).to have_css("article h4", text: "Alpha meals")

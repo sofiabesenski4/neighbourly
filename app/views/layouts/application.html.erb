@@ -38,6 +38,8 @@
        "h-dvh flex flex-col overflow-hidden bg-white"
      elsif content_for?(:landing_page)
        "h-full bg-white"
+     elsif printout_page
+       "h-full bg-white sm:bg-stone-50"
      else
        "h-full bg-stone-50"
      end %>
@@ -61,7 +63,14 @@
     <%= render "layouts/flash_messages", shared_navigation: shared_navigation %>
 
     <!-- Main Content -->
-    <main class="<%= content_for?(:chat_workspace) ? "flex-1 min-h-0 overflow-hidden" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 #{content_for?(:landing_page) ? "py-2 sm:pt-6" : "py-8"}" %>">
+    <% main_spacing = if content_for?(:landing_page)
+         "py-2 sm:pt-6"
+       elsif printout_page
+         "pt-1 sm:py-8"
+       else
+         "py-8"
+       end %>
+    <main class="<%= content_for?(:chat_workspace) ? "flex-1 min-h-0 overflow-hidden" : "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 #{main_spacing}" %>">
       <% if guest_chat_page %>
         <noscript><p class="p-3 text-sm text-stone-700">Enable JavaScript to use guest chat.</p></noscript>
       <% end %>

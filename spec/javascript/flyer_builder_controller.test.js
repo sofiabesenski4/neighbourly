@@ -25,6 +25,8 @@ test("clearing every category requests and renders the complete guide", async ()
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.revision = 0;
     controller.previewUrlValue = "/flyers/preview.json";
+    controller.searchTarget = { value: "" };
+    controller.sortTarget = { value: "default" };
     controller.previewErrorTarget = { hidden: true };
     controller.setLoading = () => {};
     controller.selectedCategories = () => selected;
@@ -43,6 +45,12 @@ test("clearing every category requests and renders the complete guide", async ()
       [],
     );
     assert.deepEqual(rendered.at(-1), [{ key: "17", resources: [] }]);
+
+    controller.searchTarget.value = " free meals ";
+    controller.sortTarget.value = "desc";
+    await controller.refresh();
+    assert.equal(requests[2].searchParams.get("flyer[query]"), "free meals");
+    assert.equal(requests[2].searchParams.get("flyer[sort]"), "desc");
   } finally {
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;
@@ -115,6 +123,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.countTarget = {};
     controller.statusTarget = {};
     controller.generateTarget = {};
+    controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
     controller.generating = false;
 
@@ -192,6 +201,8 @@ test("a delayed preview response cannot replace a newer selection", async () => 
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.revision = 0;
     controller.previewUrlValue = "/flyers/preview.json";
+    controller.searchTarget = { value: "" };
+    controller.sortTarget = { value: "default" };
     controller.previewErrorTarget = { hidden: true };
     controller.setLoading = () => {};
     controller.selectedCategories = () => selected;

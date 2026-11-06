@@ -5,7 +5,6 @@
 # See the ActiveSupport::ParameterFilter documentation for supported notations and behaviors.
 Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc,
-  # What people ask the assistant is as sensitive as anything else here — someone
-  # asking where to sleep tonight should not have that sitting in a log file.
-  :content, :prompt, :details
+  # Chat prompts and resource searches can contain private information.
+  :content, :prompt, :details, :query
 ]
