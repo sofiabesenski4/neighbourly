@@ -2,8 +2,10 @@ require "rails_helper"
 require "rake"
 
 RSpec.describe "sources rake tasks" do
+  # Loading twice would register every task twice, so each would run twice. Other
+  # task specs may already have loaded them in this process.
   before(:all) do
-    Rails.application.load_tasks
+    Rails.application.load_tasks unless Rake::Task.task_defined?(:environment)
   end
 
   let(:fake_vector) { Array.new(1536) { rand(-1.0..1.0) } }

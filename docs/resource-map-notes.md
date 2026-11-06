@@ -49,16 +49,21 @@ travel time from the user's location.
   again on every save that changes its metadata, and there's no way to list these
   resources for someone to fix.
 - After 5 failed attempts during an outage, a job gives up. The resource stays
-  without coordinates until a later save or the backfill task (planned).
+  without coordinates until a later save or a rerun of `bin/rails resources:geocode`.
+- `bin/rails resources:geocode` only queues jobs and doesn't report how many lookups
+  succeed. In development it needs `SOLID_QUEUE_IN_PUMA=1` and a running server,
+  because in-process jobs are lost when the task exits.
 - Imported coordinates are only checked for being numbers, not for being a real
   location. A latitude of 999 would be accepted, and later distance calculations
   would be wrong.
 - `limits_concurrency` only works with Solid Queue. Development uses Solid Queue
   only when `SOLID_QUEUE_IN_PUMA=1`. Otherwise jobs run on Rails' default in-process
   adapter, with no one-at-a-time limit, and queued jobs are lost on restart.
-- `geocoder_spec.rb` uses fake replies copied from real ones, so it can't detect the
-  real service changing its format. The job has not yet been run end to end against
-  the live service.
+- `geocoder_spec.rb` uses fake replies modelled on real ones, so it can't detect the
+  real service changing its format. The live check so far was a one-off: importing
+  the 20-resource sample and running the job directly gave coordinates to 19. The
+  other, The Cridge Transition House, has no street address. That check used stubbed
+  embeddings and rolled back its data. It didn't run jobs through Solid Queue.
 
 ### Sample data
 
@@ -97,6 +102,9 @@ Not part of the current goal, but easy to add later:
   All are only needed for building tiles.
 - **`trufflehog`:** the pre-commit hook needs it. It's 3.99.8 locally and 3.99.7 in CI.
 - **Local data:** the development database has no documents.
+- **Local embeddings:** a test embedding call in development didn't finish within 60
+  seconds, and the cause is unknown. Saving a resource needs an embedding, so importing
+  or saving resources locally may hang until the configured service responds.
 
 ## Documentation to update
 
