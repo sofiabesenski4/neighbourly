@@ -16,6 +16,57 @@ RSpec.describe Document, type: :model do
     end
   end
 
+  # Tests when saving a resource decides it needs a coordinate lookup, and what
+  # happens to stored coordinates across edits. Jobs are only queued here, never
+  # run, so no lookup happens. What the job does is in geocode_document_job_spec.rb.
+  describe "geocoding" do
+    before { allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0)) }
+
+    def resource(**metadata)
+      source.documents.create!(content: "Resource", metadata: metadata)
+    end
+
+    it "queues a lookup when a resource is saved with a street address" do
+      expect { resource(address: "919 Pandora Ave", city: "Victoria") }
+        .to have_enqueued_job(GeocodeDocumentJob)
+    end
+
+    it "doesn't look up a resource with only a city or no location" do
+      expect { resource(city: "Victoria") }.not_to have_enqueued_job(GeocodeDocumentJob)
+      expect { resource(notes: "Phone only") }.not_to have_enqueued_job(GeocodeDocumentJob)
+    end
+
+    it "uses coordinates supplied by an import instead of looking them up" do
+      document = nil
+
+      expect { document = resource(address: "919 Pandora Ave", lat: 48.42, lng: -123.35) }
+        .not_to have_enqueued_job(GeocodeDocumentJob)
+      expect(document.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.35))
+    end
+
+    it "treats malformed coordinates as unknown" do
+      expect(source.documents.build(metadata: {lat: "north", lng: nil}).coordinates).to be_nil
+    end
+
+    # The form and imports rebuild metadata on every save. Without this, fixing a
+    # typo in a resource's notes would erase its coordinates.
+    it "keeps coordinates when metadata is rebuilt with the same address" do
+      document = resource(address: "919 Pandora Ave", city: "Victoria", lat: 48.42, lng: -123.35)
+
+      expect { document.update!(metadata: {address: "919 Pandora Ave", city: "Victoria", notes: "New"}) }
+        .not_to have_enqueued_job(GeocodeDocumentJob)
+      expect(document.reload.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.35))
+    end
+
+    it "drops coordinates and looks up again when the address changes" do
+      document = resource(address: "919 Pandora Ave", city: "Victoria", lat: 48.42, lng: -123.35)
+
+      expect { document.update!(metadata: {address: "535 Ellice St", city: "Victoria"}) }
+        .to have_enqueued_job(GeocodeDocumentJob)
+      expect(document.reload.coordinates).to be_nil
+    end
+  end
+
   describe "associations" do
     before do
       ["Shelters", "Meals"].each { |name| Category.find_or_create_by!(name: name) }
