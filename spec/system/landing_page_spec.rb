@@ -92,12 +92,18 @@ RSpec.describe "Landing page", type: :system do
     visit root_path
 
     hero = find("section[aria-labelledby='home-heading']")
-    expect(hero).to have_css("h1", text: "What would help you today?")
+    heading = hero.find("h1", text: "What would help you today?")
+    expect(heading.evaluate_script("this.getBoundingClientRect().height <= parseFloat(getComputedStyle(this).lineHeight) + 1")).to be(true)
     expect(hero).to have_content("Victoria, BC")
     expect(hero).to have_content("Find food, shelter, health care, and everyday support nearby.")
 
     printout = find("section[aria-labelledby='printout-heading']")
     link = printout.find_link("Create printout", href: new_flyer_path)
+    composer = find("section[aria-label='Start a chat']")
+    expect(composer.evaluate_script("this.getBoundingClientRect().top") - hero.evaluate_script("this.getBoundingClientRect().bottom")).to be >= 24
+    expect(printout.evaluate_script("this.getBoundingClientRect().top") - composer.evaluate_script("this.getBoundingClientRect().bottom")).to be >= 24
+    expect(link.evaluate_script("this.getBoundingClientRect().top")).to be >= printout.find("p").evaluate_script("this.getBoundingClientRect().bottom")
+    expect(link.evaluate_script("this.getBoundingClientRect().right")).to be_within(1).of(printout.evaluate_script("this.getBoundingClientRect().right"))
     expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
     expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
 
