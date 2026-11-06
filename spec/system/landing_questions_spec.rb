@@ -16,7 +16,7 @@ RSpec.describe "Landing question composer", type: :system do
 
   it "fills and focuses each suggestion without submitting or opening another page" do
     visit root_path
-    expect(page).to have_button("Sign in to start chat", disabled: true)
+    expect(page).to have_button("Start chat", disabled: true)
 
     {
       "Find food" => "Where can I get a free meal downtown?",
@@ -28,37 +28,94 @@ RSpec.describe "Landing question composer", type: :system do
       expect(find_field("What are you looking for?")).to match_css(":focus")
       expect(page).to have_current_path(root_path)
     end
-    expect(page).to have_button("Sign in to start chat", disabled: false)
+    expect(page).to have_button("Start chat", disabled: false)
     expect(ChatResponseJob).not_to have_received(:perform_later)
   end
 
-  it "keeps a multiline question through a failed sign-in and sends it only after review" do
-    user
+  it "starts a guest conversation with a multiline question" do
     visit root_path
     fill_in "What are you looking for?", with: "Find a meal"
     find_field("What are you looking for?").send_keys(:enter, "near downtown")
     question = "Find a meal\nnear downtown"
     expect(page).to have_field("What are you looking for?", with: question)
-    click_button "Sign in to start chat"
-
-    expect(page).to have_current_path(new_user_session_path)
-    fill_in "Email address", with: user.email
-    fill_in "Password", with: "wrong-password"
-    click_button "Sign in", exact: true
-    expect(page).to have_content("Invalid email or password.")
-    fill_in "Password", with: "password123"
-    click_button "Sign in", exact: true
-
-    expect(page).to have_current_path(root_path)
-    expect(page).to have_field("What are you looking for?", with: question)
     expect(ChatResponseJob).not_to have_received(:perform_later)
     click_button "Start chat", exact: true
 
     expect(page).to have_content("Chat was successfully created.")
-    expect(page).to have_current_path(chat_path(Chat.last))
+    expect(page).to have_current_path(guest_chat_path(Chat.last))
     expect(page).to have_content("Find a meal")
+    expect(page).to have_content("Guest chat")
     expect(Chat.last.messages.find_by!(role: "user").content).to eq(question)
     expect(ChatResponseJob).to have_received(:perform_later).once
+  end
+
+  it "continues in the open tab and starts fresh in another tab or after refresh" do
+    visit root_path
+    fill_in "What are you looking for?", with: "A question from the last visitor"
+    click_button "Start chat", exact: true
+    expect(page).to have_content("A question from the last visitor")
+    chat = Chat.last
+    guest_path = guest_chat_path(chat)
+
+    click_button "Stop response"
+    expect(page).to have_content("Response stopped.")
+    fill_in "Message", with: "A follow-up from this tab"
+    click_button "Send message"
+    expect(page).to have_content("A follow-up from this tab")
+
+    # Simulate a reply missed by the live connection and recover it over HTTP.
+    page.execute_script("document.querySelector('turbo-cable-stream-source')?.remove()")
+    reply = chat.latest_response
+    answer = chat.messages.create!(role: "assistant", content: "Try a community kitchen.")
+    reply.update!(status: :completed, assistant_message: answer)
+    page.execute_script("window.dispatchEvent(new Event('online'))")
+    expect(page).to have_content("Try a community kitchen.")
+
+    within_window(open_new_window) do
+      visit guest_path
+      expect(page).to have_current_path(new_chat_path)
+      expect(page).not_to have_content("A question from the last visitor")
+    end
+
+    refresh
+    expect(page).to have_current_path(new_chat_path)
+    expect(page).not_to have_content("A question from the last visitor")
+  end
+
+  it "keeps a guest conversation while using Printout in the same tab" do
+    allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
+    source = Source.create!(name: "Local guide", source_type: "api")
+    source.documents.create!(title: "Community meal", content: "Free meals downtown")
+
+    visit root_path
+    fill_in "What are you looking for?", with: "Find a meal near downtown"
+    click_button "Start chat", exact: true
+    expect(page).to have_content("Find a meal near downtown")
+    conversation = guest_chat_path(Chat.last)
+    page.execute_script(<<~JS)
+      window.guestPrintoutViolations = [];
+      document.addEventListener('securitypolicyviolation', (event) => {
+        window.guestPrintoutViolations.push(event.effectiveDirective);
+      });
+    JS
+
+    find("nav[aria-label='Main navigation']").click_link "Printout", exact: true
+    expect(page).to have_current_path(new_flyer_path)
+    expect(page.evaluate_script("window.guestPrintoutViolations")).to eq([])
+    click_button "Generate printout"
+    expect(page).to have_link("Open PDF", href: /\Ablob:/)
+    expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)
+    expect(page.evaluate_script("window.guestPrintoutViolations")).not_to include("frame-src", "object-src")
+
+    page.go_back
+    expect(page).to have_current_path(conversation)
+    expect(page).to have_content("Find a meal near downtown")
+
+    find("nav[aria-label='Main navigation']").click_link "Printout", exact: true
+    expect(page).to have_current_path(new_flyer_path)
+    find("nav[aria-label='Main navigation']").click_link "Chat", exact: true
+    expect(page).to have_current_path(conversation)
+    expect(page).to have_content("Find a meal near downtown")
   end
 
   it "keeps the signed-in visitor's question editable after a failed start" do

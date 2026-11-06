@@ -1,13 +1,24 @@
 class Chat < ApplicationRecord
   acts_as_chat
 
-  belongs_to :user
+  GUEST_LIFETIME = 24.hours
+
+  belongs_to :user, optional: true
   has_one :first_user_message, -> { where(role: "user").order(:id) }, class_name: "Message"
   has_many :chat_responses, dependent: :destroy
 
   validates :title, length: {maximum: 60}, allow_nil: true
+  validate :require_one_owner
 
   after_update_commit :broadcast_title, if: :saved_change_to_title?
+
+  scope :guest, -> { where.not(guest_session_digest: nil) }
+  scope :active_guest, -> { guest.where("created_at > ?", GUEST_LIFETIME.ago) }
+  scope :expired_guest, -> { guest.where(created_at: ..GUEST_LIFETIME.ago) }
+
+  def guest?
+    guest_session_digest.present?
+  end
 
   def response_in_progress?
     chat_responses.active.exists?
@@ -34,5 +45,13 @@ class Chat < ApplicationRecord
 
   def broadcast_reply_succeeded
     broadcast_remove_to "chat_#{id}", target: "chat_#{id}_reply_failed"
+  end
+
+  private
+
+  def require_one_owner
+    return if user.present? != guest?
+
+    errors.add(:base, "A conversation must belong to an account or a guest session.")
   end
 end
