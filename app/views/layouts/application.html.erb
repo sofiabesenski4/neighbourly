@@ -43,9 +43,10 @@
      end %>
   <body class="<%= body_classes %>" data-guest-chat-page="<%= guest_chat_page %>" data-guest-support-page="<%= guest_support_page %>" <% if guest_support_page %>data-turbo-prefetch="false"<% end %>>
     <!-- Navigation -->
-    <% shared_navigation = content_for?(:landing_page) || content_for?(:chat_workspace) || %w[chats flyers].include?(controller_name) %>
+    <% no_active_tab = content_for?(:landing_page) || content_for?(:sign_in_page) %>
+    <% shared_navigation = no_active_tab || content_for?(:chat_workspace) || %w[chats flyers].include?(controller_name) %>
     <% if shared_navigation %>
-      <% active_tab = if content_for?(:landing_page)
+      <% active_tab = if no_active_tab
            nil
          elsif controller_name == "flyers"
            :printout

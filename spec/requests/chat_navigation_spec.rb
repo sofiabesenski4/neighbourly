@@ -38,6 +38,18 @@ RSpec.describe "Support page navigation", type: :request do
     end
   end
 
+  it "shares the landing header on sign-in without selecting a support tab" do
+    get root_path
+    landing_links = navigation.css("a").map { |link| [link["href"], link.text.squish, link.at_css("svg")&.to_html] }
+
+    get new_user_session_path
+
+    expect(response).to have_http_status(:ok)
+    expect(navigation.css("a").map { |link| [link["href"], link.text.squish, link.at_css("svg")&.to_html] }).to eq(landing_links)
+    expect(navigation.css("a[aria-current], a.bg-sage-100")).to be_empty
+    expect(response.headers.fetch("Content-Security-Policy")).to include("frame-src 'none'")
+  end
+
   it "gives guests the same brand and tabs with Printout active in the builder" do
     get new_flyer_path
 
