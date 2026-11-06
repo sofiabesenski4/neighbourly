@@ -8,6 +8,12 @@ class Flyer
 
   attribute :categories, default: -> { [] }
 
+  # Optional place to measure distances from, as typed. FlyerOrigin looks it up when
+  # the printout is generated, not here, because validating also runs for the live
+  # preview, which shouldn't call an outside service.
+  attribute :near, :string
+
+  validates :near, length: {maximum: 200}
   validate :categories_are_available
 
   # Use the same persisted categories as the resource form. String IDs match
@@ -18,6 +24,10 @@ class Flyer
 
   def categories=(value)
     super(Array(value).compact_blank.map(&:to_s).uniq)
+  end
+
+  def near=(value)
+    super(value.to_s.strip.presence)
   end
 
   private

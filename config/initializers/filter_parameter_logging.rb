@@ -7,5 +7,7 @@ Rails.application.config.filter_parameters += [
   :passw, :email, :secret, :token, :_key, :crypt, :salt, :certificate, :otp, :ssn, :cvv, :cvc,
   # What people ask the assistant is as sensitive as anything else here — someone
   # asking where to sleep tonight should not have that sitting in a log file.
-  :content, :prompt, :details
+  :content, :prompt, :details,
+  # The place someone measures a printout's distances from may be their home.
+  :near
 ]

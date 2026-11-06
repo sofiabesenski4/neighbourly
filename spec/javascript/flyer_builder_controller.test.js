@@ -3,6 +3,22 @@ import assert from "node:assert/strict";
 
 import FlyerBuilderController from "../../app/javascript/controllers/flyer_builder_controller.js";
 
+// A finished or in-progress printout has distances from the old location, so it
+// must not stay available once the location changes.
+test("changing the location discards a printout without reloading the preview", () => {
+  const events = [];
+  const controller = Object.create(FlyerBuilderController.prototype);
+  controller.printRequest = { abort: () => events.push("aborted") };
+  controller.clearPrintout = () => events.push("cleared");
+  controller.printErrorTarget = { hidden: false };
+  controller.refresh = () => events.push("refreshed");
+
+  controller.locationChanged();
+
+  assert.deepEqual(events, ["aborted", "cleared"]);
+  assert.equal(controller.printErrorTarget.hidden, true);
+});
+
 test("clearing every category requests and renders the complete guide", async () => {
   const previousWindow = globalThis.window;
   const previousFetch = globalThis.fetch;

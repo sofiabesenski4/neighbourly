@@ -38,6 +38,17 @@
         <p class="mt-6 pt-4 border-t border-stone-200 text-sm text-stone-600">
           A resource in two selected categories appears in both sections.
         </p>
+        <div class="mt-6 pt-4 border-t border-stone-200">
+          <%= form.label :near, "Near", class: "font-semibold text-lg text-stone-900" %>
+          <p id="flyer-near-hint" class="mt-1 mb-3 text-sm text-stone-600">
+            Optional. A street address or intersection, used to show distances and walking times on the printout. It isn't saved.
+          </p>
+          <%= form.text_field :near, maxlength: 200, autocomplete: "off",
+                placeholder: "e.g. Douglas St and Yates St",
+                aria: { describedby: "flyer-near-hint" },
+                class: "block w-full rounded-[7px] border border-stone-400 px-3 py-2 text-base text-stone-900 focus:outline-sage-600",
+                data: { action: "input->flyer-builder#locationChanged" } %>
+        </div>
       </aside>
 
       <section class="min-w-0" aria-labelledby="flyer-preview-heading">

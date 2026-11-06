@@ -1,4 +1,5 @@
 require "rails_helper"
+require "pdf/reader"
 
 RSpec.describe "Live resource guide builder", type: :system do
   let!(:food) { Category.create!(name: "Meals") }
@@ -138,6 +139,143 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_no_text("Private connection detail")
+  end
+
+  # Drives the "Near" box in real Chrome, so the builder's JavaScript runs. Only the
+  # outside geocoder is faked. It runs inside the test's own server, so the fake
+  # applies to the requests Chrome sends. The server-side rules are covered in more
+  # detail in spec/requests/flyers_spec.rb. This checks the page and server work together.
+  describe "the Near box" do
+    let(:point) { GeoPoint.new(lat: 48.42, lng: -123.36) }
+
+    before do
+      Document.find_by!(title: "Alpha meals").update_columns(metadata: {lat: 48.43, lng: -123.36})
+    end
+
+    # Keeps a copy of the PDF as the page turns it into a link. Fetching the link
+    # afterwards isn't possible, because the site's security policy blocks that, as
+    # it should: the page only ever shows the PDF in a frame or a new tab.
+    def capture_printout
+      page.execute_script <<~JAVASCRIPT
+        const createObjectURL = URL.createObjectURL.bind(URL);
+        URL.createObjectURL = (blob) => {
+          window.capturedPrintout = blob;
+          return createObjectURL(blob);
+        };
+      JAVASCRIPT
+    end
+
+    # Reads the PDF the browser actually received. Whitespace is squeezed because
+    # lines wrap wherever the page width falls.
+    def printed_text
+      data_url = page.evaluate_async_script(<<~JAVASCRIPT)
+        const done = arguments[0];
+        const reader = new FileReader();
+        reader.onload = () => done(reader.result);
+        reader.readAsDataURL(window.capturedPrintout);
+      JAVASCRIPT
+      pdf = data_url.split(",", 2).last.unpack1("m")
+      PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
+    end
+
+    it "prints distances from the location that was entered" do
+      expect(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC").and_return(point)
+
+      visit new_flyer_path
+      expect(page).to have_css("article h4", text: "Alpha meals")
+      capture_printout
+      fill_in "Near", with: "919 Pandora Ave"
+      click_button "Generate printout"
+
+      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(printed_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km, about 13 min walk")
+    end
+
+    it "generates the printout when Enter is pressed in the box" do
+      allow(Geocoder).to receive(:locate).and_return(point)
+
+      visit new_flyer_path
+      expect(page).to have_button("Generate printout", disabled: false)
+      find_field("Near").send_keys("919 Pandora Ave", :return)
+
+      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_current_path(new_flyer_path)
+    end
+
+    it "shows what to try when the location can't be found, then lets the person retry" do
+      allow(Geocoder).to receive(:locate).and_return(nil)
+
+      visit new_flyer_path
+      expect(page).to have_button("Generate printout", disabled: false)
+      fill_in "Near", with: "Central Library"
+      click_button "Generate printout"
+
+      expect(page).to have_css("[data-flyer-builder-target='printError']", text: "We couldn't find that location")
+      expect(page).to have_no_link("Open PDF")
+      expect(page).to have_field("Near", with: "Central Library")
+      expect(page).to have_button("Generate printout", disabled: false)
+
+      allow(Geocoder).to receive(:locate).and_return(point)
+      fill_in "Near", with: "919 Pandora Ave"
+      expect(page).to have_no_css("[data-flyer-builder-target='printError']")
+      click_button "Generate printout"
+
+      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+    end
+
+    it "explains missing distances on the printout when the geocoder is down" do
+      allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable, "HTTP 503")
+
+      visit new_flyer_path
+      expect(page).to have_button("Generate printout", disabled: false)
+      capture_printout
+      fill_in "Near", with: "919 Pandora Ave"
+      click_button "Generate printout"
+
+      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(printed_text).to include("Alpha meals", "Distances aren't shown")
+      expect(printed_text).not_to include("Distance:")
+    end
+
+    # A printout made for the old location has the wrong distances. The preview isn't
+    # affected, because the location only changes the printout.
+    it "discards a finished printout when the location changes, keeping the preview" do
+      allow(Geocoder).to receive(:locate).and_return(point)
+
+      visit new_flyer_path
+      expect(page).to have_css("article h4", text: "Alpha meals")
+      fill_in "Near", with: "919 Pandora Ave"
+      click_button "Generate printout"
+      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+
+      find_field("Near").send_keys(" West")
+
+      expect(page).to have_no_link("Open PDF")
+      expect(page).to have_no_css('iframe[title="Printable resource guide"]', visible: :all)
+      expect(page).to have_css("article h4", text: "Alpha meals")
+      expect(page).to have_text("Live preview")
+      expect(page).to have_button("Generate printout", disabled: false)
+    end
+
+    it "cancels a printout still being prepared when the location changes" do
+      allow(Geocoder).to receive(:locate) do
+        sleep 1
+        point
+      end
+
+      visit new_flyer_path
+      expect(page).to have_button("Generate printout", disabled: false)
+      fill_in "Near", with: "919 Pandora Ave"
+      click_button "Generate printout"
+      expect(page).to have_button("Preparing printout…", disabled: true)
+
+      find_field("Near").send_keys(" West")
+
+      expect(page).to have_button("Generate printout", disabled: false)
+      # Long enough for the slow reply to have arrived if it hadn't been cancelled.
+      page.evaluate_async_script("setTimeout(arguments[0], 1500)")
+      expect(page).to have_no_link("Open PDF")
+    end
   end
 
   it "opens an old HTML preview link in the live builder with its filters" do

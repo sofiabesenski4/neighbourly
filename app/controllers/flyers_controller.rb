@@ -74,15 +74,18 @@ class FlyersController < ApplicationController
     @flyer = Flyer.new(flyer_params)
 
     unless @flyer.valid?
-      if request.format.pdf?
-        render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
-      else
-        render :new, status: :unprocessable_content
-      end
+      render_invalid_flyer
       return
     end
 
-    pdf = FlyerGenerator.call(categories: @flyer.categories)
+    origin = @flyer.near && FlyerOrigin.locate(@flyer.near)
+    if @flyer.near && origin.nil?
+      @flyer.errors.add(:base, NEAR_NOT_FOUND)
+      render_invalid_flyer
+      return
+    end
+
+    pdf = FlyerGenerator.call(categories: @flyer.categories, origin: origin)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
@@ -110,20 +113,40 @@ class FlyersController < ApplicationController
 
   private
 
+  # Landmarks like "Central Library" and shorthand like "Douglas & Yates" don't get a
+  # trustworthy match from the geocoder, so this shows the forms that do work.
+  NEAR_NOT_FOUND = "We couldn't find that location. Try a street address or intersection, " \
+    "like 919 Pandora Ave or Douglas St and Yates St, or leave it blank."
+  private_constant :NEAR_NOT_FOUND
+
+  # Builder pages expect a JSON error for their PDF request. A form submitted
+  # without JavaScript gets the page again, showing the errors.
+  def render_invalid_flyer
+    if request.format.pdf?
+      render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
+    else
+      render :new, status: :unprocessable_content
+    end
+  end
+
   # A malformed filter is an error, rather than an instruction to show all.
   def reject_malformed_selection
     return unless params.key?(:flyer)
 
     input = params[:flyer]
-    unexpected = input.is_a?(ActionController::Parameters) ? input.keys - ["categories"] : []
+    unexpected = input.is_a?(ActionController::Parameters) ? input.keys - ["categories", "near"] : []
+    near_valid = input.is_a?(ActionController::Parameters) && (input[:near].nil? || input[:near].is_a?(String))
     valid = input.is_a?(ActionController::Parameters) &&
       unexpected.empty? &&
+      near_valid &&
       (input[:categories].nil? || (input[:categories].is_a?(Array) && input[:categories].all? { |value| value.is_a?(String) }))
     return if valid
 
     @flyer = Flyer.new
     if unexpected.any?
       @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}")
+    elsif input.is_a?(ActionController::Parameters) && !near_valid
+      @flyer.errors.add(:near, "must be text")
     else
       @flyer.errors.add(:categories, "must be provided as a list")
     end
@@ -136,6 +159,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:near, categories: []) : {}
   end
 end
