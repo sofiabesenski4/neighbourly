@@ -237,7 +237,7 @@ RSpec.describe "Flyers", type: :request do
         post flyers_path, params: {flyer: {near: "919 Pandora Ave"}}, headers: pdf_headers
 
         expect(response).to have_http_status(:ok)
-        expect(pdf_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km, about 13 min walk")
+        expect(pdf_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km straight-line, about 17 min walk")
       end
 
       it "doesn't look anything up when no place was entered" do
@@ -303,7 +303,7 @@ RSpec.describe "Flyers", type: :request do
         post flyers_path, params: {flyer: {lat: "48.420", lng: "-123.360"}}, headers: pdf_headers
 
         expect(response).to have_http_status(:ok)
-        expect(pdf_text).to include("Distances are from your location", "Distance: 1.1 km, about 13 min walk")
+        expect(pdf_text).to include("Distances are from your location", "Distance: 1.1 km straight-line, about 17 min walk")
         expect(pdf_text).not_to include("48.42", "123.36")
       end
 
@@ -462,7 +462,7 @@ RSpec.describe "Flyers", type: :request do
 
         expect(response).to have_http_status(:ok)
         expect(card_fields("Community meal"))
-          .to include({"label" => "Distance", "value" => "1.1 km, about 13 min walk (straight-line)"})
+          .to include({"label" => "Distance", "value" => "1.1 km straight-line, about 17 min walk"})
       end
 
       it "applies the selected categories and the location together" do

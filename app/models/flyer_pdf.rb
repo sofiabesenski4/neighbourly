@@ -99,8 +99,8 @@ class FlyerPdf
   def origin_note
     place = clean(@origin.label)
     if @origin.located?
-      "Distances are from #{place}. Walking times assume about 5 km/h in a straight " \
-        "line, so real routes may take longer."
+      "Distances are from #{place}, in a straight line. Walking times are estimates that " \
+        "allow for following streets at about 5 km/h, and some routes may take longer."
     else
       "Distances aren't shown because we couldn't look up #{place} when this was " \
         "printed. Please try again later."

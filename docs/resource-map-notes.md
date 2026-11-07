@@ -20,7 +20,7 @@ Still to do, each as one commit that's reviewed before it's made:
    resolution, with zoom 16 for the urban core only. Saved to `vendor/map_tiles/{z}/{x}/{y}.png`
    with a `manifest.json`. Ask before installing any tools, and decide on Git LFS first.
 2. **Print a map with pins numbered to match the cards.** The map is the guide's own final
-   page, with an area-wide view, a scale bar ("1 km ≈ 12 min walk"), a number-to-name list and
+   page, with an area-wide view, a scale bar ("1 km ≈ 16 min walk"), a number-to-name list and
    "© OpenStreetMap contributors". Each resource gets one number for the whole guide, shown
    in its card header. Resources at the same spot share a pin ("3, 7"). Resources with no
    coordinates go in a "Not shown on map" list. Drawn with Prawn, no network calls.
@@ -40,7 +40,7 @@ The design mockup and proposal are older than this plan. Where they differ, this
 | Assuming Victoria for typed places | `FlyerOrigin` adds `, Victoria, BC` unless the text has a comma | The score drops without a city (`919 Pandora Ave` alone gets 89). Adding Victoria still found Saanich and Esquimalt addresses in testing, but a place elsewhere in BC typed without a city could match the wrong one. |
 | Printing during a geocoder outage | Print the guide without distances, with a note saying why | Chosen so an outside service can't block someone getting a guide. The alternative is an error asking them to try again. |
 | Accepted match types | `SITE`, `UNIT`, `CIVIC_NUMBER`, `BLOCK`, `INTERSECTION` | `BLOCK` is needed for 2916 Douglas St, but places a pin on the block rather than the building. |
-| Travel time | Walking only, straight-line, at 5 km/h (1 km ≈ 12 min) | Real routes are longer, especially around the Inner Harbour and the Gorge. Accurate times would need a routing engine or paid service. The pace may also be too fast for many of the people using these guides. |
+| Travel time | Walking only: straight-line distance × 1.3 for following streets, at 5 km/h (1 km ≈ 16 min) | 1.3 (`ResourceCard::STREET_ROUTE_FACTOR`) comes from grid geometry and hasn't been measured against Victoria's streets. Accurate times would need a routing engine or paid service. The pace may also be too fast for many of the people using these guides. |
 | Map tile source | Render our own from OpenStreetMap data | Not tried yet. OpenStreetMap's own tile servers forbid bulk downloads. If rendering is too much work, the fallback is drawing a plain map ourselves. |
 | Google Maps | Not used | Its terms forbid storing tiles and restrict caching geocodes. It also needs billing, and it keeps search terms, IP addresses and coordinates. |
 
@@ -66,6 +66,13 @@ The design mockup and proposal are older than this plan. Where they differ, this
   how many production resources have usable street addresses.
 
 ## Known limitations
+
+### Walking times
+
+- **Accepted debt: water.** Walking times don't allow for going around water. A resource
+  just across the Inner Harbour or the Gorge can be a much longer walk than its printed
+  time, because the route has to reach a bridge. We've chosen to accept this, and fixing
+  it would need a routing engine.
 
 ### Geocoding
 
@@ -192,7 +199,10 @@ Not part of the current goal, but easy to add later:
   Homebrew's `chromedriver` unless needed. Selenium downloaded a matching driver by
   itself, and Homebrew's was five major versions behind its Chrome when checked.
 - **Not installed yet:** Docker (via `colima`), `osmium`, `tilemaker` and Git LFS.
-  All are only needed for building tiles.
+  All are only needed for building tiles. `tilemaker` isn't in Homebrew, so it needs a
+  container image or a source build.
+- **App Dockerfile:** it has `COPY vendor/* ./vendor/`, which flattens one directory level.
+  Check how that treats `vendor/map_tiles/` before saving tiles there, or pick another folder.
 - **`trufflehog`:** the pre-commit hook needs it. It's 3.99.8 locally and 3.99.7 in CI.
 - **Local data:** the development database has no documents.
 - **Local embeddings need the UVic VPN:** the configured embedding service,

@@ -27,14 +27,14 @@ RSpec.describe FlyerPdf do
     it "prints the distance on each card that has a known location" do
       text = text_for([resource(title: "Known", lat: 48.43, lng: -123.36), resource(title: "Unknown")], located)
 
-      expect(text).to include("Distance: 1.1 km, about 13 min walk (straight-line)")
+      expect(text).to include("Distance: 1.1 km straight-line, about 17 min walk")
       expect(text.scan("Distance:").size).to eq(1)
     end
 
     it "says what the distances are measured from and that they're estimates" do
       text = text_for([resource(lat: 48.43, lng: -123.36)], located)
 
-      expect(text).to include("Distances are from 919 Pandora Ave", "real routes may take longer")
+      expect(text).to include("Distances are from 919 Pandora Ave", "some routes may take longer")
     end
 
     it "explains missing distances when the geocoder was down" do
