@@ -16,9 +16,8 @@
 #   layout.edge_markers  # MapPinLayout::EdgeMarker values
 #   layout.not_shown     # MapPinLayout::NotShown values
 class MapPinLayout
-  # All three sizes are in page points. FlyerMapPage draws pins 14 points wide. The edge
-  # marker's 28 points is still an estimate, because nothing draws those yet. If these are
-  # drawn much larger or smaller, the values below should change to match.
+  # All three sizes are in page points. FlyerMapPage draws pins 14 points wide and arrows 10
+  # points wide. If these are drawn much larger or smaller, the values below should change.
 
   # Pins closer than this share one pin, because one would cover the other's number. A pin
   # reaches 7 points from its middle, and a digit reaches about 3 from the other pin's, so
@@ -26,12 +25,12 @@ class MapPinLayout
   # points apart left one number completely hidden.
   PIN_MERGE_DISTANCE = 10.0
 
-  # How far inside the border the middle of an edge marker sits. It's half the marker's
-  # width, which keeps the whole marker inside the frame.
+  # How far inside the border the middle of an edge marker's arrow sits. It keeps the whole
+  # arrow inside the frame, with a little room to spare.
   EDGE_MARKER_INSET = 14.0
 
-  # Edge markers closer than this share one marker. It's one full marker's width, the
-  # distance at which two markers would begin to touch.
+  # Edge markers closer than this share one marker. It's the starting point: a marker's label
+  # is usually wider than this, so FlyerMapPage asks for a larger distance if labels collide.
   EDGE_MARKER_MERGE_DISTANCE = 28.0
 
   # One resource to place. Point is a GeoPoint or nil.
@@ -77,8 +76,11 @@ class MapPinLayout
   attr_reader :pins, :edge_markers, :not_shown
 
   # Items need number, title and point, and any object with those three will do.
-  def initialize(view, items)
+  #
+  # edge_marker_merge_distance replaces the default for a caller that has measured its labels.
+  def initialize(view, items, edge_marker_merge_distance: EDGE_MARKER_MERGE_DISTANCE)
     @view = view
+    @edge_marker_merge_distance = edge_marker_merge_distance
     @frame_centre_x = view.frame_width / 2
     @frame_centre_y = view.frame_height / 2
 
@@ -146,7 +148,7 @@ class MapPinLayout
       Placement.new(item: item, x: x, y: y, right: right, up: up)
     end
 
-    group_nearby(placements, EDGE_MARKER_MERGE_DISTANCE).map { |group| edge_marker_for(group) }
+    group_nearby(placements, @edge_marker_merge_distance).map { |group| edge_marker_for(group) }
   end
 
   # Merges a group's directions by adding together arrows of equal length. Averaging the

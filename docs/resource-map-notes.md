@@ -24,7 +24,9 @@ Branch `feat/resource-map`, built on `main`, local only and never pushed.
 | `MapProjection`, `MapView` and `MapPinLayout` | `d9c3439` |
 | Final map page with numbered pins (`FlyerMapPage`, `MapTileSet`, `docs/printed-map.md`) | "Print a map with pins numbered to match the cards" |
 
-**The printout has a map, but resources off the map aren't shown yet.** Steps 2 and 3 below remain.
+| Border arrows for off-map resources | "Point to off-map resources from the map's border" |
+
+**The printout has a map with pins and arrows.** Only the "You are here" marker below remains.
 
 ### How to work (the user's rules)
 
@@ -41,9 +43,7 @@ Branch `feat/resource-map`, built on `main`, local only and never pushed.
 
 ### Next: draw the map (each is one commit)
 
-1. **Point to off-map resources from the border.** Use `MapPinLayout`'s edge markers: an arrow
-   with a number and a distance, like a video game objective marker. Merge nearby ones.
-2. **Mark the chosen location.** A "You are here" marker when a location was given.
+1. **Mark the chosen location.** A "You are here" marker when a location was given.
 
 **Later (the user wants this, approach not chosen):** change the map's area for guides where the
 fixed view doesn't work. Either zoom out when the location isn't in range, or zoom to where the
@@ -54,7 +54,7 @@ gets downtown. See `docs/printed-map.md`, and note that zooming out loses street
 the area around the chosen location, not one that fits everything. Everything else gets an
 arrow at the border. Keep all the zoom levels: dropping 11–13 saves only 3.4 MB.
 
-**Check on real printouts:** how merged arrows read, and pin sizes on actual paper. So far the
+**Check on real printouts:** how merged arrows read, and pin and arrow sizes on actual paper. So far the
 map has only been viewed on screen.
 
 ### Testing locally
@@ -208,12 +208,21 @@ DataBC through its [contact form](https://forms.gov.bc.ca/databc-contact-us/).
 
 ### Map
 
-- **Off-map resources are missing from the map for now.** With the sample centred downtown, 3 of
-  the 19 with coordinates fall outside the frame and get no pin or explanation. Step 1's arrows
-  fix this, so this page shouldn't ship without them.
+- **An arrow's label can cover a pin near the border.** Labels only avoid each other. It didn't
+  happen with the sample, but a covered pin hides its number, as pin 4 once was. Pins could be
+  checked against labels too, if real data shows this.
+- **One label collision merges arrows across the whole map.** The merge distance applies everywhere,
+  so a crowded guide can merge arrows that weren't touching. A made-up guide of 24 resources in a
+  ring went almost entirely to pairs.
+- **A merged arrow's direction is an average.** Its resources can be in somewhat different
+  directions, more so once labels have forced extra merging.
+- **Arrow distances are from the map's centre.** That matches the cards, except for a location with
+  no tiles: the map falls back to downtown, so arrows measure from downtown and cards from the
+  location. A map centred somewhere with few resources nearby, such as UVic with the sample, shows
+  only arrows.
 - **The map's area doesn't depend on the guide's resources.** It's always the same radius around
   the chosen location or downtown, on stored tiles. Only the pins change with the resources, so a
-  guide whose resources are all far from downtown prints a map with no pins. This follows the
+  guide whose resources are all far from downtown prints a map with only arrows. This follows the
   "zoomed in, not fit everything" preference, and the user may revisit it.
 - **No number-to-name list.** The user compared both and removed it. It made the map short enough
   to drop to zoom 14, and readers can match a pin's number to a card.
@@ -221,7 +230,7 @@ DataBC through its [contact form](https://forms.gov.bc.ca/databc-contact-us/).
   location. That was on screen, not on paper.
 - **A location with no tiles shows downtown instead.** The chosen fallback, rather than an empty
   box, but the page doesn't say so. A location partly on the tiles keeps its own map, with a blank
-  part. Step 2's "You are here" marker will need to handle both.
+  part. The "You are here" marker will need to handle both.
 - The radius is 1.3 km, not the 1.5–2 km first suggested. At 1.5 km the map drops to zoom 14,
   which has few street names. The frame must also stay tall enough: at about 470 pt it dropped to
   zoom 14, so anything printed under the map that takes much space costs the street names.
@@ -232,7 +241,7 @@ DataBC through its [contact form](https://forms.gov.bc.ca/databc-contact-us/).
 - The live preview's cards have no numbers. The numbers only mean something next to the printed
   map, so they're printed only.
 - `MapProjection`, `MapView` and `MapPinLayout` have now been checked against real tiles on screen,
-  but not on paper. Still assumptions: 14 pt pins, 28 pt edge markers, and a scale range of 0.6–1.2
+  but not on paper. Still assumptions: 14 pt pins, 10 pt arrows, and a scale range of 0.6–1.2
   chosen to keep map text readable and tiles at 120 dpi or better.
 - Near the edge of zoom 16's coverage, a small radius can leave a blank strip in the frame.
   A 30 m radius left 68 pt blank on the right of a 525 pt frame. A lower-zoom underlay or
