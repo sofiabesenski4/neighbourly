@@ -5,7 +5,7 @@ export default {
     const cwd = process.cwd();
     const relativePaths = absolutePaths.map((file) => path.relative(cwd, file));
 
-    return `trufflehog filesystem ${relativePaths.join(" ")} --fail --results=verified,unknown `;
+    return `trufflehog filesystem ${relativePaths.join(" ")} --fail --results=verified,unknown --no-update`;
   },
   "*.{rb,rake}": "bundle exec standardrb --fix",
   "*.html.erb": ["bundle exec herb analyze ./app", "erb_lint -a"],
