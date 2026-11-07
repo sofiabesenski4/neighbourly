@@ -239,14 +239,14 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_text("Distances from: 919 Pandora Ave.")
-      expect(page).to have_css("article", text: "Distance: 1.1 km, about 13 min walk")
+      expect(page).to have_css("article", text: "Distance: 1.1 km straight-line, about 17 min walk")
       check "Meals"
       expect(page).to have_text("1 resource · 1 card")
-      expect(page).to have_css("article", text: "Distance: 1.1 km, about 13 min walk")
+      expect(page).to have_css("article", text: "Distance: 1.1 km straight-line, about 17 min walk")
       click_button "Generate printout"
 
       expect(page).to have_link("Open PDF", href: /\Ablob:/)
-      expect(printed_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km, about 13 min walk")
+      expect(printed_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km straight-line, about 17 min walk")
     end
 
     it "continues when Enter is pressed in the box, without printing yet" do
@@ -415,7 +415,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         click_button "Use my location"
 
         expect(page).to have_text("Distances from your location (accurate to about 50 m).")
-        expect(page).to have_css("article", text: "Distance: 1.1 km, about 13 min walk")
+        expect(page).to have_css("article", text: "Distance: 1.1 km straight-line, about 17 min walk")
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
 

@@ -8,7 +8,8 @@ RSpec.describe ResourceCard do
   end
 
   # The Distance row a printed card gets when someone enters a location. 0.01 degrees
-  # of latitude is about 1.11 km, which makes the expected text easy to work out.
+  # of latitude is about 1.11 km, which makes the expected text easy to work out: minutes
+  # are km × 1.3 (following streets) × 12 (walking at 5 km/h).
   describe "distance from an origin" do
     let(:origin) { FlyerOrigin.new(label: "Here", point: GeoPoint.new(lat: 48.42, lng: -123.36)) }
 
@@ -19,17 +20,17 @@ RSpec.describe ResourceCard do
 
     it "shows the distance and walking time" do
       expect(distance_row({lat: 48.43, lng: -123.36})[:value])
-        .to eq("1.1 km, about 13 min walk (straight-line)")
+        .to eq("1.1 km straight-line, about 17 min walk")
     end
 
     it "uses hours for long walks" do
       expect(distance_row({lat: 48.52, lng: -123.36})[:value])
-        .to eq("11.1 km, about 2 hr 13 min walk (straight-line)")
+        .to eq("11.1 km straight-line, about 2 hr 53 min walk")
     end
 
     it "doesn't claim a distance of zero for a place next door" do
       expect(distance_row({lat: 48.42, lng: -123.36})[:value])
-        .to eq("Under 0.1 km, about 1 min walk (straight-line)")
+        .to eq("Under 0.1 km straight-line, about 1 min walk")
     end
 
     it "follows the address, so the location details stay together" do

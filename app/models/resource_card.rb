@@ -9,6 +9,13 @@ class ResourceCard
   # guides may be slower, which is why the printout calls this an estimate.
   WALKING_MINUTES_PER_KM = 12
 
+  # How much further someone walks than the straight line between two places, because
+  # they follow streets. On a grid, a trip along one street is 1.0 and a diagonal one is
+  # about 1.41, so 1.3 sits near a typical trip. It's an estimate that hasn't been measured
+  # against Victoria's streets, and it doesn't cover detours around water. See
+  # docs/resource-map-notes.md.
+  STREET_ROUTE_FACTOR = 1.3
+
   attr_reader :document
 
   # The origin is optional. The preview and printout pass the same one, so they show
@@ -52,19 +59,19 @@ class ResourceCard
 
   private
 
-  # Like "1.2 km, about 15 min walk (straight-line)". Calculated from saved
-  # coordinates with no network call. The label says straight-line because the real
-  # route is longer, especially around water.
+  # Like "1.0 km straight-line, about 16 min walk". Calculated from saved coordinates
+  # with no network call. The distance is labelled straight-line because that's what it
+  # measures, while the time allows for following streets.
   def distance
     return unless @origin&.located? && document.coordinates
 
     km = @origin.point.distance_km_to(document.coordinates)
     length = (km < 0.1) ? "Under 0.1 km" : "#{format("%.1f", km)} km"
-    "#{length}, about #{walking_time(km)} walk (straight-line)"
+    "#{length} straight-line, about #{walking_time(km)} walk"
   end
 
   def walking_time(km)
-    minutes = [(km * WALKING_MINUTES_PER_KM).round, 1].max
+    minutes = [(km * STREET_ROUTE_FACTOR * WALKING_MINUTES_PER_KM).round, 1].max
     return "#{minutes} min" if minutes < 60
 
     hours, leftover = minutes.divmod(60)
