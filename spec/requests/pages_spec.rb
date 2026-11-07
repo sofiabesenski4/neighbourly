@@ -28,7 +28,7 @@ RSpec.describe "Pages", type: :request do
         section = document.at_css("section[aria-labelledby='printout-heading']")
         expect(section).not_to be_nil
         expect(section.at_css("h2#printout-heading").text.squish).to eq("Prefer a paper copy?")
-        expect(section.text).to include("Print a guide with addresses, hours, and contacts.")
+        expect(section.text).to include("Choose categories and create your own resource guide.")
         link = section.at_css("a[href='#{new_flyer_path}']")
         expect(link.text.squish).to eq("Create printout")
         expect(link.at_css("svg[aria-hidden='true'][stroke='currentColor']")).to be_present
