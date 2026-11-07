@@ -8,6 +8,8 @@ export default class extends Controller {
     "category",
     "toolbar",
     "sidebar",
+    "desktopSearch",
+    "searchField",
     "search",
     "sort",
     "filterButton",
@@ -34,6 +36,7 @@ export default class extends Controller {
     this.generating = false;
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
+    this.layoutChanged();
     this.updateFilterControls();
     this.refresh();
   }
@@ -69,7 +72,8 @@ export default class extends Controller {
   finishSearch(event) {
     if (event.isComposing) return;
     event.preventDefault();
-    event.currentTarget.blur();
+    if (this.toolbarTarget.contains(event.currentTarget))
+      event.currentTarget.blur();
   }
 
   openFilters() {
@@ -94,13 +98,13 @@ export default class extends Controller {
     this.filterButtonTarget.setAttribute("aria-expanded", "false");
   }
 
-  closeFiltersOnDesktop() {
-    if (
-      this.filterDialogTarget.open &&
-      window.matchMedia("(min-width: 40rem)").matches
-    ) {
-      this.closeFilters();
-    }
+  layoutChanged() {
+    const desktop = window.matchMedia("(min-width: 40rem)").matches;
+    const destination = desktop ? this.desktopSearchTarget : this.toolbarTarget;
+    if (this.searchFieldTarget.parentElement !== destination)
+      destination.prepend(this.searchFieldTarget);
+    this.desktopSearchTarget.hidden = !desktop;
+    if (desktop && this.filterDialogTarget.open) this.closeFilters();
   }
 
   resetDraft() {
