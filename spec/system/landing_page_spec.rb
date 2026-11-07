@@ -56,6 +56,8 @@ RSpec.describe "Landing page", type: :system do
       click_button "Sign out", exact: true
     end
 
+    # Sign-out returns to the same URL, so wait for the new guest document.
+    expect(page).to have_css("body[data-guest-chat-page='true']", visible: :all)
     expect(page).to have_current_path(root_path)
     expect(find("nav[aria-label='Main navigation']")).to have_link("Sign in", href: new_user_session_path)
   end
