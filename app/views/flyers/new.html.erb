@@ -6,7 +6,7 @@
      data-action="turbo:before-cache@document->flyer-builder#beforeCache">
   <header class="mb-7">
     <h1 class="font-semibold text-3xl text-stone-900">Build a resource guide</h1>
-    <p class="mt-2 text-stone-600">Choose what to include. Your guide updates as you go.</p>
+    <p class="mt-2 text-stone-600" data-flyer-builder-target="subtitle">Choose what to include. Your guide updates as you go.</p>
   </header>
 
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,

@@ -28,6 +28,7 @@ export default class extends Controller {
     "builderHeading",
     "locationSummaryRow",
     "locationSummary",
+    "subtitle",
   ];
   static values = { previewUrl: String, locateUrl: String };
 
@@ -82,6 +83,8 @@ export default class extends Controller {
     this.locationStepTarget.hidden = false;
     this.builderStepTarget.hidden = true;
     this.locationSummaryRowTarget.hidden = true;
+    // "Choose what to include" describes the second screen, not this one.
+    this.subtitleTarget.hidden = true;
   }
 
   // The second screen: categories and preview, with a line saying what was chosen.
@@ -92,6 +95,7 @@ export default class extends Controller {
     this.locationSummaryRowTarget.hidden = false;
     this.locationStepTarget.hidden = true;
     this.builderStepTarget.hidden = false;
+    this.subtitleTarget.hidden = false;
     this.builderHeadingTarget.focus();
     this.refresh();
   }

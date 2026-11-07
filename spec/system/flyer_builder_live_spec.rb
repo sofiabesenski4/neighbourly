@@ -203,6 +203,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_button("Use my location")
       expect(page).to have_no_field("Meals", type: "checkbox")
       expect(page).to have_no_button("Generate printout")
+      expect(page).to have_no_text("Choose what to include")
     end
 
     it "keeps the location controls out of the second screen" do
@@ -211,6 +212,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       expect(page).to have_css("article h4", text: "Alpha meals")
       expect(page).to have_field("Meals", type: "checkbox")
+      expect(page).to have_text("Choose what to include")
       expect(page).to have_no_button("Use my location")
       expect(page).to have_no_field("Enter a place")
     end
