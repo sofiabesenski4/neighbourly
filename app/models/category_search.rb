@@ -3,7 +3,7 @@
 class CategorySearch
   Section = Data.define(:category, :resources, :label) do
     def initialize(category:, resources:, label: nil)
-      super(category: category, resources: resources, label: label)
+      super
     end
 
     def name
