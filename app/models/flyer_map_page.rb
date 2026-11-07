@@ -1,6 +1,7 @@
 # Draws the map at the end of a printed guide: the tiles, a numbered pin for each resource on
-# the map, an arrow at the border for each one off it, a scale bar, the required credit, and
-# a list of resources with no known location.
+# the map, an arrow at the border for each one off it, a "You are here" marker when there's a
+# chosen location, a scale bar, the required credit, and a list of resources with no known
+# location.
 #
 # Architecture: FlyerPdf owns the document and the resource numbers, and hands this class
 # its Prawn document and a list of items once the cards are done. MapView decides what the
@@ -37,6 +38,11 @@ class FlyerMapPage
   LABEL_MAX_WIDTH = 130
   LABEL_FRAME_GAP = 2
 
+  # The ring is wider than a pin, so it still shows around a pin at the same place.
+  YOU_ARE_HERE_RADIUS = 11
+  YOU_ARE_HERE_DOT_RADIUS = 2.5
+  YOU_ARE_HERE_LABEL = "You are here"
+
   SCALE_ROW_HEIGHT = 18
   SCALE_BAR_HEIGHT = 3
   LIST_SIZE = 9.5
@@ -47,6 +53,7 @@ class FlyerMapPage
   def initialize(pdf, items:, centre: nil, tile_set: MapTileSet.default)
     @pdf = pdf
     @items = items
+    @location = centre
     @centre = centre || DOWNTOWN
     @tile_set = tile_set
     @width = pdf.bounds.width
@@ -61,6 +68,9 @@ class FlyerMapPage
     @pdf.bounding_box([0, @pdf.cursor], width: view.frame_width, height: view.frame_height) do
       draw_tiles(view)
       draw_border(view)
+      # Under the pins, because a pin's number matters more than the marker. The arrows sit at
+      # the border, and the marker is at the map's centre, so those don't meet.
+      draw_you_are_here(view) if location_on_map?(view)
       layout.pins.each { |pin| draw_pin(pin) }
       layout.edge_markers.each { |marker| draw_edge_marker(marker, view) }
     end
@@ -137,6 +147,41 @@ class FlyerMapPage
 
   def text_width(label)
     @pdf.width_of(label, size: PIN_TEXT_SIZE, style: :bold)
+  end
+
+  # False with no chosen location. Also false when the location has no tiles, because the map
+  # then shows downtown and the location is off the page.
+  def location_on_map?(view)
+    @location && view.inside_frame?(view.page_position(@location))
+  end
+
+  # A target rather than a filled circle, so it can't be mistaken for a resource's pin, even in
+  # a photocopy. The label sits above it, in the same white box as the arrows' labels.
+  def draw_you_are_here(view)
+    position = view.page_position(@location)
+    centre = [position.x, position.y]
+
+    @pdf.fill_color("FFFFFF")
+    @pdf.stroke_color("000000")
+    @pdf.line_width(2)
+    @pdf.fill_and_stroke_circle(centre, YOU_ARE_HERE_RADIUS)
+    @pdf.fill_color("000000")
+    @pdf.fill_circle(centre, YOU_ARE_HERE_DOT_RADIUS)
+    draw_you_are_here_label(position)
+  end
+
+  def draw_you_are_here_label(position)
+    width = text_width(YOU_ARE_HERE_LABEL) + 2 * LABEL_PADDING + 1
+    height = @pdf.height_of(YOU_ARE_HERE_LABEL, size: PIN_TEXT_SIZE, style: :bold) + 2 * LABEL_PADDING
+    left = position.x - width / 2.0
+    top = position.y + YOU_ARE_HERE_RADIUS + 2 + height
+
+    @pdf.fill_color("FFFFFF")
+    @pdf.line_width(0.6)
+    @pdf.fill_and_stroke_rounded_rectangle([left, top], width, height, 3)
+    @pdf.fill_color("000000")
+    @pdf.text_box(YOU_ARE_HERE_LABEL, at: [left, top - LABEL_PADDING], width: width, height: height,
+      size: PIN_TEXT_SIZE, style: :bold, align: :center)
   end
 
   # Merging more whenever two markers would overlap, because a covered label hides its numbers.
