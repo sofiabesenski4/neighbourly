@@ -1,8 +1,9 @@
 # The printed map
 
 Every printed guide ends with a map page. It shows the area around the chosen location, or
-downtown Victoria if there isn't one, with a numbered pin for each resource. The numbers match
-the card headers, so a reader finds a pin's name by looking up its card.
+downtown Victoria if there isn't one, with a numbered pin for each resource on the map and an
+arrow at the border for each one off it. The numbers match the card headers, so a reader finds a
+name by looking up its card.
 
 The page is drawn when the guide is printed, from image tiles stored in the app. Drawing it makes
 no network calls. Looking up a typed location can call the geocoder, but that happens before the
@@ -20,9 +21,9 @@ The map isn't fitted to the resources in the guide.
 |---|---|---|
 | Streets and water | PNG tiles in `lib/map_tiles/`, rendered once by hand | No |
 | Area shown | A 1.3 km radius around the centre | Only with the centre |
-| Pins and "Not shown on map" list | The resources in this guide | Yes |
+| Pins, arrows and "Not shown on map" list | The resources in this guide | Yes |
 
-A guide whose resources are all far from downtown therefore prints a map with no pins. This is
+A guide whose resources are all far from downtown therefore prints a map with only arrows. This is
 deliberate: a map zoomed in enough to read is preferred over one that fits everything.
 
 ## Where the map is centred
@@ -49,7 +50,7 @@ FlyersController
                  ├─ MapTileSet    reads the manifest and finds tile files
                  ├─ MapView       picks the zoom, scale, tiles and page positions
                  │    └─ MapProjection   converts degrees to world pixels
-                 └─ MapPinLayout  decides what's a pin and what's not shown
+                 └─ MapPinLayout  decides what's a pin, an arrow or not shown
 ```
 
 1. `FlyerPdf` numbers each resource in the order the cards print. A resource in two categories
@@ -59,7 +60,9 @@ FlyersController
 3. `FlyerMapPage` works out how tall the map can be, after leaving room for the text below it.
 4. `MapView` chooses a zoom and scale for that frame, and which tiles it needs.
 5. `MapPinLayout` sorts the resources into pins, edge markers and "not shown".
-6. `FlyerMapPage` draws the tiles, the border, the pins, the scale bar, the credit and the list.
+6. `FlyerMapPage` measures the arrow labels and asks for more merging if any would overlap.
+7. `FlyerMapPage` draws the tiles, the border, the pins, the arrows, the scale bar, the credit and
+   the list.
 
 `MapView`, `MapPinLayout` and `MapProjection` know nothing about Prawn or the database, so they
 can be tested with plain numbers. All the Prawn drawing for the map is in `FlyerMapPage`.
@@ -102,7 +105,7 @@ continues on another page. At that height the map will be at zoom 14.
 |---|---|
 | Inside the frame | A pin with its number |
 | Within 10 pt of another pin | One shared pin, such as "4, 19" |
-| Has coordinates, but outside the frame | **Nothing yet** (see below) |
+| Has coordinates, but outside the frame | An arrow at the border with its number and distance |
 | No coordinates, or impossible ones | Its number and name under "Not shown on map" |
 
 Pins are black with white numbers, because guides may be photocopied and the map is grey. They
@@ -112,8 +115,24 @@ Pins merge at 10 pt because of how they're drawn. A pin reaches 7 pt from its mi
 reaches about 3 pt from the other pin's middle, so anything closer can hide a number. A merged
 pin sits in the middle of its group, so it's slightly away from each real location.
 
-**Off-map resources:** `MapPinLayout` already works out edge markers for these, but nothing draws
-them yet. Until the border arrows are added, these resources have a card but no sign on the map.
+## Arrows for off-map resources
+
+An arrow sits where the line from the map's centre to the resource meets the border, so it points
+straight out from the centre. A white label behind it shows the number and the straight-line
+distance from the map's centre, such as "5" and "3.8 km". The label is white with a border so it
+doesn't read as another pin.
+
+Arrows in similar directions merge into one, showing all the numbers and a range, such as "5, 14,
+17" and "4.8–8.7 km". Merging happens in two stages:
+
+1. `MapPinLayout` merges arrows within `EDGE_MARKER_MERGE_DISTANCE`, 28 pt.
+2. `FlyerMapPage#layout_without_label_overlaps` measures the labels. If any would overlap, it asks
+   for the whole layout again at 1.5 times the distance, and repeats until none do.
+
+The second stage is needed because a covered label hides its numbers, and only the drawing code can
+measure text. It always finishes, because a large enough distance leaves one marker. It applies to
+the whole map, so one collision can merge arrows elsewhere that weren't touching. A label with many
+numbers wraps at 130 pt wide.
 
 ## Clipping the tiles
 
@@ -148,6 +167,7 @@ data's licence requires this, so keep it if you redesign the page. See the credi
 | The default centre | `FlyerMapPage::DOWNTOWN` | |
 | Pin size | `FlyerMapPage::PIN_DIAMETER` | `MapPinLayout::PIN_MERGE_DISTANCE`, which assumes it |
 | When pins merge | `MapPinLayout::PIN_MERGE_DISTANCE` | Downtown on a printout |
+| Arrow size | `FlyerMapPage::ARROW_SIZE` | `MapPinLayout::EDGE_MARKER_INSET`, which keeps it in the frame |
 | Readable size limits | `MapView::MIN_SCALE`, `MapView::MAX_SCALE` | Map text and sharpness on paper |
 | Walking pace | `ResourceCard` constants | The cards and the scale bar change together |
 
