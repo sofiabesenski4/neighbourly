@@ -114,6 +114,32 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("h3")
   end
 
+  it "searches alongside desktop categories and keeps the query when switching to mobile" do
+    visit new_flyer_path
+    expect(page).to have_css("article h4", text: "Alpha meals")
+
+    within("aside[aria-label='Resource filters']") do
+      fill_in "Search resources", with: "clinic"
+      find_field("Search resources").send_keys(:enter)
+    end
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_css("article h4", text: "Beta clinic")
+    expect(page).to have_no_text("Alpha meals")
+    check "Meals"
+    expect(page).to have_text("No resources match your search.")
+    uncheck "Meals"
+    expect(page).to have_css("article h4", text: "Beta clinic")
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    within("[role='search']") do
+      expect(page).to have_field("Search resources", with: "clinic")
+    end
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "searches and applies draft filters from the mobile toolbar" do
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
