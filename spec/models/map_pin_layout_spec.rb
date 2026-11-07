@@ -91,7 +91,8 @@ RSpec.describe MapPinLayout do
     end
 
     it "doesn't chain a line of pins into one distant pin" do
-      spots = [100, 105, 110, 115]
+      # Each is within the merge distance of the next, but not of the one after that.
+      spots = (0..3).map { |step| 100 + step * described_class::PIN_MERGE_DISTANCE * 0.8 }
       result = described_class.new(view, spots.each_with_index.map { |x, index| item(index + 1, geo_at(x, 100)) })
 
       expect(result.pins.map(&:label)).to eq(["1, 2", "3, 4"])

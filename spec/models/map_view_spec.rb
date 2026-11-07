@@ -419,4 +419,18 @@ RSpec.describe MapView do
       expect { view_around(pandora, 1, zooms: {min_zoom: 11, max_zoom: 16, zooms: {}}) }.to raise_error(ArgumentError)
     end
   end
+
+  describe "#points_per_km" do
+    # Checks against positions on the page, so a scale bar always matches the map under it.
+    # A point 1 km north is found using the Earth's radius, then measured with GeoPoint.
+    it "matches the page distance between two places 1 km apart" do
+      centre = GeoPoint.new(lat: 48.4265, lng: -123.3656)
+      view = described_class.new(frame_width: 525, frame_height: 600, centre: centre, radius_km: 1.3,
+        manifest: {min_zoom: 11, max_zoom: 16, zooms: {15 => {south: 48.0, west: -124.0, north: 49.0, east: -123.0}}})
+      north = GeoPoint.new(lat: centre.lat + 180 / (Math::PI * GeoPoint::EARTH_RADIUS_KM), lng: centre.lng)
+
+      expect(centre.distance_km_to(north)).to be_within(1e-6).of(1)
+      expect(view.page_position(north).y - view.page_position(centre).y).to be_within(0.5).of(view.points_per_km)
+    end
+  end
 end

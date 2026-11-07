@@ -1,10 +1,10 @@
 # Decides exactly what one printed map shows: which zoom, how large it's drawn, where any
 # GeoPoint lands on the page, and which tiles to draw.
 #
-# Architecture: the PDF step will build one MapView for each map, draw `tiles`, then pass
+# Architecture: FlyerMapPage builds one MapView for each map, draws `tiles`, then passes
 # the view to MapPinLayout to work out the pins and edge markers. It sits between
-# MapProjection, which knows the world's geometry, and the drawing code, which will know
-# about Prawn. This class reads no files and draws nothing: it's told what tiles exist
+# MapProjection, which knows the world's geometry, and FlyerMapPage, which knows about
+# Prawn. See docs/printed-map.md. This class reads no files and draws nothing: it's told what tiles exist
 # through a manifest hash, so it can be tested with plain numbers.
 #
 # Why it exists: tiles and pins must never drift apart. Both go through
@@ -117,6 +117,16 @@ class MapView
     page_position_for_world(MapProjection.to_world(point, @zoom))
   end
 
+  # How many page points one km takes up at the frame's centre, for a scale bar. A km covers
+  # more world pixels further north, because Mercator stretches by 1 / cos(latitude). The
+  # Earth's circumference at this latitude is 2 * pi * radius * cos(latitude), and the whole
+  # world is world_size pixels wide. A map this small hardly varies from top to bottom.
+  def points_per_km
+    circumference = 2 * Math::PI * GeoPoint::EARTH_RADIUS_KM * Math.cos(centre.lat * Math::PI / 180)
+
+    MapProjection.world_size(@zoom) / circumference * @scale
+  end
+
   # Whether a PagePoint is inside the frame. Points on the border count as inside.
   def inside_frame?(page_point)
     page_point.x.between?(-BORDER_TOLERANCE, @frame_width + BORDER_TOLERANCE) &&
@@ -131,7 +141,7 @@ class MapView
 
   # The tiles that exist and show within the frame, from the top row down and left to
   # right, so the PDF's contents stay in a stable order. Tiles can hang over the frame's
-  # border, so the drawing step must clip them.
+  # border, so FlyerMapPage clips them.
   def tiles
     @tiles ||= begin
       half_width = @frame_width / (2 * @scale)
