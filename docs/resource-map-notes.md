@@ -311,6 +311,11 @@ Not part of the current goal, but easy to add later:
   build fails every example in that file with "expected to find css". Don't install
   Homebrew's `chromedriver` unless needed. Selenium downloaded a matching driver by
   itself, and Homebrew's was five major versions behind its Chrome when checked.
+- **CI has no stylesheet:** `rspec.yml` runs `yarn build`, which only builds JavaScript, so browser
+  specs there run without `tailwind.css`. A local copy hides this, because it's git-ignored and stays
+  around. Specs that depend on layout pass locally and fail in CI. To match CI, move
+  `app/assets/builds/tailwind.css` aside and run the specs. Adding `bin/rails tailwindcss:build` to
+  the workflow would fix it properly, which is the team's call.
 - **Tile build tools:** `colima`, `docker` and `osmium-tool` from Homebrew, used only to run
   `script/build_map_tiles`. The app never needs them. `tilemaker` and `tileserver-gl` run in
   containers pinned by digest in the script. Git LFS isn't used.
