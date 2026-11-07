@@ -1,0 +1,155 @@
+require "rails_helper"
+require "pdf/reader"
+
+# Draws onto a real Prawn document and reads the resulting PDF back, so these check what
+# actually reaches the page rather than which methods got called.
+RSpec.describe FlyerMapPage do
+  let(:downtown) { described_class::DOWNTOWN }
+  let(:near_downtown) { GeoPoint.new(lat: 48.4280, lng: -123.3640) }
+
+  def item(number, title: "Resource #{number}", point: near_downtown)
+    MapPinLayout::Item.new(number: number, title: title, point: point)
+  end
+
+  # The same page setup as FlyerPdf, including the font, which holds the ≈ and © characters.
+  def document
+    pdf = Prawn::Document.new(page_size: "LETTER", margin: FlyerPdf::MARGIN)
+    fonts = Rails.root.join("app/assets/fonts/dejavu")
+    pdf.font_families.update("ResourceSans" => {
+      normal: fonts.join("DejaVuSans.ttf").to_s,
+      bold: fonts.join("DejaVuSans-Bold.ttf").to_s
+    })
+    pdf.font("ResourceSans")
+    pdf
+  end
+
+  def draw(items, **options)
+    pdf = document
+    described_class.new(pdf, items: items, **options).draw
+    PDF::Reader.new(StringIO.new(pdf.render))
+  end
+
+  def text_of(reader)
+    reader.pages.map(&:text).join("\n").gsub(/\s+/, " ")
+  end
+
+  def images_on(page)
+    page.xobjects.values.count { |object| object.hash[:Subtype] == :Image }
+  end
+
+  it "draws real tiles, clipped to the map's frame" do
+    page = draw([item(1)]).pages.first
+
+    expect(images_on(page)).to be > 1
+    expect(page.raw_content).to match(/[\d.]+ [\d.]+ [\d.]+ [\d.]+ re W n/)
+  end
+
+  # Pins must land where MapView says, which is where the tiles put that street. The text
+  # is centred on the pin, so its position is compared with the frame's position on the page.
+  it "places a pin's number at the resource's position on the map" do
+    pdf = document
+    top = pdf.cursor
+    described_class.new(pdf, items: [item(7)]).draw
+    run = PDF::Reader.new(StringIO.new(pdf.render)).pages.first.runs.find { |text_run| text_run.text == "7" }
+
+    view = MapView.new(frame_width: pdf.bounds.width, frame_height: top - below_map_height(pdf),
+      manifest: MapTileSet.default.view_manifest, centre: downtown, radius_km: described_class::RADIUS_KM)
+    position = view.page_position(near_downtown)
+
+    expect(run.x + run.width / 2).to be_within(1).of(FlyerPdf::MARGIN + position.x)
+    expect(run.y).to be_within(4).of(FlyerPdf::MARGIN + below_map_height(pdf) + position.y)
+  end
+
+  # The space the scale and credit take under a map with no not-shown list.
+  def below_map_height(pdf)
+    page = described_class.new(pdf, items: [])
+    described_class::GAP + described_class::SCALE_ROW_HEIGHT + page.send(:credit_height)
+  end
+
+  it "shares one pin between resources at the same spot" do
+    runs = draw([item(3), item(7)]).pages.first.runs.map(&:text)
+
+    expect(runs).to include("3, 7")
+  end
+
+  it "shows only numbers on pins, not names" do
+    expect(text_of(draw([item(3, title: "Our Place")]))).not_to include("Our Place")
+  end
+
+  it "prints the credit and a scale bar matching the cards' walking pace" do
+    text = text_of(draw([item(1)]))
+
+    expect(text).to include("© OpenMapTiles © OpenStreetMap contributors", "Positron", "1 km ≈ 16 min walk")
+  end
+
+  it "lists resources with no coordinates rather than pinning them" do
+    text = text_of(draw([item(1), item(2, title: "Cridge", point: nil)]))
+
+    expect(text).to include("Not shown on map: 2. Cridge")
+  end
+
+  it "lists a resource with impossible coordinates as not shown" do
+    text = text_of(draw([item(4, title: "Bad import", point: GeoPoint.new(lat: 999.0, lng: -123.36))]))
+
+    expect(text).to include("Not shown on map: 4. Bad import")
+  end
+
+  it "prints nothing about missing resources when all have coordinates" do
+    expect(text_of(draw([item(1)]))).not_to include("Not shown on map")
+  end
+
+  it "continues a very long not-shown list on another page, keeping every name" do
+    items = (1..600).map { |number| item(number, title: "Resource name #{number}", point: nil) }
+    reader = draw(items)
+
+    expect(reader.page_count).to be > 1
+    expect(text_of(reader)).to include("600. Resource name 600")
+  end
+
+  it "keeps the map at a readable height when the not-shown list is long" do
+    items = (1..600).map { |number| item(number, point: nil) }
+    pdf = document
+    page = described_class.new(pdf, items: items)
+    allow(page).to receive(:build_view).and_call_original
+
+    page.draw
+
+    expect(page).to have_received(:build_view).with(downtown, described_class::MIN_MAP_HEIGHT)
+  end
+
+  it "centres on the given location" do
+    elsewhere = GeoPoint.new(lat: 48.4600, lng: -123.3100)
+    pdf = document
+    page = described_class.new(pdf, items: [item(1)], centre: elsewhere)
+    allow(page).to receive(:build_view).and_call_original
+
+    page.draw
+
+    expect(page).to have_received(:build_view).with(elsewhere, anything).at_least(:once)
+    expect(page).not_to have_received(:build_view).with(downtown, anything)
+  end
+
+  it "shows downtown rather than an empty box for a location with no tiles" do
+    vancouver = GeoPoint.new(lat: 49.2827, lng: -123.1207)
+    page = draw([item(1)], centre: vancouver).pages.first
+
+    expect(images_on(page)).to be > 1
+    expect(page.runs.map(&:text)).to include("1")
+  end
+
+  it "still prints when a tile file is missing" do
+    tile_set = instance_double(MapTileSet, view_manifest: MapTileSet.default.view_manifest, path_for: nil,
+      attribution: "Credit", style_credit: "Style")
+    page = draw([item(1)], tile_set: tile_set).pages.first
+
+    expect(images_on(page)).to eq(0)
+    expect(page.runs.map(&:text)).to include("1")
+  end
+
+  it "uses a zoom where street names are printed" do
+    view = MapView.new(frame_width: 525.6, frame_height: 640, manifest: MapTileSet.default.view_manifest,
+      centre: downtown, radius_km: described_class::RADIUS_KM)
+
+    expect(view.zoom).to eq(15)
+  end
+end
