@@ -32,11 +32,16 @@ RSpec.describe "Chats", type: :system do
     expect(Chat.last.user).to eq(user)
   end
 
-  it "prevents guest users from creating chats" do
+  it "shows the guest composer and requires JavaScript to submit it" do
     visit new_chat_path
 
-    expect(page).to have_content("Sign in to your account")
-    expect(page).not_to have_content("New chat")
+    expect(page).to have_content("Guest chat.")
+    expect(page).to have_link("Sign in", href: new_user_session_path)
+    fill_in "Prompt", with: "Where can I find a meal?"
+
+    expect { click_button "Start new chat" }.not_to change(Chat, :count)
+    expect(page).to have_content("Enable JavaScript and reopen Chat to start a guest conversation.")
+    expect(page).to have_field("Prompt", with: "Where can I find a meal?")
   end
 
   context "when logged in" do
