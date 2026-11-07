@@ -1,9 +1,10 @@
-# Draws the map at the end of a printed guide: the tiles, a numbered pin for each resource,
-# a scale bar, the required credit, and a list of resources with no known location.
+# Draws the map at the end of a printed guide: the tiles, a numbered pin for each resource on
+# the map, an arrow at the border for each one off it, a scale bar, the required credit, and
+# a list of resources with no known location.
 #
 # Architecture: FlyerPdf owns the document and the resource numbers, and hands this class
 # its Prawn document and a list of items once the cards are done. MapView decides what the
-# map shows, MapPinLayout decides what becomes a pin, and MapTileSet finds the files. This
+# map shows, MapPinLayout decides what's a pin or an arrow, and MapTileSet finds the files. This
 # class only turns their answers into marks on the page, and it makes no network calls.
 #
 # Why it's separate from FlyerPdf: FlyerPdf lays out rows of cards, and nothing here shares
@@ -26,6 +27,16 @@ class FlyerMapPage
   PIN_TEXT_SIZE = 8
   PIN_SIDE_PADDING = 3
 
+  # The arrow is a triangle centred on the edge marker's position, with its label beside it on
+  # the map's side. A label wider than the maximum wraps, because a guide with many resources
+  # in one direction can merge dozens of numbers into one marker.
+  ARROW_SIZE = 10
+  LABEL_NUMBER_SIZE = 8
+  LABEL_DISTANCE_SIZE = 7
+  LABEL_PADDING = 3
+  LABEL_MAX_WIDTH = 130
+  LABEL_FRAME_GAP = 2
+
   SCALE_ROW_HEIGHT = 18
   SCALE_BAR_HEIGHT = 3
   LIST_SIZE = 9.5
@@ -45,12 +56,13 @@ class FlyerMapPage
   def draw
     layout = MapPinLayout.new(view_with_height(@pdf.cursor), @items)
     view = view_with_height(map_height(layout.not_shown))
-    layout = MapPinLayout.new(view, @items)
+    layout = layout_without_label_overlaps(view)
 
     @pdf.bounding_box([0, @pdf.cursor], width: view.frame_width, height: view.frame_height) do
       draw_tiles(view)
       draw_border(view)
       layout.pins.each { |pin| draw_pin(pin) }
+      layout.edge_markers.each { |marker| draw_edge_marker(marker, view) }
     end
     draw_scale(view)
     draw_credit
@@ -125,6 +137,123 @@ class FlyerMapPage
 
   def text_width(label)
     @pdf.width_of(label, size: PIN_TEXT_SIZE, style: :bold)
+  end
+
+  # Merging more whenever two markers would overlap, because a covered label hides its numbers.
+  # MapPinLayout's fixed distance can't guarantee this: it knows nothing about Prawn, and a
+  # merged label grows with its numbers. Only this class can measure them. This always ends,
+  # because a distance wider than the frame merges every marker into one, which overlaps nothing.
+  def layout_without_label_overlaps(view)
+    distance = MapPinLayout::EDGE_MARKER_MERGE_DISTANCE
+    loop do
+      layout = MapPinLayout.new(view, @items, edge_marker_merge_distance: distance)
+      return layout unless markers_overlap?(layout.edge_markers, view)
+
+      distance *= 1.5
+    end
+  end
+
+  def markers_overlap?(markers, view)
+    markers.map { |marker| marker_footprint(marker, view) }.combination(2).any? do |first, second|
+      first[:left] < second[:right] && second[:left] < first[:right] &&
+        first[:bottom] < second[:top] && second[:bottom] < first[:top]
+    end
+  end
+
+  # The rectangle holding a marker's arrow and label.
+  def marker_footprint(marker, view)
+    right, up = direction_of(marker)
+    width, _number_height, height = marker_label_size(marker)
+    left, top = marker_label_corner(marker, view, right, up, width, height)
+    half = ARROW_SIZE / 2.0
+
+    {left: [left, marker.x - half].min, right: [left + width, marker.x + half].max,
+     bottom: [top - height, marker.y - half].min, top: [top, marker.y + half].max}
+  end
+
+  # An off-map resource: an arrow pointing toward it, and a label with its number and how far
+  # it is from the map's centre.
+  def draw_edge_marker(marker, view)
+    right, up = direction_of(marker)
+
+    draw_arrow(marker, right, up)
+    draw_marker_label(marker, view, right, up)
+  end
+
+  # The marker's angle is counterclockwise from east, so cos gives how far right it points and
+  # sin how far up.
+  def direction_of(marker)
+    radians = marker.angle_degrees * Math::PI / 180
+
+    [Math.cos(radians), Math.sin(radians)]
+  end
+
+  # Works out the triangle's corners rather than using Prawn's rotate, so its points stay plain
+  # page positions. The perpendicular of a direction (right, up) is (-up, right).
+  def draw_arrow(marker, right, up)
+    half = ARROW_SIZE / 2.0
+    tip = [marker.x + right * half, marker.y + up * half]
+    back_x = marker.x - right * half
+    back_y = marker.y - up * half
+
+    @pdf.fill_color("000000")
+    @pdf.stroke_color("FFFFFF")
+    @pdf.line_width(0.75)
+    @pdf.fill_and_stroke_polygon(tip,
+      [back_x - up * half, back_y + right * half],
+      [back_x + up * half, back_y - right * half])
+    @pdf.stroke_color("000000")
+  end
+
+  # White with a black border, so it reads as a label rather than as another pin.
+  def draw_marker_label(marker, view, right, up)
+    width, number_height, height = marker_label_size(marker)
+    left, top = marker_label_corner(marker, view, right, up, width, height)
+
+    @pdf.fill_color("FFFFFF")
+    @pdf.stroke_color("000000")
+    @pdf.line_width(0.6)
+    @pdf.fill_and_stroke_rounded_rectangle([left, top], width, height, 3)
+    @pdf.fill_color("000000")
+    text_left = left + LABEL_PADDING
+    text_width = width - 2 * LABEL_PADDING
+    @pdf.text_box(marker.label, at: [text_left, top - LABEL_PADDING], width: text_width,
+      height: number_height, size: LABEL_NUMBER_SIZE, style: :bold, align: :center)
+    @pdf.text_box(marker.distance_label, at: [text_left, top - LABEL_PADDING - number_height], width: text_width,
+      height: height - number_height - 2 * LABEL_PADDING, size: LABEL_DISTANCE_SIZE, align: :center)
+  end
+
+  # The width, the height of the numbers, and the full height. One point is added to the
+  # measured width because a box exactly as wide as its text can still wrap it.
+  def marker_label_size(marker)
+    content = [
+      @pdf.width_of(marker.label, size: LABEL_NUMBER_SIZE, style: :bold),
+      @pdf.width_of(marker.distance_label, size: LABEL_DISTANCE_SIZE)
+    ].max + 1
+    width = [content + 2 * LABEL_PADDING, LABEL_MAX_WIDTH].min
+    text_width = width - 2 * LABEL_PADDING
+    number_height = @pdf.height_of(marker.label, width: text_width, size: LABEL_NUMBER_SIZE, style: :bold)
+    distance_height = @pdf.height_of(marker.distance_label, width: text_width, size: LABEL_DISTANCE_SIZE)
+
+    [width, number_height, number_height + distance_height + 2 * LABEL_PADDING]
+  end
+
+  # Puts the label directly behind the arrow, on the side toward the map's centre. A line from
+  # the label's middle in this direction leaves the rectangle after the shorter of two walks:
+  # to its side, or to its top or bottom. Moving back by that much makes the label touch the
+  # arrow. Near a corner that can still reach past the frame, so it's then moved back inside.
+  def marker_label_corner(marker, view, right, up, width, height)
+    walks = []
+    walks << (width / 2.0) / right.abs if right.abs > 1e-9
+    walks << (height / 2.0) / up.abs if up.abs > 1e-9
+    back = ARROW_SIZE / 2.0 + 1 + walks.min
+    middle_x = marker.x - right * back
+    middle_y = marker.y - up * back
+
+    [
+      (middle_x - width / 2.0).clamp(LABEL_FRAME_GAP, view.frame_width - width - LABEL_FRAME_GAP),
+      (middle_y + height / 2.0).clamp(height + LABEL_FRAME_GAP, view.frame_height - LABEL_FRAME_GAP)
+    ]
   end
 
   # The bar is exactly one km at the map's centre. The minutes come from the same figures as

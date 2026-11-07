@@ -98,6 +98,68 @@ RSpec.describe FlyerMapPage do
     expect(text_of(draw([item(1)]))).not_to include("Not shown on map")
   end
 
+  describe "resources off the map" do
+    # About 4 km north and east of downtown, well outside a 1.3 km map.
+    let(:far_north) { GeoPoint.new(lat: 48.4625, lng: -123.3656) }
+    let(:far_east) { GeoPoint.new(lat: 48.4265, lng: -123.3100) }
+
+    def frame_runs(reader)
+      reader.pages.first.runs
+    end
+
+    it "prints an arrow label with the number and distance from the map's centre" do
+      reader = draw([item(5, point: far_north)])
+
+      expect(frame_runs(reader).map(&:text)).to include("5", "4.0 km")
+      expect(text_of(reader)).not_to include("Not shown on map")
+    end
+
+    it "draws no arrow for a resource on the map" do
+      texts = frame_runs(draw([item(5)])).map(&:text)
+
+      expect(texts.grep(/\d km\z/)).to be_empty
+    end
+
+    it "keeps the label inside the frame" do
+      pdf = document
+      top = pdf.cursor
+      described_class.new(pdf, items: [item(5, point: far_east)]).draw
+      run = PDF::Reader.new(StringIO.new(pdf.render)).pages.first.runs.find { |text_run| text_run.text == "5" }
+
+      expect(run.x).to be_between(FlyerPdf::MARGIN, FlyerPdf::MARGIN + pdf.bounds.width)
+      expect(run.y).to be < FlyerPdf::MARGIN + top
+    end
+
+    it "merges resources in the same direction, showing the range of distances" do
+      further = GeoPoint.new(lat: 48.5000, lng: -123.3656)
+      texts = frame_runs(draw([item(5, point: far_north), item(9, point: further)])).map(&:text)
+
+      expect(texts).to include("5, 9", "4.0–8.2 km")
+    end
+
+    # Reads the label rectangles the page would draw, because a covered label hides its numbers.
+    it "merges further when labels would overlap, keeping every number" do
+      ring = (0...40).map do |step|
+        angle = step * 9 * Math::PI / 180
+        item(step + 1, point: GeoPoint.new(lat: downtown.lat + 0.06 * Math.sin(angle), lng: downtown.lng + 0.09 * Math.cos(angle)))
+      end
+      pdf = document
+      page = described_class.new(pdf, items: ring)
+      view = page.send(:view_with_height, 640)
+      layout = page.send(:layout_without_label_overlaps, view)
+
+      expect(page.send(:markers_overlap?, layout.edge_markers, view)).to be(false)
+      expect(layout.edge_markers.flat_map(&:numbers)).to match_array(1..40)
+    end
+
+    it "wraps a marker holding many numbers, keeping them all" do
+      many = (1..60).map { |number| item(number, point: far_north) }
+      text = text_of(draw(many))
+
+      expect(text).to include("1, 2, 3", "59, 60")
+    end
+  end
+
   it "continues a very long not-shown list on another page, keeping every name" do
     items = (1..600).map { |number| item(number, title: "Resource name #{number}", point: nil) }
     reader = draw(items)

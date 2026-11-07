@@ -378,4 +378,14 @@ RSpec.describe MapPinLayout do
       expect(result.edge_markers.flat_map(&:numbers)).to eq([1, 2])
     end
   end
+
+  describe "a caller's merge distance for edge markers" do
+    it "merges markers further apart than the default when asked" do
+      # Both are just past the top border, so their markers land about 58 points apart.
+      items = [item(1, geo_at(262.5, 450)), item(2, geo_at(340, 450))]
+
+      expect(described_class.new(view, items).edge_markers.size).to eq(2)
+      expect(described_class.new(view, items, edge_marker_merge_distance: 60).edge_markers.size).to eq(1)
+    end
+  end
 end
