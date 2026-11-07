@@ -251,7 +251,7 @@ export default class extends Controller {
   card(resource) {
     const article = document.createElement("article");
     article.className =
-      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white";
+      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
     const title = document.createElement("h4");
     title.className =
       "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
