@@ -119,7 +119,9 @@ RSpec.describe "Live resource guide builder", type: :system do
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
     visit new_flyer_path
 
-    expect(page).to have_no_text("Build your resource guide")
+    title = find("h1", text: "Build your resource guide")
+    expect(page).to have_text("Print a guide with addresses, hours, and contacts.")
+    expect(title.evaluate_script("getComputedStyle(this.closest('header')).position")).to eq("static")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
     find("button[aria-label='Filters']").click

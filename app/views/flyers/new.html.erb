@@ -5,8 +5,8 @@
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
      data-flyer-builder-locate-url-value="<%= locate_flyers_path(format: :json) %>"
      data-action="turbo:before-cache@document->flyer-builder#beforeCache resize@window->flyer-builder#closeFiltersOnDesktop">
-  <header class="mb-7 hidden sm:block">
-    <h1 class="text-2xl font-semibold tracking-tight text-stone-900">Build your resource guide</h1>
+  <header class="mb-3 pt-3 sm:mb-7 sm:pt-0">
+    <h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Build your resource guide</h1>
     <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="subtitle">Print a guide with addresses, hours, and contacts.</p>
   </header>
 
@@ -105,7 +105,7 @@
 
       <section class="flex min-w-0 flex-col sm:grid sm:grid-cols-[minmax(0,1fr)_auto] sm:items-start sm:gap-x-4" aria-labelledby="flyer-preview-heading">
         <div class="my-3 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 sm:col-start-1 sm:row-start-1 sm:my-0 sm:self-center">
-          <h1 class="text-lg font-semibold text-stone-900 sm:hidden">Guide preview</h1>
+          <p class="text-lg font-semibold text-stone-900 sm:hidden">Guide preview</p>
           <h2 id="flyer-preview-heading" class="text-xs text-stone-600 sm:text-xl sm:font-semibold sm:text-stone-900" tabindex="-1" data-flyer-builder-target="builderHeading count" aria-live="polite">Loading resources…</h2>
           <span class="sr-only" data-flyer-builder-target="status" role="status"></span>
         </div>
