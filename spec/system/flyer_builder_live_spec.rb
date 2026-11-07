@@ -114,6 +114,23 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("h3")
   end
 
+  it "fills the final row when a category has an odd number of cards" do
+    source = Source.find_by!(name: "Local")
+    source.documents.create!(title: "Bravo meals", content: "Meals", categories: [food])
+    source.documents.create!(title: "Charlie meals", content: "Meals", categories: [food])
+    page.current_window.resize_to(1280, 900)
+    visit new_flyer_path
+
+    section = find("h3", text: "Meals").ancestor("[data-flyer-builder-target='cards'] > section")
+    cards = section.all("article", count: 3)
+    widths = cards.map { |card| card.evaluate_script("this.getBoundingClientRect().width") }
+    grid_width = cards.last.evaluate_script("this.parentElement.getBoundingClientRect().width")
+
+    expect(widths[0]).to be_within(1).of(widths[1])
+    expect(widths[2]).to be > widths[0]
+    expect(widths[2]).to be_within(1).of(grid_width)
+  end
+
   it "searches alongside desktop categories and keeps the query when switching to mobile" do
     visit new_flyer_path
     expect(page).to have_css("article h4", text: "Alpha meals")
