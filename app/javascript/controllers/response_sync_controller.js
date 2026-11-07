@@ -1,5 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
 import { Turbo } from "@hotwired/turbo-rails";
+import { guestChatHeaders } from "../lib/guest_chat";
 
 // Cable delivers live updates; HTTP repairs gaps after reconnecting or resuming.
 export default class extends Controller {
@@ -191,7 +192,10 @@ export default class extends Controller {
       const url = new URL(this.urlValue, window.location.href);
       url.searchParams.set("after_response_id", this.boundary);
       const response = await fetch(url, {
-        headers: { Accept: "text/vnd.turbo-stream.html" },
+        headers: {
+          Accept: "text/vnd.turbo-stream.html",
+          ...guestChatHeaders(url),
+        },
         credentials: "same-origin",
         cache: "no-store",
         signal: request.signal,

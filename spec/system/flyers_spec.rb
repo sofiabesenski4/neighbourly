@@ -13,7 +13,7 @@ RSpec.describe "Flyers", type: :system do
     expect(FlyerGenerator).to receive(:call).with(categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s)).and_return(nil)
 
     visit root_path
-    click_link "Make a printable flyer"
+    click_link "Create printout"
 
     check "Meals"
     check "Harm Reduction Resources"

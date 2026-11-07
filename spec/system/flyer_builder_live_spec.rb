@@ -22,15 +22,39 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit root_path
     page.execute_script("window.flyerNavigationSentinel = true")
 
-    click_link "Make a printable flyer"
+    find_link("Create printout").send_keys(:enter)
 
+    expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page.evaluate_script("window.flyerNavigationSentinel")).to be_nil
 
     click_button "Generate printout"
 
     expect(page).to have_link("Open PDF", href: /\Ablob:/)
+    expect(page).to have_css('button[data-flyer-builder-target="generate"] svg[fill="none"][stroke="currentColor"]')
     expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)
+  end
+
+  it "keeps the landing header visible on a narrow printout screen" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit new_flyer_path
+
+    within("nav[aria-label='Main navigation']") do
+      expect(page).to have_link("neighbourly", href: root_path)
+      expect(page).to have_link("Chat", href: new_chat_path)
+      expect(page).to have_link("Printout", href: new_flyer_path)
+      expect(page).to have_link("Sign in", href: new_user_session_path)
+      expect(page).not_to have_button("Open main menu")
+      all("a").each do |link|
+        expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+        expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+      end
+    end
+    expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
+    expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
   it "updates cards and print availability when categories are selected and cleared" do
@@ -39,29 +63,124 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_css("article h4", text: "Beta clinic")
     expect(page).to have_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("All available resources · 3 resources · 3 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "3 resources included")
+    expect(page).to have_no_css("h3", text: "Legal Support")
+    expect(page).to have_no_text("No matching resources in this category.")
     expect(page).to have_button("Generate printout", disabled: false)
 
     check "Meals"
+    expect(page).to have_css('button[data-flyer-builder-target="generate"] svg[fill="none"][stroke="currentColor"]')
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_no_css("article h4", text: "Beta clinic")
     expect(page).to have_no_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("1 resource · 1 card")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_button("Generate printout", disabled: false)
+
+    check "Legal Support"
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_css("h3", text: "Meals")
+    expect(page).to have_no_css("h3", text: "Legal Support")
+    expect(page).to have_no_text("No matching resources in this category.")
+    uncheck "Legal Support"
 
     check "Health Care"
     expect(page).to have_css("article h4", text: "Beta clinic")
-    expect(page).to have_text("2 resources · 2 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
 
     uncheck "Meals"
     uncheck "Health Care"
     expect(page).to have_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("All available resources · 3 resources · 3 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "3 resources included")
     expect(page).to have_button("Generate printout", disabled: false)
 
     check "Legal Support"
     expect(page).to have_text("No resources match the selected categories.")
     expect(page).to have_button("Generate printout", disabled: true)
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "0 resources included")
+    expect(page).to have_no_css("h3")
+  end
+
+  it "fills the final row when a category has an odd number of cards" do
+    source = Source.find_by!(name: "Local")
+    source.documents.create!(title: "Bravo meals", content: "Meals", categories: [food])
+    source.documents.create!(title: "Charlie meals", content: "Meals", categories: [food])
+    page.current_window.resize_to(1280, 900)
+    visit new_flyer_path
+
+    section = find("h3", text: "Meals").ancestor("[data-flyer-builder-target='cards'] > section")
+    cards = section.all("article", count: 3)
+    widths = cards.map { |card| card.evaluate_script("this.getBoundingClientRect().width") }
+    grid_width = cards.last.evaluate_script("this.parentElement.getBoundingClientRect().width")
+
+    expect(widths[0]).to be_within(1).of(widths[1])
+    expect(widths[2]).to be > widths[0]
+    expect(widths[2]).to be_within(1).of(grid_width)
+  end
+
+  it "searches alongside desktop categories and keeps the query when switching to mobile" do
+    visit new_flyer_path
+    expect(page).to have_css("article h4", text: "Alpha meals")
+
+    within("aside[aria-label='Resource filters']") do
+      fill_in "Search resources", with: "clinic"
+      find_field("Search resources").send_keys(:enter)
+    end
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_css("article h4", text: "Beta clinic")
+    expect(page).to have_no_text("Alpha meals")
+    check "Meals"
+    expect(page).to have_text("No resources match your search.")
+    uncheck "Meals"
+    expect(page).to have_css("article h4", text: "Beta clinic")
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    within("[role='search']") do
+      expect(page).to have_field("Search resources", with: "clinic")
+    end
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
+  it "searches and applies draft filters from the mobile toolbar" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit new_flyer_path
+
+    title = find("h1", text: "Build your resource guide")
+    expect(page).to have_text("Print a guide with addresses, hours, and contacts.")
+    expect(title.evaluate_script("getComputedStyle(this.closest('header')).position")).to eq("static")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
+    find("button[aria-label='Filters']").click
+    within("dialog") do
+      check "Meals"
+      find("button[aria-label='Close filters']").click
+    end
+    expect(page).to have_css("article h4", text: "Beta clinic")
+
+    find("button[aria-label='Filters']").click
+    within("dialog") do
+      expect(page).to have_unchecked_field("Meals")
+      check "Meals"
+      check "Health Care"
+      select "Resource name Z–A", from: "Sort order"
+      click_button "Apply filters"
+    end
+    expect(page).to have_no_css("dialog[open]")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
+    expect(all("article h4").map(&:text)).to eq(["Beta clinic", "Alpha meals"])
+    expect(page).to have_no_text("Gamma noticeboard")
+
+    fill_in "Search resources", with: "clinic"
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_no_text("Alpha meals")
+    fill_in "Search resources", with: "no such resource"
+    expect(page).to have_text("No resources match your search.")
+    expect(page).to have_button("Generate printout", disabled: true)
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
   it "does not let a delayed old preview replace the latest selection" do
@@ -97,14 +216,14 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     check "Health Care"
     expect(page).to have_css("article h4", text: "Beta clinic")
-    expect(page).to have_text("2 resources · 2 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
 
     page.execute_script("window.heldPreviewResponses.shift()()")
     page.evaluate_async_script("setTimeout(arguments[0], 50)")
 
     expect(page).to have_no_css("article h4", text: "Stale result")
     expect(page).to have_css("article h4", text: "Beta clinic")
-    expect(page).to have_text("2 resources · 2 cards")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "2 resources included")
   end
 
   it "disables printing after a preview failure and recovers when retried" do
@@ -117,7 +236,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     JAVASCRIPT
 
     check "Meals"
-    expect(page).to have_text("Preview unavailable")
+    expect(page).to have_text("We couldn't update your guide. Check your connection and try again.")
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
 
@@ -134,7 +253,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     visit new_flyer_path
 
-    expect(page).to have_text("Preview unavailable")
+    expect(page).to have_text("We couldn't update your guide. Check your connection and try again.")
     expect(page).to have_css("[data-flyer-builder-target='previewError']", visible: true)
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_no_text("Private connection detail")
@@ -149,6 +268,6 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_no_css("article h4", text: "Beta clinic")
     expect(page).to have_no_css("article h4", text: "Gamma noticeboard")
-    expect(page).to have_text("1 resource · 1 card")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
   end
 end
