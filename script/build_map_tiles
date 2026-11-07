@@ -1,0 +1,770 @@
+#!/usr/bin/env bash
+#
+# script/build_map_tiles: build the one-time map tiles of Greater Victoria, BC, that
+# get drawn into printable PDFs by Prawn, with pins on top.
+#
+# WHAT IT MAKES
+#   <output dir>/{z}/{x}/{y}.png    512x512 greyscale PNGs, standard XYZ numbering
+#   <output dir>/manifest.json      zooms, bounds, tile size, attribution, data sources
+#
+# USAGE
+#   colima start --memory 6 --cpu 4       # any running Docker daemon will do
+#   script/build_map_tiles [output_dir]   # output_dir defaults to lib/map_tiles
+#   colima stop
+#
+# WHEN TO RERUN
+#   Rarely, and by hand. The app never runs this. It only reads the finished PNGs, and
+#   never needs Docker, a map server or a network call to draw a map. Rerun when:
+#     - the streets are out of date enough to matter (the data is a snapshot),
+#     - the area or zoom levels below change, or
+#     - the look of the map changes (see patch_style).
+#   The tiles are replaced as a set, and only after a complete and checked build.
+#
+# COST
+#   Measured on an 8-core Apple Silicon Mac in November 2026: 10.5 minutes from nothing,
+#   with a local copy of the sea polygons (5 of it downloading BC, 2.5 pulling images).
+#   Downloading the sea polygons adds to that, and hasn't been measured. They and BC are
+#   each over 1 GB, and the images are 1.6 GB, so have 6 GB free. All downloads, intermediate
+#   files and any images this run pulled are deleted when it ends. The result is about 56 MB.
+#
+# NEEDS
+#   docker (with a running daemon), osmium, curl, jq, awk, unzip. Nothing else: the
+#   vector tile, rendering and image-compression tools all live in the pinned images.
+#
+# ENVIRONMENT (all optional)
+#   WATER_POLYGONS_DIR  Use a local copy of the sea polygons instead of downloading them
+#                       (see WATER_POLYGONS_URL). The directory needs water_polygons.shp,
+#                       .shx and .dbf. It's only read, and is left in place. For the manifest,
+#                       also set WATER_POLYGONS_SOURCE (where the copy came from) and
+#                       WATER_POLYGONS_DATE (the date of its data).
+#   MAP_TILES_WORK_DIR  Use and keep this work directory, skipping any steps it has
+#                       already finished. For debugging a step without downloading
+#                       everything again. Delete a step's .done.* file to redo it.
+#   RENDER_JOBS         Tiles to render at once. Defaults to 6.
+#   MINIMUM_FREE_GB     Disk space required before starting. Defaults to 6, which is for a
+#                       full build. A rerun of later steps in a work directory needs far less.
+
+set -euo pipefail
+
+# ------------------------------------------------------------------------------
+# Area and zoom levels. Change these to change what gets built.
+# ------------------------------------------------------------------------------
+
+# Bounding boxes are west,south,east,north in degrees. A tile is built if any part of
+# it touches the box, so the tiles always cover a little more than the box itself.
+WHOLE_AREA_BBOX="-123.65,48.30,-123.20,48.72"
+WHOLE_AREA_MIN_ZOOM=11
+WHOLE_AREA_MAX_ZOOM=15
+
+# Zoom 16 has four times the tiles of zoom 15, so it covers only the urban core.
+URBAN_CORE_BBOX="-123.45,48.40,-123.28,48.52"
+URBAN_CORE_MIN_ZOOM=16
+URBAN_CORE_MAX_ZOOM=16
+
+# Each tile covers the normal XYZ area but at double resolution: 512 pixels, not 256.
+TILE_SIZE=512
+
+# Degrees of extra OpenStreetMap data to keep around the outermost tiles, so that roads
+# and labels near the edge of a tile aren't cut off where the data stops.
+EXTRACT_MARGIN_DEGREES=0.05
+
+# ------------------------------------------------------------------------------
+# Look of the tiles
+# ------------------------------------------------------------------------------
+
+# Extra map to render around each tile before cropping to size, in 256-tile pixels. With no
+# margin, a town label is drawn only in the tile holding its anchor point, so it gets cut
+# off at the tile's edge, which shows wherever tiles sit side by side. This has to be
+# wider than the longest label.
+RENDER_TILE_MARGIN=256
+
+# Number of grey levels in each PNG. Fewer makes smaller files, but the text edges get
+# rougher. Text needs its in-between greys to stay readable at print size.
+GREY_LEVELS=32
+
+# Positron asks for Metropolis first and Noto Sans as a backup, and for an italic that
+# isn't available either. tileserver-gl bundles Noto Sans Regular, with all of its
+# glyph ranges, so every label uses that and there are no fonts to download.
+LABEL_FONT="Noto Sans Regular"
+FONTS_DIR_IN_IMAGE="/usr/src/app/node_modules/tileserver-gl-styles/fonts"
+
+# Credit text for the map page. See the license notes in the manifest step.
+ATTRIBUTION="© OpenMapTiles © OpenStreetMap contributors"
+ATTRIBUTION_LINKS='["https://openmaptiles.org/","https://www.openstreetmap.org/copyright"]'
+STYLE_CREDIT="Style based on Positron (CC BY 4.0), © MapTiler and OpenMapTiles contributors, derived from CartoDB Basemaps (CC BY 3.0) by Stamen and Paul Norman for CartoDB Inc. Changed: fonts, darker label colours, greyscale."
+
+# ------------------------------------------------------------------------------
+# Pinned tools and data sources
+# ------------------------------------------------------------------------------
+
+# Images are pinned by digest, so a rerun can't quietly get different software.
+#
+# tilemaker publishes one moving tag, "master", with no version tags. This digest is
+# the build reporting itself as v3.2.0+g278965195157. To update it, pull :master and
+# read the new digest from `docker images --digests`.
+TILEMAKER_IMAGE="ghcr.io/systemed/tilemaker@sha256:9cd8728a37a31c8a5205e091cedd3ff2c2c450c57e1ce3e5b58916185540ebba"
+TILESERVER_IMAGE="maptiler/tileserver-gl:v5.7.0@sha256:24d0364e1d40da0ae3fb3269f617c26e36a883ad4b7454e5c4064a8795bfc807"
+
+# Geofabrik's latest British Columbia extract. Never fetch tiles from the
+# tile.openstreetmap.org servers instead: their usage policy forbids bulk downloads.
+GEOFABRIK_URL="https://download.geofabrik.de/north-america/canada/british-columbia-latest.osm.pbf"
+
+# Positron, at a released tag rather than a moving branch.
+POSITRON_VERSION="v1.9"
+POSITRON_URL="https://raw.githubusercontent.com/openmaptiles/positron-gl-style/${POSITRON_VERSION}/style.json"
+
+# The sea. OpenStreetMap stores coastlines as lines, so land and water need ready-made
+# polygons before the sea can be filled in. tilemaker's OpenMapTiles config expects this
+# data set, processed by the OpenStreetMap community from the same coastlines.
+#
+# There is deliberately no automatic backup source. If this host is down, the build stops
+# and says so. Use WATER_POLYGONS_DIR if there's a copy to hand, and name its source.
+WATER_POLYGONS_URL="https://osmdata.openstreetmap.de/download/water-polygons-split-4326.zip"
+
+# A generic client name. No personal details belong in download requests.
+USER_AGENT="neighbourly-map-tile-build/1.0"
+
+# How many times to try a download, 30 seconds apart, when the connection fails.
+DOWNLOAD_ATTEMPTS=4
+
+# Open water in the Strait of Juan de Fuca, used to check the sea was really drawn. A tile
+# here that averages lighter than SEA_MAX_MEAN_GREY has land colour where sea should be.
+# In Positron's colours, water is about 198 and land about 243.
+SEA_CHECK_LAT=48.33
+SEA_CHECK_LNG=-123.35
+SEA_MAX_MEAN_GREY=225
+
+# Stop early rather than fill the disk halfway through.
+MINIMUM_FREE_GB="${MINIMUM_FREE_GB:-6}"
+
+# Local-only port for the temporary tile server, and how many tiles to render at once.
+RENDER_PORT=18080
+RENDER_JOBS="${RENDER_JOBS:-6}"
+
+# ------------------------------------------------------------------------------
+# Setup
+# ------------------------------------------------------------------------------
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+OUTPUT_DIR="${1:-${REPO_ROOT}/lib/map_tiles}"
+RENDER_CONTAINER="map-tiles-render-$$"
+STARTED_AT="$(date +%s)"
+PULLED_IMAGES=""
+WORK_DIR=""
+KEEP_WORK_DIR=0
+
+log() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$*"; }
+die() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+
+# Runs on every exit, including failures and Ctrl-C, so that a failed build doesn't
+# leave gigabytes of data, a running server or pulled images behind.
+cleanup() {
+  local status=$?
+  trap - EXIT
+  docker rm -f "$RENDER_CONTAINER" >/dev/null 2>&1 || true
+  if [ "$KEEP_WORK_DIR" = 0 ]; then
+    [ -n "$PULLED_IMAGES" ] && docker image rm $PULLED_IMAGES >/dev/null 2>&1 || true
+    [ -n "$WORK_DIR" ] && rm -rf "$WORK_DIR"
+  fi
+  exit "$status"
+}
+trap cleanup EXIT
+
+# Runs a step once. With MAP_TILES_WORK_DIR, a step that finished earlier is skipped.
+run_step() {
+  local name=$1
+  if [ -e "${WORK_DIR}/.done.${name}" ]; then
+    log "Skipping ${name}: already done"
+    return 0
+  fi
+  log "Starting ${name}"
+  "$name"
+  touch "${WORK_DIR}/.done.${name}"
+}
+
+# Downloads are untrusted data. Each goes in its own new directory and is only ever passed
+# to tools as a path. A dropped connection resumes where it stopped (--continue-at -),
+# because a large file can fail far into the transfer. An HTTP error such as a 403 or 404
+# (curl exit 22) stops at once: that's the server's answer, and asking again is rude.
+download() {
+  local attempt=1 status=0
+  while [ "$attempt" -le "$DOWNLOAD_ATTEMPTS" ]; do
+    status=0
+    curl --fail --location --silent --show-error --proto '=https' \
+      --user-agent "$USER_AGENT" --connect-timeout 20 \
+      --continue-at - --output "$2" "$1" || status=$?
+    if [ "$status" = 0 ] || [ "$status" = 22 ]; then
+      return "$status"
+    fi
+    log "Download attempt ${attempt} of ${DOWNLOAD_ATTEMPTS} failed (curl exit ${status})"
+    attempt=$((attempt + 1))
+    sleep 30
+  done
+  return "$status"
+}
+
+check_prerequisites() {
+  local tool
+  for tool in docker osmium curl jq awk unzip; do
+    command -v "$tool" >/dev/null || die "${tool} is not installed"
+  done
+
+  docker info >/dev/null 2>&1 \
+    || die "Docker isn't reachable. Start it first: colima start --memory 6 --cpu 4"
+
+  local free_gb
+  free_gb=$(df -Pk "$REPO_ROOT" | awk 'NR==2 { print int($4 / 1024 / 1024) }')
+  [ "$free_gb" -ge "$MINIMUM_FREE_GB" ] \
+    || die "Only ${free_gb} GB free, and this needs at least ${MINIMUM_FREE_GB} GB"
+
+  # The output directory is replaced at the end, so refuse anything that doesn't look
+  # like an earlier build. A typo in the argument must not cost someone their files.
+  if [ -d "$OUTPUT_DIR" ] && [ -n "$(ls -A "$OUTPUT_DIR")" ] \
+      && [ ! -f "${OUTPUT_DIR}/manifest.json" ]; then
+    die "${OUTPUT_DIR} has files but no manifest.json, so it isn't an earlier tile build"
+  fi
+}
+
+# Uses the current Docker daemon, but with an empty client config. A credential helper
+# named in ~/.docker/config.json can be missing (docker-credential-osxkeychain was, here),
+# which breaks even anonymous pulls. These images are public and need no login, and this
+# leaves the user's own Docker config untouched.
+configure_docker_client() {
+  if [ -z "${DOCKER_HOST:-}" ]; then
+    DOCKER_HOST="$(docker context inspect --format '{{.Endpoints.docker.Host}}')"
+    export DOCKER_HOST
+  fi
+  mkdir -p "${WORK_DIR}/docker-config"
+  echo '{}' > "${WORK_DIR}/docker-config/config.json"
+  export DOCKER_CONFIG="${WORK_DIR}/docker-config"
+}
+
+pull_images() {
+  local image
+  for image in "$TILEMAKER_IMAGE" "$TILESERVER_IMAGE"; do
+    # Only images this run pulled get removed at the end, not ones already there.
+    if ! docker image inspect "$image" >/dev/null 2>&1; then
+      docker pull --quiet "$image" >/dev/null
+      PULLED_IMAGES="${PULLED_IMAGES} ${image}"
+    fi
+  done
+}
+
+# ------------------------------------------------------------------------------
+# Web Mercator tile maths, for standard XYZ numbering. This has to match what the PDF
+# code uses to place pins. Tile y counts down from the north, so north gives the lowest y.
+# ------------------------------------------------------------------------------
+
+# Prints "x_min x_max y_min y_max" for a zoom level and a west,south,east,north box.
+tile_range() {
+  awk -v z="$1" -v bbox="$2" 'BEGIN {
+    split(bbox, b, ",")
+    n = 2 ^ z
+    pi = atan2(0, -1)
+    x_min = int((b[1] + 180) / 360 * n)
+    x_max = int((b[3] + 180) / 360 * n)
+    y_min = int(lat_to_y(b[4]) * n)
+    y_max = int(lat_to_y(b[2]) * n)
+    printf "%d %d %d %d\n", x_min, x_max, y_min, y_max
+  }
+  function lat_to_y(lat, r) {
+    r = lat * pi / 180
+    return (1 - log(sin(r) / cos(r) + 1 / cos(r)) / pi) / 2
+  }'
+}
+
+# Prints "west south east north" for the outer edges of a block of tiles.
+tile_range_bounds() {
+  awk -v z="$1" -v x_min="$2" -v x_max="$3" -v y_min="$4" -v y_max="$5" 'BEGIN {
+    n = 2 ^ z
+    pi = atan2(0, -1)
+    printf "%.6f %.6f %.6f %.6f\n", x_min / n * 360 - 180, y_to_lat(y_max + 1),
+      (x_max + 1) / n * 360 - 180, y_to_lat(y_min)
+  }
+  function y_to_lat(y, m) {
+    m = pi * (1 - 2 * y / n)
+    return atan2(exp(m) - exp(-m), 2) * 180 / pi
+  }'
+}
+
+# Prints "zoom bbox" for every zoom level being built.
+zoom_levels() {
+  local z
+  z=$WHOLE_AREA_MIN_ZOOM
+  while [ "$z" -le "$WHOLE_AREA_MAX_ZOOM" ]; do
+    echo "$z $WHOLE_AREA_BBOX"
+    z=$((z + 1))
+  done
+  z=$URBAN_CORE_MIN_ZOOM
+  while [ "$z" -le "$URBAN_CORE_MAX_ZOOM" ]; do
+    echo "$z $URBAN_CORE_BBOX"
+    z=$((z + 1))
+  done
+}
+
+# Prints "z x y" for every tile, and is the one list of what should exist.
+list_tiles() {
+  local z bbox x_min x_max y_min y_max
+  zoom_levels | while read -r z bbox; do
+    read -r x_min x_max y_min y_max < <(tile_range "$z" "$bbox")
+    awk -v z="$z" -v x_min="$x_min" -v x_max="$x_max" -v y_min="$y_min" -v y_max="$y_max" 'BEGIN {
+      for (x = x_min; x <= x_max; x++) for (y = y_min; y <= y_max; y++) print z, x, y
+    }'
+  done
+}
+
+# ------------------------------------------------------------------------------
+# Build steps
+# ------------------------------------------------------------------------------
+
+# Step 1: Download British Columbia and check it against Geofabrik's published checksum.
+# "latest" redirects to a dated file. Using the dated name makes sure the file and its
+# checksum belong together, even if Geofabrik publishes a new day's data part way through.
+download_osm_data() {
+  local dir="${WORK_DIR}/download-osm"
+  mkdir -p "$dir"
+
+  local dated_url
+  dated_url=$(curl --fail --silent --show-error --location --head --proto '=https' \
+    --user-agent "$USER_AGENT" --output /dev/null --write-out '%{url_effective}' "$GEOFABRIK_URL")
+  log "Downloading ${dated_url}"
+  download "$dated_url" "${dir}/british-columbia.osm.pbf"
+  download "${dated_url}.md5" "${dir}/british-columbia.md5"
+
+  local expected actual
+  expected=$(awk '{ print $1; exit }' "${dir}/british-columbia.md5")
+  if command -v md5sum >/dev/null; then
+    actual=$(md5sum "${dir}/british-columbia.osm.pbf" | awk '{ print $1 }')
+  else
+    actual=$(md5 -q "${dir}/british-columbia.osm.pbf")
+  fi
+  [ "$expected" = "$actual" ] || die "Checksum mismatch for ${dated_url}"
+  echo "$dated_url" > "${WORK_DIR}/osm-source-url"
+}
+
+# Step 2: Cut out the area with osmium. The cut covers the whole footprint of the
+# lowest-zoom tiles plus a margin, not just the bounding box, because those tiles
+# reach well past the box and would otherwise show bare land around the edge.
+#
+# The "smart" strategy keeps every polygon that crosses the edge whole. The default
+# leaves large areas such as parks or forests broken, and tilemaker then drops them.
+extract_area() {
+  local x_min x_max y_min y_max west south east north bbox
+  read -r x_min x_max y_min y_max < <(tile_range "$WHOLE_AREA_MIN_ZOOM" "$WHOLE_AREA_BBOX")
+  read -r west south east north < <(tile_range_bounds "$WHOLE_AREA_MIN_ZOOM" "$x_min" "$x_max" "$y_min" "$y_max")
+  bbox=$(awk -v w="$west" -v s="$south" -v e="$east" -v n="$north" -v m="$EXTRACT_MARGIN_DEGREES" \
+    'BEGIN { printf "%.5f,%.5f,%.5f,%.5f", w - m, s - m, e + m, n + m }')
+
+  # tilemaker needs this box as well, because it clips the sea polygons with it.
+  echo "$bbox" > "${WORK_DIR}/extract-bbox"
+
+  log "Extracting ${bbox}"
+  osmium extract --bbox "$bbox" --strategy smart --overwrite --no-progress \
+    --output "${WORK_DIR}/greater_victoria.osm.pbf" \
+    "${WORK_DIR}/download-osm/british-columbia.osm.pbf"
+
+  # The cut is all that's needed from here on, so free the disk space right away.
+  osmium fileinfo --no-progress --get header.option.osmosis_replication_timestamp \
+    "${WORK_DIR}/download-osm/british-columbia.osm.pbf" > "${WORK_DIR}/osm-data-date" || true
+  [ "$KEEP_WORK_DIR" = 1 ] || rm -rf "${WORK_DIR}/download-osm"
+}
+
+# Step 3: Get the sea polygons. Only the files that are needed get unzipped, with paths
+# stripped (-j) so that an archive can't write outside its directory.
+#
+# The .dbf holds no data this build reads, but it has to exist. Without it tilemaker
+# silently skips the whole shapefile and reports success, and the sea comes out as land.
+download_water_polygons() {
+  local dir="${WORK_DIR}/coastline"
+
+  if [ -n "${WATER_POLYGONS_DIR:-}" ]; then
+    [ -n "${WATER_POLYGONS_SOURCE:-}" ] && [ -n "${WATER_POLYGONS_DATE:-}" ] \
+      || die "WATER_POLYGONS_DIR also needs WATER_POLYGONS_SOURCE and WATER_POLYGONS_DATE"
+    dir="$WATER_POLYGONS_DIR"
+    log "Using the local copy in ${dir}, from ${WATER_POLYGONS_SOURCE}"
+    echo "$WATER_POLYGONS_SOURCE" > "${WORK_DIR}/water-source-url"
+    echo "$WATER_POLYGONS_DATE" > "${WORK_DIR}/water-data-date"
+  else
+    mkdir -p "$dir"
+    log "Downloading ${WATER_POLYGONS_URL}"
+    download "$WATER_POLYGONS_URL" "${dir}/water-polygons.zip" \
+      || die "Couldn't download the sea polygons. Try later, or see WATER_POLYGONS_DIR."
+    unzip -q -j -o "${dir}/water-polygons.zip" \
+      '*/water_polygons.shp' '*/water_polygons.shx' '*/water_polygons.dbf' '*/README.txt' -d "$dir"
+    rm -f "${dir}/water-polygons.zip"
+    echo "$WATER_POLYGONS_URL" > "${WORK_DIR}/water-source-url"
+    # Keep just the date from the README, and treat everything else in it as untrusted.
+    sed -n 's/^Date of the data used is \([0-9TZ:-]*\).*/\1/p' "${dir}/README.txt" | head -1 \
+      > "${WORK_DIR}/water-data-date"
+  fi
+
+  # A shapefile always starts with the bytes 00 00 27 0a, which catches a saved error page.
+  [ -s "${dir}/water_polygons.shx" ] || die "water_polygons.shx is missing from ${dir}"
+  [ -s "${dir}/water_polygons.dbf" ] || die "water_polygons.dbf is missing from ${dir}"
+  [ "$(od -An -tx1 -N4 "${dir}/water_polygons.shp" | tr -d ' \n')" = "0000270a" ] \
+    || die "water_polygons.shp in ${dir} isn't a shapefile"
+}
+
+# Step 4: Make vector tiles with tilemaker. Its bundled OpenMapTiles config and Lua
+# profile produce the layers and fields Positron reads, so no schema mapping is needed.
+#
+# Its config also lists Natural Earth layers for zoom 9 and below (urban areas, ice shelves
+# and glaciers). They aren't needed here and tilemaker stops if the files are missing,
+# so they get removed.
+#
+# --network none: this step only reads local files.
+build_vector_tiles() {
+  local dir="${WORK_DIR}/vector"
+  mkdir -p "$dir"
+
+  docker run --rm --entrypoint cat "$TILEMAKER_IMAGE" \
+    /usr/src/app/resources/config-openmaptiles.json \
+    | jq 'del(.layers.urban_areas, .layers.ice_shelf, .layers.glacier)' \
+    > "${dir}/config.json"
+
+  docker run --rm --network none --user "$(id -u):$(id -g)" \
+    --volume "${WORK_DIR}/greater_victoria.osm.pbf:/input/area.osm.pbf:ro" \
+    --volume "${WATER_POLYGONS_DIR:-${WORK_DIR}/coastline}:/run-dir/coastline:ro" \
+    --volume "${dir}:/output" \
+    --workdir /run-dir \
+    --entrypoint /usr/src/app/tilemaker \
+    "$TILEMAKER_IMAGE" \
+    --bbox "$(cat "${WORK_DIR}/extract-bbox")" \
+    --input /input/area.osm.pbf \
+    --output /output/greater_victoria.mbtiles \
+    --config /output/config.json \
+    --process /usr/src/app/resources/process-openmaptiles.lua
+
+  # The source data has served its purpose, so free the disk space. A WATER_POLYGONS_DIR
+  # copy isn't under the work directory, so it stays.
+  [ "$KEEP_WORK_DIR" = 1 ] || rm -rf "${WORK_DIR}/coastline" "${WORK_DIR}/greater_victoria.osm.pbf"
+}
+
+# Step 5: Download Positron and adapt it for offline, print-friendly rendering. Every
+# change to the look of the map is here. CC BY 4.0 requires saying the style was changed,
+# so keep STYLE_CREDIT accurate if this changes.
+patch_style() {
+  local dir="${WORK_DIR}/style"
+  mkdir -p "${dir}/download"
+  download "$POSITRON_URL" "${dir}/download/style.json"
+
+  # - sources and glyphs: use our local tiles and fonts in place of MapTiler's service.
+  # - sprite and icon-image: remove. Its only icons are place dots below zoom 8,
+  #   so nothing is lost, and rendering makes no outside requests.
+  # - text-font: use the one bundled font.
+  # - label colours: Positron's street names are #bbb, which is designed to stay out of
+  #   the way on screen but would nearly vanish on paper. Darken them all, and use a
+  #   solid white halo so names stay readable where they cross a road.
+  jq --arg font "$LABEL_FONT" '
+    del(.sprite)
+    | .glyphs = "{fontstack}/{range}.pbf"
+    | .sources.openmaptiles = { type: "vector", url: "mbtiles://{openmaptiles}" }
+    | .layers |= map(
+        if .layout["text-font"] then .layout["text-font"] = [$font] else . end
+        | if .layout["icon-image"] then .layout |= del(.["icon-image"]) else . end
+        | if .id == "highway_name_other" then
+            .paint["text-color"] = "#3c3c3c"
+            | .paint["text-halo-color"] = "#ffffff"
+            | .paint["text-halo-blur"] = 0.5
+            | .layout["text-size"] = 11
+          elif .id == "highway_name_motorway" then
+            .paint["text-color"] = "#3c3c3c"
+          elif .id == "water_name" then
+            .paint["text-color"] = "#5a6468"
+          elif (.id | startswith("place_")) then
+            .paint["text-color"] = "#333333"
+          else . end
+      )
+  ' "${dir}/download/style.json" > "${dir}/positron.json"
+  rm -rf "${dir}/download"
+}
+
+# Step 6: Render every tile with tileserver-gl, through a temporary server that only this
+# machine can reach. The "@2x" address gives 512-pixel images of normal XYZ tiles. The
+# server's own /512/ address is a different thing and uses a different numbering.
+render_tiles() {
+  local dir="${WORK_DIR}/rendered"
+  mkdir -p "$dir"
+
+  jq -n --arg fonts "$FONTS_DIR_IN_IMAGE" --argjson margin "$RENDER_TILE_MARGIN" '{
+    options: {
+      tileMargin: $margin,
+      paths: { root: "/data", styles: "style", mbtiles: "vector", fonts: $fonts },
+      formatOptions: { png: { compressionLevel: 1 } }
+    },
+    styles: { positron: { style: "positron.json" } },
+    data: { openmaptiles: { mbtiles: "greater_victoria.mbtiles" } }
+  }' > "${WORK_DIR}/tileserver-config.json"
+
+  docker run --detach --name "$RENDER_CONTAINER" \
+    --publish "127.0.0.1:${RENDER_PORT}:8080" \
+    --volume "${WORK_DIR}/style:/data/style:ro" \
+    --volume "${WORK_DIR}/vector:/data/vector:ro" \
+    --volume "${WORK_DIR}/tileserver-config.json:/data/config.json:ro" \
+    --user "$(id -u):$(id -g)" \
+    "$TILESERVER_IMAGE" --config /data/config.json --port 8080 >/dev/null
+
+  local attempt=0
+  until curl --fail --silent --output /dev/null "http://127.0.0.1:${RENDER_PORT}/health"; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -gt 90 ]; then
+      docker logs --tail 40 "$RENDER_CONTAINER" >&2
+      die "tileserver-gl didn't start within 90 seconds"
+    fi
+    sleep 1
+  done
+
+  log "Rendering $(list_tiles | wc -l | tr -d ' ') tiles"
+  list_tiles | awk -v dir="$dir" '{ print dir "/" $1 "/" $2 }' | sort -u | xargs mkdir -p
+
+  # xargs stops everything at the first tile a curl can't fetch (exit 255), because a
+  # build with gaps in it is no use. The tile count gets checked again in write_manifest.
+  list_tiles | RENDER_OUTPUT="$dir" RENDER_PORT="$RENDER_PORT" \
+    xargs -n 3 -P "$RENDER_JOBS" sh -c '
+      curl --fail --silent --show-error --retry 3 --retry-all-errors \
+        --output "$RENDER_OUTPUT/$1/$2/$3.png" \
+        "http://127.0.0.1:$RENDER_PORT/styles/positron/$1/$2/$3@2x.png" || exit 255
+    ' render
+
+  # A tile with a missing font still renders, just without its labels, so a successful
+  # request proves nothing about labels. The server does log the problem, so check that.
+  if docker logs "$RENDER_CONTAINER" 2>&1 | grep -i 'font' | grep -iqE 'not found|missing|error'; then
+    docker logs "$RENDER_CONTAINER" 2>&1 | grep -i 'font' | head -5 >&2
+    die "tileserver-gl reported a font problem, so labels may be missing"
+  fi
+}
+
+# Step 7: Convert to greyscale palette PNGs. This uses the sharp library already inside the
+# tileserver-gl image, so nothing has to be installed. It also confirms each tile is
+# really 512x512, and fails the build if not. The result goes to a new directory, so
+# the existing tiles stay in place until the whole build has succeeded.
+compress_tiles() {
+  local dir="${WORK_DIR}/scripts"
+  mkdir -p "$dir" "${WORK_DIR}/final"
+  cat > "${dir}/compress.js" <<'NODE'
+// Runs inside the tileserver-gl image. Arguments: input dir, output dir, size, grey levels.
+const fs = require('fs');
+const path = require('path');
+const sharp = require('/usr/src/app/node_modules/sharp');
+
+const [input, output, size, levels] = process.argv.slice(2);
+const files = fs.readdirSync(input, { recursive: true })
+  .filter((name) => name.endsWith('.png'));
+
+let next = 0;
+let failed = 0;
+
+async function worker() {
+  while (next < files.length) {
+    const name = files[next++];
+    const target = path.join(output, name);
+    try {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      // flatten removes transparency: nothing shows through a tile on paper. No dither,
+      // because speckled flat areas compress badly and print worse.
+      await sharp(path.join(input, name))
+        .flatten({ background: '#ffffff' })
+        .greyscale()
+        .png({ palette: true, colours: Number(levels), dither: 0, compressionLevel: 9, effort: 10 })
+        .toFile(target);
+      const { width, height } = await sharp(target).metadata();
+      if (width !== Number(size) || height !== Number(size)) {
+        throw new Error(`${width}x${height}`);
+      }
+    } catch (error) {
+      failed += 1;
+      console.error(`${name}: ${error.message}`);
+    }
+  }
+}
+
+Promise.all(Array.from({ length: 8 }, worker)).then(() => {
+  console.log(`Compressed ${files.length - failed} of ${files.length} tiles`);
+  process.exit(failed ? 1 : 0);
+});
+NODE
+
+  docker run --rm --network none --user "$(id -u):$(id -g)" \
+    --volume "${dir}:/scripts:ro" \
+    --volume "${WORK_DIR}/rendered:/input:ro" \
+    --volume "${WORK_DIR}/final:/output" \
+    --entrypoint node \
+    "$TILESERVER_IMAGE" /scripts/compress.js /input /output "$TILE_SIZE" "$GREY_LEVELS"
+}
+
+# Step 8: Check the sea was really drawn. Tools can succeed while producing a map with no
+# sea (see step 3), and only looking at the result shows that. This checks one tile of open
+# water per zoom. It skips the urban core: its zooms are drawn from the same vector tiles
+# as the whole area's, and its box has too little open water to check reliably.
+check_sea_drawn() {
+  local z x y paths=""
+  z=$WHOLE_AREA_MIN_ZOOM
+  while [ "$z" -le "$WHOLE_AREA_MAX_ZOOM" ]; do
+    read -r x _ y _ < <(tile_range "$z" "${SEA_CHECK_LNG},${SEA_CHECK_LAT},${SEA_CHECK_LNG},${SEA_CHECK_LAT}")
+    paths="${paths} ${z}/${x}/${y}.png"
+    z=$((z + 1))
+  done
+
+  cat > "${WORK_DIR}/scripts/check_sea.js" <<'NODE'
+// Runs inside the tileserver-gl image. Arguments: tiles dir, limit, tile paths.
+const sharp = require('/usr/src/app/node_modules/sharp');
+const [dir, limit, ...tiles] = process.argv.slice(2);
+
+(async () => {
+  let failed = false;
+  for (const tile of tiles) {
+    const { channels } = await sharp(`${dir}/${tile}`).stats();
+    const mean = channels[0].mean;
+    console.log(`Sea check ${tile}: mean grey ${mean.toFixed(0)} (limit ${limit})`);
+    if (mean > Number(limit)) failed = true;
+  }
+  process.exit(failed ? 1 : 0);
+})();
+NODE
+
+  # shellcheck disable=SC2086 # The tile paths are meant to split into separate arguments.
+  docker run --rm --network none --user "$(id -u):$(id -g)" \
+    --volume "${WORK_DIR}/scripts:/scripts:ro" \
+    --volume "${WORK_DIR}/final:/tiles:ro" \
+    --entrypoint node \
+    "$TILESERVER_IMAGE" /scripts/check_sea.js /tiles "$SEA_MAX_MEAN_GREY" $paths \
+    || die "Open water came out the colour of land, so the sea polygons weren't drawn"
+}
+
+# Step 9: Check nothing is missing, then write the manifest beside the tiles.
+#
+# LICENSES behind the attribution text:
+#   - OpenStreetMap data is ODbL: credit "© OpenStreetMap contributors".
+#   - The OpenMapTiles schema, used by Positron and by tilemaker's config, requires a
+#     visible credit to "OpenMapTiles". On printed and static maps, it goes in a text
+#     description near the image, like crediting a photograph.
+#   - The Positron design is CC BY 4.0. Its credit needn't be on the image but must
+#     be reasonably accessible, and our changes to it must be stated. See STYLE_CREDIT.
+write_manifest() {
+  local expected actual
+  expected=$(list_tiles | wc -l | tr -d ' ')
+  actual=$(find "${WORK_DIR}/final" -type f -name '*.png' | wc -l | tr -d ' ')
+  [ "$expected" = "$actual" ] || die "Expected ${expected} tiles, but built ${actual}"
+
+  # One entry per zoom: which tiles exist and the area they actually cover. That's a
+  # little more than the bounding box, because whole tiles are kept.
+  local z bbox x_min x_max y_min y_max west south east north zooms_file
+  zooms_file="${WORK_DIR}/manifest-zooms.jsonl"
+  : > "$zooms_file"
+  zoom_levels | while read -r z bbox; do
+    read -r x_min x_max y_min y_max < <(tile_range "$z" "$bbox")
+    read -r west south east north < <(tile_range_bounds "$z" "$x_min" "$x_max" "$y_min" "$y_max")
+    jq -n -c --argjson z "$z" --argjson x_min "$x_min" --argjson x_max "$x_max" \
+      --argjson y_min "$y_min" --argjson y_max "$y_max" \
+      --argjson w "$west" --argjson s "$south" --argjson e "$east" --argjson n "$north" \
+      '{ zoom: $z, x_min: $x_min, x_max: $x_max, y_min: $y_min, y_max: $y_max,
+         tile_count: (($x_max - $x_min + 1) * ($y_max - $y_min + 1)),
+         covered_bounds: { west: $w, south: $s, east: $e, north: $n } }' >> "$zooms_file"
+  done
+
+  jq -n \
+    --argjson zooms "$(jq -s -c '.' "$zooms_file")" \
+    --argjson tile_size "$TILE_SIZE" \
+    --argjson total "$actual" \
+    --arg attribution "$ATTRIBUTION" \
+    --argjson attribution_links "$ATTRIBUTION_LINKS" \
+    --arg style_credit "$STYLE_CREDIT" \
+    --arg whole_bbox "$WHOLE_AREA_BBOX" --argjson whole_min "$WHOLE_AREA_MIN_ZOOM" --argjson whole_max "$WHOLE_AREA_MAX_ZOOM" \
+    --arg core_bbox "$URBAN_CORE_BBOX" --argjson core_min "$URBAN_CORE_MIN_ZOOM" --argjson core_max "$URBAN_CORE_MAX_ZOOM" \
+    --arg osm_url "$(cat "${WORK_DIR}/osm-source-url")" \
+    --arg osm_date "$(cat "${WORK_DIR}/osm-data-date")" \
+    --arg water_url "$(cat "${WORK_DIR}/water-source-url")" \
+    --arg water_date "$(cat "${WORK_DIR}/water-data-date")" \
+    --arg positron "$POSITRON_VERSION" \
+    --arg tilemaker "$TILEMAKER_IMAGE" --arg tileserver "$TILESERVER_IMAGE" \
+    --arg built_at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '
+    def bounds($b): ($b | split(",") | map(tonumber)) as $v
+      | { west: $v[0], south: $v[1], east: $v[2], north: $v[3] };
+    {
+      tile_format: "png",
+      tile_size: $tile_size,
+      pixel_ratio: 2,
+      scheme: "xyz",
+      path_template: "{z}/{x}/{y}.png",
+      projection: "EPSG:3857",
+      attribution: $attribution,
+      attribution_links: $attribution_links,
+      style_credit: $style_credit,
+      zoom_levels: ($zooms | map(.zoom)),
+      zoom_ranges: [
+        { name: "whole_area", min_zoom: $whole_min, max_zoom: $whole_max, bounds: bounds($whole_bbox) },
+        { name: "urban_core", min_zoom: $core_min, max_zoom: $core_max, bounds: bounds($core_bbox) }
+      ],
+      zooms: $zooms,
+      total_tiles: $total,
+      built_at: $built_at,
+      sources: {
+        openstreetmap: { url: $osm_url, data_date: $osm_date },
+        water_polygons: { url: $water_url, data_date: $water_date },
+        style: ("positron-gl-style " + $positron),
+        tilemaker_image: $tilemaker,
+        tileserver_image: $tileserver
+      }
+    }' > "${WORK_DIR}/final/manifest.json"
+}
+
+# Step 10: Put the finished tiles in place, removing any tiles from an earlier build. Only
+# numbered zoom directories and the manifest are removed, so a mistaken output directory
+# can't lose anything else. It's been checked to be empty or an earlier build by now.
+install_tiles() {
+  mkdir -p "$OUTPUT_DIR"
+  rm -f "${OUTPUT_DIR}/manifest.json"
+  find "$OUTPUT_DIR" -mindepth 1 -maxdepth 1 -type d -name '[0-9]*' -exec rm -rf {} +
+  mv "${WORK_DIR}/final/"* "$OUTPUT_DIR/"
+}
+
+# Prints measured tile counts and sizes, so they don't need guessing.
+print_summary() {
+  local z dir total_bytes=0 bytes count
+  log "Tiles in ${OUTPUT_DIR}:"
+  for z in $(ls "$OUTPUT_DIR" | grep -E '^[0-9]+$' | sort -n); do
+    dir="${OUTPUT_DIR}/${z}"
+    count=$(find "$dir" -type f -name '*.png' | wc -l | tr -d ' ')
+    bytes=$(find "$dir" -type f -name '*.png' -print0 | xargs -0 cat | wc -c | tr -d ' ')
+    total_bytes=$((total_bytes + bytes))
+    awk -v z="$z" -v c="$count" -v b="$bytes" \
+      'BEGIN { printf "  zoom %-3s %6d tiles %9.1f MB\n", z, c, b / 1000000 }'
+  done
+  awk -v b="$total_bytes" -v s="$(($(date +%s) - STARTED_AT))" \
+    'BEGIN { printf "  total %.1f MB, built in %d min %d s\n", b / 1000000, s / 60, s % 60 }'
+}
+
+# ------------------------------------------------------------------------------
+# Main
+# ------------------------------------------------------------------------------
+
+check_prerequisites
+
+if [ -n "${MAP_TILES_WORK_DIR:-}" ]; then
+  WORK_DIR="$MAP_TILES_WORK_DIR"
+  KEEP_WORK_DIR=1
+  mkdir -p "$WORK_DIR"
+else
+  mkdir -p "${REPO_ROOT}/tmp"
+  WORK_DIR="$(mktemp -d "${REPO_ROOT}/tmp/map_tiles_build.XXXXXX")"
+fi
+WORK_DIR="$(cd "$WORK_DIR" && pwd)"
+log "Working in ${WORK_DIR}"
+
+configure_docker_client
+pull_images
+
+run_step download_osm_data
+run_step extract_area
+run_step download_water_polygons
+run_step build_vector_tiles
+run_step patch_style
+run_step render_tiles
+docker rm -f "$RENDER_CONTAINER" >/dev/null 2>&1 || true
+run_step compress_tiles
+run_step check_sea_drawn
+run_step write_manifest
+install_tiles
+print_summary
+
+log "Done. Credit on every map page: ${ATTRIBUTION}"
