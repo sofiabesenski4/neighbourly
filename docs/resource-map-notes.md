@@ -30,6 +30,17 @@ Still to do, each as one commit that's reviewed before it's made:
    add a "You are here" marker. Pins and tiles share one world-pixel coordinate system, using
    the Web Mercator formulas, so pins line up exactly.
 
+**Map direction (product preference):** favour a map zoomed in enough to read, showing
+downtown or the area around the chosen location, over one that fits everything. Anything
+outside it gets a direction arrow at the border, like a video game objective marker. So
+without a location, default to downtown rather than the whole region. This replaces the
+"area-wide view" in step 2. Zooms 11–13 may then go unused and could be dropped to shrink
+the tiles.
+
+**Map labels:** pins show numbers only, and border arrows show a number and a distance.
+The number-to-name list is undecided. Leaning toward removing it depending on space, so
+generate the map page both with and without it, on real data, and compare before deciding.
+
 The design mockup and proposal are older than this plan. Where they differ, this plan wins.
 
 ## Decisions to revisit
@@ -133,8 +144,51 @@ The design mockup and proposal are older than this plan. Where they differ, this
 - Rainbow Kitchen is listed under Victoria, but the geocoder places it in Esquimalt.
   The match looks right, but the printed city would be wrong.
 
+### Map tiles
+
+- **Replace the coastline data.** The official host (`osmdata.openstreetmap.de`) was down for
+  the whole build, so the water comes from an unofficial January 2022 copy at Ifremer, and
+  its `.dbf` was regenerated locally, holding no geography. Streets are from 5 Nov 2026.
+  Nothing looked wrong downtown, but it wasn't compared against current data. Rebuild when
+  the official host is back. The copy was deleted, so a rerun needs that host, and the
+  script's official-download path has never run for real.
+- 4,470 tiles, about 55 MB, kept in plain git at `lib/map_tiles/`. Not `vendor/`, because the
+  Dockerfile's `COPY vendor/* ./vendor/` flattens folders and invalidates its gem cache, and
+  not `tmp/`, which deploys exclude. Rebuilding adds another copy to git history forever, so
+  rebuild rarely. Zooms 11–13 total only 3.4 MB, so dropping them saves little.
+- Credit must read `© OpenMapTiles © OpenStreetMap contributors`, near the printed map. The
+  manifest also has a `style_credit` for the Positron style, which should be somewhere readers
+  can find it. The water polygons' own license wasn't checked.
+- The tiles' `manifest.json` doesn't match what `MapView` expects: it has a `zooms` array with
+  `covered_bounds`, not a hash keyed by zoom. The drawing step needs to convert it.
+- Tiles are 8-bit palette PNGs and haven't been tried in Prawn yet. Seams line up; a scan
+  flagged 104 of 8,671, of which the 3 worst viewed were just labels ending on a seam.
+- Map content quirks: no US roads, so San Juan Island is a bare coastline at the edge; "Sidney"
+  is missing at zoom 11; a ferry label reads "PORT ANGELES VICTORIA" over the water; and marina
+  dock letters appear at zoom 15. Most street names only appear by zoom 15.
+- The tile build needs about 6 GB free, and Homebrew's `colima` leaves about 1.3 GB in
+  `~/.colima` after stopping. `colima delete` removes it.
+
 ### Map (not built yet)
 
+- `MapProjection`, `MapView` and `MapPinLayout` have only been tested on their own, not
+  against real tiles or a printed page. Their sizes are assumptions to check on paper:
+  14 pt pins, 28 pt edge markers, and a scale range of 0.6–1.2 chosen to keep map text
+  readable and tiles at 120 dpi or better.
+- Near the edge of zoom 16's coverage, a small radius can leave a blank strip in the frame.
+  A 30 m radius left 68 pt blank on the right of a 525 pt frame. A lower-zoom underlay or
+  requiring coverage of the whole frame would fix it.
+- A short frame makes the area-wide map too small to read: 525 × 400 pt gives about 4.5 pt
+  map text, while 525 × 650 pt gives a usable scale. Plan the page around a tall map.
+- `MapView` assumes the manifest has `min_zoom`, `max_zoom` and `zooms: {z => {south, west,
+  north, east}}`, and that a tile exists if it overlaps those bounds. The tile build must
+  match this, and the drawing step should cope with a missing file.
+- Coverage of a centred map is checked using the rectangle around its circle, so a corner
+  can trigger a less detailed zoom even when the circle itself fits.
+- There's no wrapping across the 180° meridian. That's fine for Victoria, but an arrow for
+  a resource very far away could point the long way round.
+- Pins whose group would be too spread out stay separate, so downtown pins just over the
+  merge distance will partly overlap.
 - Downtown pins will crowd together. Many resources are within a few blocks of each
   other, and several in the sample share an address (713 Johnson St). A downtown
   inset may be needed.
@@ -203,11 +257,9 @@ Not part of the current goal, but easy to add later:
   around. Specs that depend on layout pass locally and fail in CI. To match CI, move
   `app/assets/builds/tailwind.css` aside and run the specs. Adding `bin/rails tailwindcss:build` to
   the workflow would fix it properly, which is the team's call.
-- **Not installed yet:** Docker (via `colima`), `osmium`, `tilemaker` and Git LFS.
-  All are only needed for building tiles. `tilemaker` isn't in Homebrew, so it needs a
-  container image or a source build.
-- **App Dockerfile:** it has `COPY vendor/* ./vendor/`, which flattens one directory level.
-  Check how that treats `vendor/map_tiles/` before saving tiles there, or pick another folder.
+- **Tile build tools:** `colima`, `docker` and `osmium-tool` from Homebrew, used only to run
+  `script/build_map_tiles`. The app never needs them. `tilemaker` and `tileserver-gl` run in
+  containers pinned by digest in the script. Git LFS isn't used.
 - **`trufflehog`:** the pre-commit hook needs it. It's 3.99.8 locally and 3.99.7 in CI.
 - **Local data:** the development database has no documents.
 - **Local embeddings need the UVic VPN:** the configured embedding service,
