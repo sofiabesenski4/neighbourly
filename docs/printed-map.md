@@ -38,7 +38,10 @@ deliberate: a map zoomed in enough to read is preferred over one that fits every
 A location partly on the tiles keeps its own map, with a blank part where the tiles end. In the
 last row of the table, the page doesn't tell the reader that the map shows somewhere else.
 
-The location isn't marked on the map yet, so a reader has to assume it's the middle.
+A chosen location gets a "You are here" marker at the middle of the map: a target ring with a
+label. It doesn't look like a pin, so it can't be mistaken for a resource, and it's drawn under the
+pins so it never hides a number. There's no marker for a downtown map, including the last row of
+the table, where the location is off the page.
 
 ## How a page gets drawn
 
@@ -61,8 +64,8 @@ FlyersController
 4. `MapView` chooses a zoom and scale for that frame, and which tiles it needs.
 5. `MapPinLayout` sorts the resources into pins, edge markers and "not shown".
 6. `FlyerMapPage` measures the arrow labels and asks for more merging if any would overlap.
-7. `FlyerMapPage` draws the tiles, the border, the pins, the arrows, the scale bar, the credit and
-   the list.
+7. `FlyerMapPage` draws the tiles, the border, the "You are here" marker, the pins, the arrows, the
+   scale bar, the credit and the list.
 
 `MapView`, `MapPinLayout` and `MapProjection` know nothing about Prawn or the database, so they
 can be tested with plain numbers. All the Prawn drawing for the map is in `FlyerMapPage`.

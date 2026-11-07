@@ -160,6 +160,44 @@ RSpec.describe FlyerMapPage do
     end
   end
 
+  describe "the You are here marker" do
+    let(:location) { GeoPoint.new(lat: 48.4300, lng: -123.3500) }
+
+    def texts_on(reader)
+      reader.pages.first.runs.map(&:text).join(" ")
+    end
+
+    it "marks a chosen location at the middle of the map" do
+      pdf = document
+      described_class.new(pdf, items: [item(1)], centre: location).draw
+      run = PDF::Reader.new(StringIO.new(pdf.render)).pages.first.runs.find { |text_run| text_run.text.include?("You are here") }
+
+      expect(run.x + run.width / 2).to be_within(1).of(FlyerPdf::MARGIN + pdf.bounds.width / 2)
+    end
+
+    it "shows no marker without a chosen location" do
+      expect(texts_on(draw([item(1)]))).not_to include("You are here")
+    end
+
+    # The map falls back to downtown here, so the location isn't on the page.
+    it "shows no marker for a location with no tiles" do
+      vancouver = GeoPoint.new(lat: 49.2827, lng: -123.1207)
+
+      expect(texts_on(draw([item(1)], centre: vancouver))).not_to include("You are here")
+    end
+
+    it "draws the marker before the pins, so it can't hide a pin at the same place" do
+      page = described_class.new(document, items: [item(1, point: location)], centre: location)
+      allow(page).to receive(:draw_you_are_here).and_call_original
+      allow(page).to receive(:draw_pin).and_call_original
+
+      page.draw
+
+      expect(page).to have_received(:draw_you_are_here).ordered
+      expect(page).to have_received(:draw_pin).ordered
+    end
+  end
+
   it "continues a very long not-shown list on another page, keeping every name" do
     items = (1..600).map { |number| item(number, title: "Resource name #{number}", point: nil) }
     reader = draw(items)

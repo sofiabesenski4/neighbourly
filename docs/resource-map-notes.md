@@ -11,7 +11,7 @@ travel time from the user's location.
 
 ### Where things stand
 
-Branch `feat/resource-map`, built on `main`, local only and never pushed.
+Branch `feat/resource-map`, built on `main`, pushed with no PR opened yet.
 
 | Done and committed | Commit |
 |---|---|
@@ -23,10 +23,10 @@ Branch `feat/resource-map`, built on `main`, local only and never pushed.
 | Stored tiles in `lib/map_tiles/`, the build script, and `docs/map-tiles.md` | `6e5a63b` |
 | `MapProjection`, `MapView` and `MapPinLayout` | `d9c3439` |
 | Final map page with numbered pins (`FlyerMapPage`, `MapTileSet`, `docs/printed-map.md`) | "Print a map with pins numbered to match the cards" |
-
 | Border arrows for off-map resources | "Point to off-map resources from the map's border" |
+| "You are here" marker | "Mark the chosen location on the printed map" |
 
-**The printout has a map with pins and arrows.** Only the "You are here" marker below remains.
+**The planned map is finished.** Only the decisions and checks below remain.
 
 ### How to work (the user's rules)
 
@@ -41,9 +41,7 @@ Branch `feat/resource-map`, built on `main`, local only and never pushed.
   come up. Use agents where work is independent. Keep replies short: the user is watching tokens.
 - Before browser specs, run `yarn build`. They use real Chrome and need current JavaScript.
 
-### Next: draw the map (each is one commit)
-
-1. **Mark the chosen location.** A "You are here" marker when a location was given.
+### Next
 
 **Later (the user wants this, approach not chosen):** change the map's area for guides where the
 fixed view doesn't work. Either zoom out when the location isn't in range, or zoom to where the
@@ -69,7 +67,7 @@ map has only been viewed on screen.
 
 The team still needs to decide on confidential addresses before the map ships, which the user
 set aside for now. Coastline data should be rebuilt once the official host is back. The branch
-hasn't been pushed or had a PR opened.
+hasn't had a PR opened.
 
 The design mockup and proposal are older than this plan. Where they differ, this plan wins.
 
@@ -108,10 +106,9 @@ DataBC through its [contact form](https://forms.gov.bc.ca/databc-contact-us/).
   ships.
 - **Geocoder limits:** the public limit is 1,000 requests a minute with no key. A
   free key gives higher limits if we ever need them. The code doesn't send a key.
-- **Git LFS for tiles:** not decided. Tiles could reach 60–150 MB (an estimate, not
-  measured). LFS needs GitHub storage quota, and all developers, CI and Docker
-  builds would need it set up. Decide before the tile commit, because large files
-  are hard to remove from git history.
+- **Git LFS for tiles:** the tiles were committed in plain git, about 55 MB. LFS would need GitHub
+  storage quota, and all developers, CI and Docker builds would need it set up. Check the team is
+  OK with this before pushing, because large files are hard to remove from git history.
 - **Real data coverage:** we've only tested the 20-resource sample. We don't know
   how many production resources have usable street addresses.
 
@@ -224,13 +221,21 @@ DataBC through its [contact form](https://forms.gov.bc.ca/databc-contact-us/).
   the chosen location or downtown, on stored tiles. Only the pins change with the resources, so a
   guide whose resources are all far from downtown prints a map with only arrows. This follows the
   "zoomed in, not fit everything" preference, and the user may revisit it.
+- **Numbers belong to resources, not cards.** A resource in two categories keeps the number from
+  its first card, so it has one pin. That means later categories can read out of order, such as
+  "7, then 1". The user tried numbering every card 1 to n and chose this, to avoid repeated numbers
+  on pins.
+- **A pin at the chosen location can cover most of the "You are here" ring.** Pins are drawn on top
+  so their numbers stay readable, and the label above still shows. With 919 Pandora Ave as the
+  location, "4, 19" covers the ring and "15" touches the label. "You are here" could also be wrong
+  for someone printing for another person, such as an outreach worker.
 - **No number-to-name list.** The user compared both and removed it. It made the map short enough
   to drop to zoom 14, and readers can match a pin's number to a card.
 - The user printed a guide from Chrome through the real screens, and the map centred on their
   location. That was on screen, not on paper.
 - **A location with no tiles shows downtown instead.** The chosen fallback, rather than an empty
   box, but the page doesn't say so. A location partly on the tiles keeps its own map, with a blank
-  part. The "You are here" marker will need to handle both.
+  part. The "You are here" marker shows on the partial map, but not on the downtown one.
 - The radius is 1.3 km, not the 1.5–2 km first suggested. At 1.5 km the map drops to zoom 14,
   which has few street names. The frame must also stay tall enough: at about 470 pt it dropped to
   zoom 14, so anything printed under the map that takes much space costs the street names.
