@@ -1,7 +1,7 @@
 # Decides what to draw for each numbered resource on a printed map: a pin, an arrow at the
 # map's edge, or an entry in the "not shown on map" list.
 #
-# Architecture: the PDF step gives this a MapView and the guide's numbered resources, then
+# Architecture: FlyerMapPage gives this a MapView and the guide's numbered resources, then
 # draws the plain values it returns. It uses MapView for all positions, so pins stay lined
 # up with the tiles. It knows nothing about Prawn or the database.
 #
@@ -16,14 +16,15 @@
 #   layout.edge_markers  # MapPinLayout::EdgeMarker values
 #   layout.not_shown     # MapPinLayout::NotShown values
 class MapPinLayout
-  # All three sizes are in page points, and assume a pin about 14 points wide and an edge
-  # marker about 28 points wide. Those sizes are estimates, because the drawing step hasn't
-  # been written. If it draws them much larger or smaller, these should change to match.
+  # All three sizes are in page points. FlyerMapPage draws pins 14 points wide. The edge
+  # marker's 28 points is still an estimate, because nothing draws those yet. If these are
+  # drawn much larger or smaller, the values below should change to match.
 
-  # Pins closer than this share one pin. Pins this close overlap so much that their digits
-  # would print on top of each other. It's a bit under half a pin's width. Pins further
-  # apart overlap partly, but both numbers can still be made out.
-  PIN_MERGE_DISTANCE = 6.0
+  # Pins closer than this share one pin, because one would cover the other's number. A pin
+  # reaches 7 points from its middle, and a digit reaches about 3 from the other pin's, so
+  # at least 10 is needed. An earlier 6 proved too small on a real printout: two pins 8
+  # points apart left one number completely hidden.
+  PIN_MERGE_DISTANCE = 10.0
 
   # How far inside the border the middle of an edge marker sits. It's half the marker's
   # width, which keeps the whole marker inside the frame.
