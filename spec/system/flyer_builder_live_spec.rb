@@ -19,6 +19,8 @@ RSpec.describe "Live resource guide builder", type: :system do
     source.documents.create!(title: "Gamma noticeboard", content: "Noticeboard", metadata: {})
   end
 
+  # Distance checks allow any space after the label. CI doesn't build the stylesheet, so there
+  # the label and value land on separate lines, and that layout isn't what they're testing.
   # Most examples here are about the second screen, so they skip the location one.
   def visit_builder
     visit new_flyer_path
@@ -239,10 +241,10 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_text("Distances from: 919 Pandora Ave.")
-      expect(page).to have_css("article", text: "Distance: 1.1 km straight-line, about 17 min walk")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
       expect(page).to have_text("1 resource · 1 card")
-      expect(page).to have_css("article", text: "Distance: 1.1 km straight-line, about 17 min walk")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       click_button "Generate printout"
 
       expect(page).to have_link("Open PDF", href: /\Ablob:/)
@@ -334,14 +336,14 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       visit_location_screen
       continue_with_place("919 Pandora Ave")
-      expect(page).to have_css("article", text: "Distance: 1.1 km")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.41, lng: -123.36))
       click_button "Change"
       continue_with_place("535 Ellice St")
 
       expect(page).to have_text("Distances from: 535 Ellice St.")
-      expect(page).to have_css("article", text: "Distance: 2.2 km")
+      expect(page).to have_css("article", text: /Distance:\s+2\.2 km/)
     end
 
     # The location may be someone's home, so it must not end up in a URL.
@@ -358,7 +360,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       JAVASCRIPT
 
       continue_with_place("919 Pandora Ave")
-      expect(page).to have_css("article", text: "Distance: 1.1 km")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       urls = page.evaluate_script("window.previewUrls")
       expect(urls.join).to include("/flyers/preview")
@@ -415,7 +417,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         click_button "Use my location"
 
         expect(page).to have_text("Distances from your location (accurate to about 50 m).")
-        expect(page).to have_css("article", text: "Distance: 1.1 km straight-line, about 17 min walk")
+        expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
 
