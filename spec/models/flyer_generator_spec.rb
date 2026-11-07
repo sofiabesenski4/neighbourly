@@ -14,8 +14,18 @@ RSpec.describe FlyerGenerator do
     time = Time.current
     allow(CategorySearch).to receive(:call).with(categories: ["17"]).and_return(sections)
     renderer = instance_double(FlyerPdf, render: "%PDF-real")
-    expect(FlyerPdf).to receive(:new).with(sections: sections, printed_at: time).and_return(renderer)
+    expect(FlyerPdf).to receive(:new).with(sections: sections, origin: nil, printed_at: time).and_return(renderer)
 
     expect(described_class.call(categories: ["17"], printed_at: time)).to eq("%PDF-real")
+  end
+
+  it "passes the place to measure distances from to the PDF renderer" do
+    sections = [CategorySearch::Section.new(category: Category.new(name: "Food"), resources: [Document.new])]
+    origin = FlyerOrigin.new(label: "919 Pandora Ave", point: GeoPoint.new(lat: 48.42, lng: -123.35))
+    allow(CategorySearch).to receive(:call).and_return(sections)
+    renderer = instance_double(FlyerPdf, render: "%PDF-real")
+    expect(FlyerPdf).to receive(:new).with(hash_including(origin: origin)).and_return(renderer)
+
+    described_class.call(categories: [], origin: origin)
   end
 end

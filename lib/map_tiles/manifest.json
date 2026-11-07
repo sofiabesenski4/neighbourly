@@ -1,0 +1,140 @@
+{
+  "tile_format": "png",
+  "tile_size": 512,
+  "pixel_ratio": 2,
+  "scheme": "xyz",
+  "path_template": "{z}/{x}/{y}.png",
+  "projection": "EPSG:3857",
+  "attribution": "© OpenMapTiles © OpenStreetMap contributors",
+  "attribution_links": [
+    "https://openmaptiles.org/",
+    "https://www.openstreetmap.org/copyright"
+  ],
+  "style_credit": "Style based on Positron (CC BY 4.0), © MapTiler and OpenMapTiles contributors, derived from CartoDB Basemaps (CC BY 3.0) by Stamen and Paul Norman for CartoDB Inc. Changed: fonts, darker label colours, greyscale.",
+  "zoom_levels": [11, 12, 13, 14, 15, 16],
+  "zoom_ranges": [
+    {
+      "name": "whole_area",
+      "min_zoom": 11,
+      "max_zoom": 15,
+      "bounds": {
+        "west": -123.65,
+        "south": 48.3,
+        "east": -123.2,
+        "north": 48.72
+      }
+    },
+    {
+      "name": "urban_core",
+      "min_zoom": 16,
+      "max_zoom": 16,
+      "bounds": {
+        "west": -123.45,
+        "south": 48.4,
+        "east": -123.28,
+        "north": 48.52
+      }
+    }
+  ],
+  "zooms": [
+    {
+      "zoom": 11,
+      "x_min": 320,
+      "x_max": 323,
+      "y_min": 705,
+      "y_max": 709,
+      "tile_count": 20,
+      "covered_bounds": {
+        "west": -123.75,
+        "south": 48.224673,
+        "east": -123.046875,
+        "north": 48.806863
+      }
+    },
+    {
+      "zoom": 12,
+      "x_min": 641,
+      "x_max": 646,
+      "y_min": 1411,
+      "y_max": 1418,
+      "tile_count": 48,
+      "covered_bounds": {
+        "west": -123.662109,
+        "south": 48.283193,
+        "east": -123.134766,
+        "north": 48.748945
+      }
+    },
+    {
+      "zoom": 13,
+      "x_min": 1282,
+      "x_max": 1292,
+      "y_min": 2822,
+      "y_max": 2837,
+      "tile_count": 176,
+      "covered_bounds": {
+        "west": -123.662109,
+        "south": 48.283193,
+        "east": -123.178711,
+        "north": 48.748945
+      }
+    },
+    {
+      "zoom": 14,
+      "x_min": 2564,
+      "x_max": 2585,
+      "y_min": 5645,
+      "y_max": 5674,
+      "tile_count": 660,
+      "covered_bounds": {
+        "west": -123.662109,
+        "south": 48.297812,
+        "east": -123.178711,
+        "north": 48.734455
+      }
+    },
+    {
+      "zoom": 15,
+      "x_min": 5129,
+      "x_max": 5170,
+      "y_min": 11291,
+      "y_max": 11349,
+      "tile_count": 2478,
+      "covered_bounds": {
+        "west": -123.651123,
+        "south": 48.297812,
+        "east": -123.189697,
+        "north": 48.727209
+      }
+    },
+    {
+      "zoom": 16,
+      "x_min": 10294,
+      "x_max": 10325,
+      "y_min": 22639,
+      "y_max": 22672,
+      "tile_count": 1088,
+      "covered_bounds": {
+        "west": -123.453369,
+        "south": 48.396385,
+        "east": -123.277588,
+        "north": 48.520243
+      }
+    }
+  ],
+  "total_tiles": 4470,
+  "built_at": "2026-11-07T02:07:04Z",
+  "sources": {
+    "openstreetmap": {
+      "url": "https://download.geofabrik.de/north-america/canada/british-columbia-261105.osm.pbf",
+      "data_date": "2026-11-05T21:23:02Z"
+    },
+    "water_polygons": {
+      "url": "https://cyclobs.ifremer.fr/static/sarwing_datarmor/xsardata/water-polygons-split-4326 (unofficial copy of osmdata.openstreetmap.de water-polygons-split-4326; .shp and .shx from there, .dbf regenerated locally because the host refused it, and it holds no geographic data)",
+      "data_date": "2022-01-26T01:00:00Z"
+    },
+    "style": "positron-gl-style v1.9",
+    "tilemaker_image": "ghcr.io/systemed/tilemaker@sha256:9cd8728a37a31c8a5205e091cedd3ff2c2c450c57e1ce3e5b58916185540ebba",
+    "tileserver_image": "maptiler/tileserver-gl:v5.7.0@sha256:24d0364e1d40da0ae3fb3269f617c26e36a883ad4b7454e5c4064a8795bfc807"
+  }
+}

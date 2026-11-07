@@ -92,6 +92,13 @@ RSpec.describe "Documents", type: :request do
         expect(doc.content).to include("Description: Drop-in centre offering meals and shelter")
       end
 
+      # Checks the real form path end to end: submitting the form ends with a lookup
+      # queued. document_spec.rb covers the rules for when a lookup is needed.
+      it "queues a coordinate lookup for the new resource's address" do
+        expect { post documents_path, params: valid_params }
+          .to have_enqueued_job(GeocodeDocumentJob)
+      end
+
       it "creates a document with correct metadata" do
         post documents_path, params: valid_params
 

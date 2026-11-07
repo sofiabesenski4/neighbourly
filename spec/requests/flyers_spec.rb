@@ -54,7 +54,7 @@ RSpec.describe "Flyers", type: :request do
       get new_flyer_path
 
       document = Nokogiri::HTML(response.body)
-      layout = document.at_css('[data-controller="flyer-builder"] form > div:last-child')
+      layout = document.at_css('[data-flyer-builder-target="builderStep"] > div:last-child')
       filters = document.at_css('aside[aria-label="Resource filters"]')
       selected_label = document.at_css('label:has(input[data-flyer-builder-target="category"])')
 
@@ -67,7 +67,7 @@ RSpec.describe "Flyers", type: :request do
 
   describe "POST /flyers" do
     it "hands the selected categories to the generator" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s]).and_return(nil)
+      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: ["", food.id.to_s, harm_reduction.id.to_s]}}
 
@@ -87,7 +87,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when nothing is selected" do
-      expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
 
       post flyers_path, params: {flyer: {categories: [""]}}
 
@@ -96,7 +96,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when no flyer params are sent" do
-      expect(FlyerGenerator).to receive(:call).with(categories: []).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
 
       post flyers_path
 
@@ -183,7 +183,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "explains when the complete guide has no available resources" do
-      allow(FlyerGenerator).to receive(:call).with(categories: []).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return(nil)
 
       post flyers_path, headers: {"Accept" => "application/pdf"}
 
@@ -192,7 +192,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "shows the same complete-guide message after a standard form submission" do
-      allow(FlyerGenerator).to receive(:call).with(categories: []).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: [""]}}
       expect(response).to redirect_to(new_flyer_path)
@@ -213,6 +213,147 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).not_to include("Internal connection details")
     end
 
+    # The whole path from a submitted location to the generated PDF. Only the outside
+    # service is faked: the query, card and PDF code all run for real.
+    context "with a place to measure distances from" do
+      let(:pdf_headers) { {"Accept" => "application/pdf"} }
+
+      before do
+        allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+        Source.create!(name: "Local", source_type: "api").documents.create!(
+          title: "Community meal", content: "Community meal", categories: [food],
+          metadata: {address: "1 Test St", lat: 48.43, lng: -123.36}
+        )
+      end
+
+      def pdf_text
+        PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
+      end
+
+      it "prints distances from the place that was entered" do
+        expect(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC")
+          .and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
+
+        post flyers_path, params: {flyer: {near: "919 Pandora Ave"}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(pdf_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km straight-line, about 17 min walk")
+      end
+
+      it "doesn't look anything up when no place was entered" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post flyers_path, params: {flyer: {near: "  "}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(pdf_text).not_to include("Distance")
+      end
+
+      it "asks for a correction when the place can't be found" do
+        allow(Geocoder).to receive(:locate).and_return(nil)
+        expect(FlyerGenerator).not_to receive(:call)
+
+        post flyers_path, params: {flyer: {near: "Central Library"}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"].join).to include("couldn't find that location", "Douglas St and Yates St")
+      end
+
+      it "shows the form again with the typed text when submitted without JavaScript" do
+        allow(Geocoder).to receive(:locate).and_return(nil)
+
+        post flyers_path, params: {flyer: {near: "Central Library"}}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        document = Nokogiri::HTML(response.body)
+        expect(document.at_css('[role="alert"]').text).to include("couldn't find that location")
+        expect(document.at_css('input[name="flyer[near]"]')["value"]).to eq("Central Library")
+      end
+
+      it "still prints, without distances, when the geocoder is down" do
+        allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable, "HTTP 503")
+
+        post flyers_path, params: {flyer: {near: "919 Pandora Ave"}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(pdf_text).to include("Community meal", "Distances aren't shown")
+        expect(pdf_text).not_to include("Distance:")
+      end
+
+      it "rejects a location that isn't text" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post flyers_path, params: {flyer: {near: ["919 Pandora Ave"]}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"]).to include("Near must be text")
+      end
+
+      it "rejects an unreasonably long location before looking it up" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post flyers_path, params: {flyer: {near: "a" * 201}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+
+      it "prints distances from the device's location without calling the geocoder" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post flyers_path, params: {flyer: {lat: "48.420", lng: "-123.360"}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(pdf_text).to include("Distances are from your location", "Distance: 1.1 km straight-line, about 17 min walk")
+        expect(pdf_text).not_to include("48.42", "123.36")
+      end
+
+      # The first screen already looked this place up, so printing shouldn't repeat it.
+      it "uses a checked place's coordinates without looking it up again" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post flyers_path, params: {flyer: {near: "919 Pandora Ave", lat: "48.420", lng: "-123.360"}}, headers: pdf_headers
+
+        expect(pdf_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km")
+      end
+
+      it "treats the page's blank hidden fields as no device location" do
+        post flyers_path, params: {flyer: {near: "", lat: "", lng: ""}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(pdf_text).not_to include("Distance")
+      end
+
+      it "rejects an unusable device location" do
+        expect(FlyerGenerator).not_to receive(:call)
+
+        post flyers_path, params: {flyer: {lat: "999", lng: "-123.360"}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"].join).to include("couldn't read your device's location")
+      end
+
+      it "rejects coordinates that aren't text" do
+        post flyers_path, params: {flyer: {lat: ["48.42"], lng: "-123.36"}}, headers: pdf_headers
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body["errors"]).to include("Lat must be text")
+      end
+
+      # A location may be someone's home, so it must not reach the logs.
+      it "filters the location from logged parameters" do
+        filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+
+        expect(filter.filter("flyer" => {"near" => "919 Pandora Ave", "lat" => "48.42", "lng" => "-123.36"}))
+          .to eq("flyer" => {"near" => "[FILTERED]", "lat" => "[FILTERED]", "lng" => "[FILTERED]"})
+      end
+
+      it "doesn't hide unrelated parameters whose names contain lat" do
+        filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
+
+        expect(filter.filter("template" => "a")).to eq("template" => "a")
+      end
+    end
+
     it "lets a programming error in PDF generation fail visibly" do
       allow(FlyerGenerator).to receive(:call).and_raise(NoMethodError, "Unexpected renderer bug")
 
@@ -222,12 +363,142 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
+  # The check behind the first screen's Continue button. It only says whether a place
+  # can be found, so that the person can correct it before choosing categories.
+  describe "POST /flyers/locate" do
+    def locate(near)
+      post locate_flyers_path(format: :json), params: {flyer: {near: near}}
+    end
+
+    it "returns a found place's coordinates, rounded to about 100 m" do
+      expect(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC")
+        .and_return(GeoPoint.new(lat: 48.4271129, lng: -123.3577635))
+
+      locate("919 Pandora Ave")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq("located" => true, "lat" => 48.427, "lng" => -123.358)
+    end
+
+    it "explains what to try when a place can't be found" do
+      allow(Geocoder).to receive(:locate).and_return(nil)
+
+      locate("Central Library")
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"].join).to include("couldn't find that location", "Douglas St and Yates St")
+    end
+
+    it "treats a blank place as not found, without calling the geocoder" do
+      expect(Geocoder).not_to receive(:locate)
+
+      locate("  ")
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    it "lets the person carry on when the geocoder is down" do
+      allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable, "HTTP 503")
+
+      locate("919 Pandora Ave")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.parsed_body).to eq("located" => false)
+    end
+
+    it "rejects unreasonably long text before calling the geocoder" do
+      expect(Geocoder).not_to receive(:locate)
+
+      locate("a" * 201)
+
+      expect(response).to have_http_status(:unprocessable_content)
+    end
+
+    it "rejects a place that isn't text" do
+      expect(Geocoder).not_to receive(:locate)
+
+      post locate_flyers_path(format: :json), params: {flyer: {near: ["919 Pandora Ave"]}}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to include("Near must be text")
+    end
+
+    it "limits checks per connection, with an error the page can show" do
+      allow(Geocoder).to receive(:locate).and_return(nil)
+
+      60.times { locate("Somewhere") }
+      expect(response).to have_http_status(:unprocessable_content)
+
+      locate("Somewhere")
+      expect(response).to have_http_status(:too_many_requests)
+      expect(response.parsed_body["errors"].join).to include("try again later")
+    end
+  end
+
   describe "GET /flyers/preview" do
     before do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
       source = Source.create!(name: "Local", source_type: "api")
       source.documents.create!(title: "Community meal", content: "Community meal", categories: [food], metadata: {notes: "Call ahead"})
       source.documents.create!(title: "Unrelated clinic", content: "Clinic", categories: [health])
+    end
+
+    # The preview should show the same distances as the printout, using the same card
+    # code. It must never call the geocoder: it runs each time a category changes.
+    context "with a chosen location" do
+      before do
+        Document.find_by!(title: "Community meal").update_columns(metadata: {lat: 48.43, lng: -123.36})
+      end
+
+      def card_fields(title)
+        cards = response.parsed_body["categories"].flat_map { |category| category["resources"] }
+        cards.find { |card| card["title"] == title }["fields"]
+      end
+
+      it "shows distances from coordinates sent in the request body" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post preview_flyers_path(format: :json), params: {flyer: {lat: "48.420", lng: "-123.360"}}
+
+        expect(response).to have_http_status(:ok)
+        expect(card_fields("Community meal"))
+          .to include({"label" => "Distance", "value" => "1.1 km straight-line, about 17 min walk"})
+      end
+
+      it "applies the selected categories and the location together" do
+        post preview_flyers_path(format: :json), params: {flyer: {categories: [food.id.to_s], lat: "48.420", lng: "-123.360"}}
+
+        titles = response.parsed_body["categories"].flat_map { |category| category["resources"].map { |card| card["title"] } }
+        expect(titles).to eq(["Community meal"])
+        expect(card_fields("Community meal").map { |field| field["label"] }).to include("Distance")
+      end
+
+      it "has no distance row for a resource whose location isn't known" do
+        post preview_flyers_path(format: :json), params: {flyer: {lat: "48.420", lng: "-123.360"}}
+
+        expect(card_fields("Unrelated clinic").map { |field| field["label"] }).not_to include("Distance")
+      end
+
+      it "shows no distances without coordinates" do
+        get preview_flyers_path(format: :json)
+
+        expect(card_fields("Community meal").map { |field| field["label"] }).not_to include("Distance")
+      end
+
+      it "ignores a typed place rather than calling the geocoder" do
+        expect(Geocoder).not_to receive(:locate)
+
+        post preview_flyers_path(format: :json), params: {flyer: {near: "919 Pandora Ave"}}
+
+        expect(response).to have_http_status(:ok)
+        expect(card_fields("Community meal").map { |field| field["label"] }).not_to include("Distance")
+      end
+
+      it "rejects unusable coordinates" do
+        post preview_flyers_path(format: :json), params: {flyer: {lat: "999", lng: "-123.360"}}
+
+        expect(response).to have_http_status(:unprocessable_content)
+      end
     end
 
     it "redirects a filtered HTML preview to the builder with its selection" do

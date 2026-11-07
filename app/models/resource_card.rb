@@ -5,10 +5,25 @@ class ResourceCard
   CONTENT_LABELS = ["City", "Address", "Phone", "Email", "Website", "Hours",
     "Age range", "Gender", "Categories", "Description", "Notes", "Intake", "Beds"].freeze
 
+  # Assumes about 5 km/h, a common estimate for walking. Many people using these
+  # guides may be slower, which is why the printout calls this an estimate.
+  WALKING_MINUTES_PER_KM = 12
+
+  # How much further someone walks than the straight line between two places, because
+  # they follow streets. On a grid, a trip along one street is 1.0 and a diagonal one is
+  # about 1.41, so 1.3 sits near a typical trip. It's an estimate that hasn't been measured
+  # against Victoria's streets, and it doesn't cover detours around water. See
+  # docs/resource-map-notes.md.
+  STREET_ROUTE_FACTOR = 1.3
+
   attr_reader :document
 
-  def initialize(document)
+  # The origin is optional. The preview and printout pass the same one, so they show
+  # the same distances. Without it, or when the resource's location isn't known, the
+  # card simply has no Distance row, like any other missing field.
+  def initialize(document, origin: nil)
     @document = document
+    @origin = origin
   end
 
   def title
@@ -22,6 +37,7 @@ class ResourceCard
       ["Services", value("description", "Description") || text(document.category_names)],
       ["Address", address && [address, city].compact.join(", ")],
       ["City", (city unless address)],
+      ["Distance", distance],
       ["Hours", value("hours", "Hours")],
       ["Phone", value("phone", "Phone", separator: "\n")],
       ["Email", value("email", "Email")],
@@ -42,6 +58,25 @@ class ResourceCard
   end
 
   private
+
+  # Like "1.0 km straight-line, about 16 min walk". Calculated from saved coordinates
+  # with no network call. The distance is labelled straight-line because that's what it
+  # measures, while the time allows for following streets.
+  def distance
+    return unless @origin&.located? && document.coordinates
+
+    km = @origin.point.distance_km_to(document.coordinates)
+    length = (km < 0.1) ? "Under 0.1 km" : "#{format("%.1f", km)} km"
+    "#{length} straight-line, about #{walking_time(km)} walk"
+  end
+
+  def walking_time(km)
+    minutes = [(km * STREET_ROUTE_FACTOR * WALKING_MINUTES_PER_KM).round, 1].max
+    return "#{minutes} min" if minutes < 60
+
+    hours, leftover = minutes.divmod(60)
+    leftover.zero? ? "#{hours} hr" : "#{hours} hr #{leftover} min"
+  end
 
   def value(key, legacy_label = nil, separator: ", ")
     text(document.metadata[key], separator: separator) || (text(content_fields[legacy_label], separator: separator) if legacy_label)

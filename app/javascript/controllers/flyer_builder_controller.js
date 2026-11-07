@@ -13,13 +13,40 @@ export default class extends Controller {
     "printError",
     "printout",
     "pdfLink",
+    "near",
+    "lat",
+    "lng",
+    "useLocation",
+    "locationStatus",
+    "locationNote",
+    "placeError",
+    "confirmPlaceButton",
+    "skipLocation",
+    "locationStep",
+    "locationHeading",
+    "builderStep",
+    "builderHeading",
+    "locationSummaryRow",
+    "locationSummary",
+    "subtitle",
   ];
-  static values = { previewUrl: String };
+  static values = { previewUrl: String, locateUrl: String };
 
   connect() {
     this.revision = (this.revision || 0) + 1;
     this.hasResults = false;
     this.generating = false;
+    this.locationRequest = 0;
+    // Browsers can restore a page's old field values, but not which screen it was on.
+    // Starting clean on the first screen means a location is never used invisibly.
+    this.forgetLocationChoice();
+    const supported = Boolean(navigator.geolocation);
+    this.useLocationTarget.hidden = !supported;
+    this.locationNoteTarget.hidden = !supported;
+    this.confirmPlaceButtonTarget.hidden = false;
+    this.skipLocationTarget.hidden = false;
+    this.showLocationStep();
+    // The guide loads behind the first screen, so it's ready when the person moves on.
     this.refresh();
   }
 
@@ -33,6 +60,7 @@ export default class extends Controller {
     this.previewRequest?.abort();
     this.printRequest?.abort();
     this.clearPrintout();
+    this.forgetLocationChoice();
     this.generateTarget.textContent = "Generate printout";
   }
 
@@ -49,6 +77,220 @@ export default class extends Controller {
     this.debounce = setTimeout(() => this.refresh(), 300);
   }
 
+  // The first screen: where distances are measured from. The person has to make a
+  // choice here, even if that choice is to skip, before seeing the second screen.
+  showLocationStep() {
+    this.locationStepTarget.hidden = false;
+    this.builderStepTarget.hidden = true;
+    this.locationSummaryRowTarget.hidden = true;
+    // "Choose what to include" describes the second screen, not this one.
+    this.subtitleTarget.hidden = true;
+  }
+
+  // The second screen: categories and preview, with a line saying what was chosen.
+  // Focus moves to its heading so keyboard and screen reader users follow the change.
+  // The preview reloads because its distances depend on the choice just made.
+  showBuilderStep(summary) {
+    this.locationSummaryTarget.textContent = summary;
+    this.locationSummaryRowTarget.hidden = false;
+    this.locationStepTarget.hidden = true;
+    this.builderStepTarget.hidden = false;
+    this.subtitleTarget.hidden = false;
+    this.builderHeadingTarget.focus();
+    this.refresh();
+  }
+
+  // Back to the first screen. Any printout is discarded, because its distances are
+  // for the choice being changed. Selected categories and the preview are kept.
+  changeLocation() {
+    this.discardPrintout();
+    this.showLocationStep();
+    this.locationHeadingTarget.focus();
+  }
+
+  skipLocation() {
+    this.forgetLocationChoice();
+    this.nearTarget.value = "";
+    this.showBuilderStep("Distances won't be shown on your printout.");
+  }
+
+  // Typing a place replaces any device location, so only one is ever sent.
+  locationChanged() {
+    this.forgetLocationChoice();
+  }
+
+  // Checks a typed place before moving on, so a place we can't find is corrected here
+  // rather than discovered after choosing categories. The coordinates it returns are
+  // kept for the preview and printout, so the place is only looked up this once.
+  async confirmPlace() {
+    const place = this.nearTarget.value.trim();
+    this.forgetLocationChoice();
+    if (!place) {
+      this.showPlaceError(
+        "Enter a street address or intersection, or choose another option.",
+      );
+      return;
+    }
+
+    const request = this.locationRequest;
+    this.placeCheck = new AbortController();
+    this.setCheckingPlace(true);
+    const body = new FormData();
+    body.append("flyer[near]", place);
+    try {
+      const response = await fetch(this.locateUrlValue, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "X-CSRF-Token":
+            document.querySelector('meta[name="csrf-token"]')?.content || "",
+        },
+        credentials: "same-origin",
+        body,
+        signal: this.placeCheck.signal,
+      });
+      const data = await response.json();
+      if (request !== this.locationRequest) return;
+      this.setCheckingPlace(false);
+      if (!response.ok) {
+        this.showPlaceError(data.errors.join(" "));
+      } else if (data.located) {
+        this.latTarget.value = data.lat;
+        this.lngTarget.value = data.lng;
+        this.showBuilderStep(`Distances from: ${place}.`);
+      } else {
+        // The geocoder is down. The guide can still print, so this shouldn't stop
+        // the person. The printout itself explains any missing distances.
+        this.showBuilderStep(
+          `We can't check ${place} right now, so your printout may not show distances.`,
+        );
+      }
+    } catch (error) {
+      if (error.name === "AbortError" || request !== this.locationRequest)
+        return;
+      this.setCheckingPlace(false);
+      this.showPlaceError(
+        "We couldn't check that place. Check your connection and try again.",
+      );
+    }
+  }
+
+  setCheckingPlace(checking) {
+    this.confirmPlaceButtonTarget.disabled = checking;
+    this.confirmPlaceButtonTarget.textContent = checking
+      ? "Checking…"
+      : "Continue";
+  }
+
+  showPlaceError(message) {
+    this.placeErrorTarget.textContent = message;
+    this.placeErrorTarget.hidden = false;
+  }
+
+  // A printout made for the previous location would show the wrong distances, so
+  // it's discarded as soon as the location changes. The preview stays as it is,
+  // because the location only affects the printout.
+  discardPrintout() {
+    this.printRequest?.abort();
+    this.clearPrintout();
+    this.printErrorTarget.hidden = true;
+  }
+
+  // Asks the browser where the device is. The browser shows its own permission prompt
+  // the first time, so the answer can take a while, or never come. Only a button press
+  // starts this: asking when the page loads would prompt people for no clear reason.
+  useMyLocation() {
+    this.forgetLocationChoice();
+    const request = this.locationRequest;
+    this.showLocationStatus("Finding your location…");
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        // The person typed a place or cleared this while the browser was working.
+        if (request !== this.locationRequest) return;
+        this.applyDevicePosition(position.coords);
+      },
+      (error) => {
+        if (request !== this.locationRequest) return;
+        this.showLocationStatus(
+          // 1 is the Geolocation API's PERMISSION_DENIED.
+          error.code === 1
+            ? "Location access is turned off for this site. You can type a nearby place instead."
+            : "We couldn't find your location. You can try again or type a nearby place instead.",
+        );
+      },
+      // A rough, recent position is enough, and much faster than waiting for GPS.
+      { timeout: 10000, maximumAge: 60000 },
+    );
+  }
+
+  // Rounds to 3 decimal places, about 100 m, before the position leaves the browser.
+  applyDevicePosition({ latitude, longitude, accuracy }) {
+    this.latTarget.value = latitude.toFixed(3);
+    this.lngTarget.value = longitude.toFixed(3);
+    this.nearTarget.value = "";
+    this.locationStatusTarget.hidden = true;
+    this.showBuilderStep(this.deviceLocationMessage(accuracy));
+  }
+
+  // Laptops estimate their position from nearby Wi-Fi and can be far off. Saying how
+  // accurate it is lets someone spot that before relying on the distances.
+  deviceLocationMessage(accuracy) {
+    if (accuracy >= 1000) {
+      const km = Math.round(accuracy / 1000);
+      return `Distances from your location, which may be off by about ${km} km. If that's too far, change it to a nearby place.`;
+    }
+    return `Distances from your location (accurate to about ${Math.round(accuracy)} m).`;
+  }
+
+  // Clears whichever location was chosen, along with any messages about it. Moving on
+  // the request number also makes any answer still on its way get ignored, so a late
+  // answer can't bring back a location the person has moved on from.
+  forgetLocationChoice() {
+    this.locationRequest += 1;
+    this.placeCheck?.abort();
+    this.setCheckingPlace(false);
+    this.latTarget.value = "";
+    this.lngTarget.value = "";
+    this.locationStatusTarget.textContent = "";
+    this.locationStatusTarget.hidden = true;
+    this.placeErrorTarget.textContent = "";
+    this.placeErrorTarget.hidden = true;
+  }
+
+  showLocationStatus(message) {
+    this.locationStatusTarget.textContent = message;
+    this.locationStatusTarget.hidden = false;
+  }
+
+  // With a location chosen, the preview needs it to show the same distances as the
+  // printout. It goes in a POST body rather than the URL, because web server logs
+  // record URLs, and this may be someone's home. Categories have to go in the body with
+  // it: Rails doesn't combine a `flyer` from the URL with one from the body, it keeps
+  // only the URL's, which would lose the location.
+  previewRequestOptions(categories, url) {
+    const headers = { Accept: "application/json" };
+    if (!this.hasLatTarget || !this.latTarget.value) {
+      categories.forEach((key) =>
+        url.searchParams.append("flyer[categories][]", key),
+      );
+      return { headers };
+    }
+
+    const body = new FormData();
+    categories.forEach((key) => body.append("flyer[categories][]", key));
+    body.append("flyer[lat]", this.latTarget.value);
+    body.append("flyer[lng]", this.lngTarget.value);
+    return {
+      method: "POST",
+      body,
+      headers: {
+        ...headers,
+        "X-CSRF-Token":
+          document.querySelector('meta[name="csrf-token"]')?.content || "",
+      },
+    };
+  }
+
   async refresh() {
     clearTimeout(this.debounce);
     const revision = ++this.revision;
@@ -58,14 +300,12 @@ export default class extends Controller {
     this.setLoading();
     const categories = this.selectedCategories();
     const url = new URL(this.previewUrlValue, window.location.origin);
-    categories.forEach((key) =>
-      url.searchParams.append("flyer[categories][]", key),
-    );
+    const options = this.previewRequestOptions(categories, url);
     try {
       const response = await fetch(url, {
-        headers: { Accept: "application/json" },
         credentials: "same-origin",
         signal: this.previewRequest.signal,
+        ...options,
       });
       const data = await response.json();
       if (!response.ok)
