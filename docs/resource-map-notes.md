@@ -44,6 +44,19 @@ The design mockup and proposal are older than this plan. Where they differ, this
 | Map tile source | Render our own from OpenStreetMap data | Not tried yet. OpenStreetMap's own tile servers forbid bulk downloads. If rendering is too much work, the fallback is drawing a plain map ourselves. |
 | Google Maps | Not used | Its terms forbid storing tiles and restrict caching geocodes. It also needs billing, and it keeps search terms, IP addresses and coordinates. |
 
+## Geocoder privacy
+
+The BC geocoder goes through DataBC's API gateway. Its
+[collection notice](https://github.com/bcgov/api-specs/blob/master/COLLECTION_NOTICE.md)
+says the province won't collect, use or disclose personal information through the gateway.
+It does store IP addresses temporarily, in Canada, for counting hits and for security only.
+
+Our server makes the call, not the person's browser, so the IP address the province stores
+is our server's and doesn't identify the person printing. The text of each lookup still
+leaves our server, which is why a typed location is never stored or logged on our side
+(`config/initializers/filter_parameter_logging.rb`). Questions about the notice go to
+DataBC through its [contact form](https://forms.gov.bc.ca/databc-contact-us/).
+
 ## Open questions
 
 - **Confidential addresses:** set aside for now at the project's request. Some
@@ -52,10 +65,6 @@ The design mockup and proposal are older than this plan. Where they differ, this
   sample data has no street address, so it wouldn't get a pin, but nothing stops a
   private address being entered. The team should decide on a rule before the map
   ships.
-- **Geocoder privacy:** we couldn't find whether the BC geocoder logs requests or
-  how long it keeps them. To find out, email DataBC at data@gov.bc.ca. This matters
-  most for a location typed by the person printing, which should never be stored
-  or logged on our side.
 - **Geocoder limits:** the public limit is 1,000 requests a minute with no key. A
   free key gives higher limits if we ever need them. The code doesn't send a key.
 - **Git LFS for tiles:** not decided. Tiles could reach 60–150 MB (an estimate, not
