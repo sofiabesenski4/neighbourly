@@ -3,6 +3,8 @@ require "prawn"
 # A measured, row-based layout. Cards stay at the agreed text sizes;
 # narrow and full-width measurements are cached for the duration of a render.
 # A card that exceeds a full page continues across pages without losing text.
+# Each resource gets one number for the guide, shown on its card and its pin on the final
+# map page, which FlyerMapPage draws. See docs/printed-map.md.
 class FlyerPdf
   MARGIN = 43.2
   GUTTER = 20.16
@@ -12,7 +14,13 @@ class FlyerPdf
   TITLE_SIZE = 13.5
   SECONDARY_SIZE = 10.5
   BOTTOM = 6
-  Entry = Data.define(:key, :title, :rows)
+  # One resource's card. number is its one number for the whole guide, which its map pin also
+  # shows. heading is what the card's header prints, and title stays the plain name for lists.
+  Entry = Data.define(:key, :number, :title, :rows) do
+    def heading
+      "#{number}. #{title}"
+    end
+  end
   Measure = Data.define(:height, :header_height, :row_heights)
 
   def initialize(sections:, origin: nil, printed_at: Time.current)
@@ -37,6 +45,7 @@ class FlyerPdf
     @sections.each do |section|
       render_section(section) if section.resources.any?
     end
+    render_map if entries.any?
     @pdf.number_pages("Printed #{@printed_at.strftime("%Y-%m-%d %H:%M %Z")}  |  Page <page>",
       at: [0, -16], width: @width, size: 9.5)
     @pdf.render
@@ -49,7 +58,37 @@ class FlyerPdf
       .gsub(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/, "")
   end
 
+  def key_for(document)
+    document.id || document.object_id
+  end
+
   def entry_for(document)
+    entries.fetch(key_for(document))
+  end
+
+  # Every resource's entry, numbered in the order the cards print. A resource in two
+  # categories prints two cards, and both share its one entry and number, so the same pin
+  # matches both.
+  def entries
+    @entries ||= @sections.flat_map(&:resources).uniq { |document| key_for(document) }
+      .each_with_index.to_h { |document, index| [key_for(document), build_entry(document, index + 1)] }
+  end
+
+  def render_map
+    new_page
+    draw_heading("Map")
+    @pdf.move_cursor_to(@cursor)
+    FlyerMapPage.new(@pdf, items: map_items, centre: (@origin.point if @origin&.located?)).draw
+  end
+
+  def map_items
+    @sections.flat_map(&:resources).uniq { |document| key_for(document) }.map do |document|
+      entry = entry_for(document)
+      MapPinLayout::Item.new(number: entry.number, title: entry.title, point: document.coordinates)
+    end
+  end
+
+  def build_entry(document, number)
     card = ResourceCard.new(document, origin: @origin)
     title = clean(card.title)
     rows = card.fields.map { |field|
@@ -62,7 +101,7 @@ class FlyerPdf
       rows.unshift({label: "Resource name", value: title, size: BODY_SIZE})
       title = title.each_grapheme_cluster.take(80).join + "…"
     end
-    Entry.new(key: document.id || document.object_id, title: title, rows: rows)
+    Entry.new(key: key_for(document), number: number, title: title, rows: rows)
   end
 
   def fragments(row)
@@ -73,7 +112,7 @@ class FlyerPdf
   def measurement(entry, width)
     @measurements[[entry.key, width]] ||= begin
       inner = width - 2 * PADDING
-      header = @pdf.height_of(entry.title, width: inner, size: TITLE_SIZE, style: :bold, leading: 2) + 16
+      header = @pdf.height_of(entry.heading, width: inner, size: TITLE_SIZE, style: :bold, leading: 2) + 16
       heights = entry.rows.map { |row| @pdf.height_of_formatted(fragments(row), width: inner, leading: 2) }
       Measure.new(height: header + 2 * PADDING + heights.sum + [heights.size - 1, 0].max * 5,
         header_height: header, row_heights: heights)
@@ -182,7 +221,7 @@ class FlyerPdf
 
   def draw_card(entry, x, top, width)
     measure = measurement(entry, width)
-    frame(entry.title, x, top, width, measure.height, measure.header_height)
+    frame(entry.heading, x, top, width, measure.height, measure.header_height)
     y = top - measure.header_height - PADDING
     entry.rows.each_with_index do |row, index|
       height = measure.row_heights[index]
@@ -197,7 +236,7 @@ class FlyerPdf
     remaining = entry.rows.flat_map { |row| fragments(row) + [{text: "\n\n", size: row[:size]}] }
     part = 0
     while remaining.any?
-      title = entry.title + (part.positive? ? " continued" : "")
+      title = entry.heading + (part.positive? ? " continued" : "")
       header = @pdf.height_of(title, width: @width - 2 * PADDING, size: TITLE_SIZE, style: :bold, leading: 2) + 16
       available = @cursor - BOTTOM - header - 2 * PADDING
       options = {at: [PADDING, @cursor - header - PADDING], width: @width - 2 * PADDING,

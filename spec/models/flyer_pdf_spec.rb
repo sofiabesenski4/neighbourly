@@ -56,10 +56,46 @@ RSpec.describe FlyerPdf do
       section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
       reader = PDF::Reader.new(StringIO.new(described_class.new(sections: [section], origin: located).render))
 
-      expect(reader.page_count).to be > 1
+      expect(reader.page_count).to be > 2
       expect(reader.pages.first.text.gsub(/\s+/, " ")).to include("Distances are from")
-      expect(reader.pages.last.text).not_to include("Distances are from")
+      expect(reader.pages[1].text).not_to include("Distances are from")
     end
+  end
+
+  describe "numbering resources to match the map" do
+    def section(name, resources)
+      CategorySearch::Section.new(category: Category.new(name: name), resources: resources)
+    end
+
+    def text_of(sections)
+      PDF::Reader.new(StringIO.new(described_class.new(sections: sections).render))
+        .pages.map(&:text).join("\n").gsub(/\s+/, " ")
+    end
+
+    it "numbers card headers in print order across categories" do
+      text = text_of([section("Food", [resource(title: "Alpha")]), section("Health", [resource(title: "Beta")])])
+
+      expect(text).to include("1. Alpha", "2. Beta")
+    end
+
+    it "gives a resource in two categories the same number on both cards" do
+      shared = Document.new(id: 7, title: "Shared", content: "Shared", metadata: {},
+        source: Source.new(name: "Guide", source_type: "api"))
+      copy = Document.new(id: 7, title: "Shared", content: "Shared", metadata: {},
+        source: Source.new(name: "Guide", source_type: "api"))
+      text = text_of([section("Food", [shared, resource(title: "Other")]), section("Health", [copy])])
+
+      expect(text.scan("1. Shared").size).to be >= 2
+      expect(text).to include("2. Other")
+      expect(text).not_to include("3. ")
+    end
+  end
+
+  it "ends the guide with a map page" do
+    reader = reader_for([resource(lat: 48.4265, lng: -123.3656)])
+
+    expect(reader.pages.last.text).to include("Map", "© OpenMapTiles © OpenStreetMap contributors")
+    expect(reader.pages.first.text).not_to include("OpenStreetMap")
   end
 
   it "creates a real readable PDF with the print date and missing fields omitted" do
@@ -101,7 +137,7 @@ RSpec.describe FlyerPdf do
 
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
-    expect(reader.page_count).to eq(1)
+    expect(reader.page_count).to eq(2) # the cards, then the map
     expect(placements.map { |placement| placement[:title] }).to eq(titles)
     expect(placements.map { |placement| placement[:page] }).to eq([1, 1, 1, 1])
     expect(placements[0][:top]).to eq(placements[1][:top])
@@ -128,7 +164,7 @@ RSpec.describe FlyerPdf do
 
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
-    expect(reader.page_count).to be > 1
+    expect(reader.page_count).to be > 2 # more than one page of cards, then the map
     expect(printed_titles).to eq(titles)
     text = reader.pages.map(&:text).join("\n")
     first_mentions = titles.map { |title| text.index(title) }
@@ -161,10 +197,10 @@ RSpec.describe FlyerPdf do
     reader = reader_for([resource(notes: words.join(" "), intake_info: "Walk in")])
     text = reader.pages.map(&:text).join("\n")
 
-    expect(reader.page_count).to be > 1
+    expect(reader.page_count).to be > 2 # more than one page of cards, then the map
     expect(text).to include("continued")
     expect(text.scan(/step\d{5}/)).to eq(words)
-    expect(reader.pages.last.text).to include("Intake:", "Walk in")
+    expect(reader.pages[-2].text).to include("Intake:", "Walk in")
   end
 
   it "retains a very long resource name in the card body" do
