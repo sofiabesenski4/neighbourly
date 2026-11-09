@@ -1,13 +1,27 @@
 import { Controller } from "@hotwired/stimulus";
 
+const DEFAULT_SORT = "default";
+
 export default class extends Controller {
   static targets = [
     "form",
     "category",
+    "toolbar",
+    "sidebar",
+    "desktopSearch",
+    "searchField",
+    "search",
+    "sort",
+    "filterButton",
+    "filterDialog",
+    "draftCategory",
+    "draftSort",
+    "clearSearchOrder",
     "cards",
     "count",
     "status",
     "generate",
+    "generateLabel",
     "previewError",
     "previewErrorMessage",
     "printError",
@@ -47,6 +61,10 @@ export default class extends Controller {
     this.skipLocationTarget.hidden = false;
     this.showLocationStep();
     // The guide loads behind the first screen, so it's ready when the person moves on.
+    this.toolbarTarget.hidden = false;
+    this.sidebarTarget.classList.add("hidden");
+    this.layoutChanged();
+    this.updateFilterControls();
     this.refresh();
   }
 
@@ -59,18 +77,20 @@ export default class extends Controller {
     clearTimeout(this.debounce);
     this.previewRequest?.abort();
     this.printRequest?.abort();
+    this.closeFilters();
     this.clearPrintout();
     this.forgetLocationChoice();
-    this.generateTarget.textContent = "Generate printout";
+    this.generateLabelTarget.textContent = "Generate printout";
   }
 
   filter() {
+    this.updateFilterControls();
     clearTimeout(this.debounce);
     this.revision += 1;
     this.previewRequest?.abort();
     this.printRequest?.abort();
     this.generating = false;
-    this.generateTarget.textContent = "Generate printout";
+    this.generateLabelTarget.textContent = "Generate printout";
     this.clearPrintout();
     this.printErrorTarget.hidden = true;
     this.setLoading();
@@ -269,15 +289,21 @@ export default class extends Controller {
   // only the URL's, which would lose the location.
   previewRequestOptions(categories, url) {
     const headers = { Accept: "application/json" };
+    const query = this.searchTarget.value.trim();
+    const sort = this.sortTarget.value;
     if (!this.hasLatTarget || !this.latTarget.value) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
+      if (query) url.searchParams.set("flyer[query]", query);
+      if (sort !== DEFAULT_SORT) url.searchParams.set("flyer[sort]", sort);
       return { headers };
     }
 
     const body = new FormData();
     categories.forEach((key) => body.append("flyer[categories][]", key));
+    if (query) body.append("flyer[query]", query);
+    if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
     body.append("flyer[lat]", this.latTarget.value);
     body.append("flyer[lng]", this.lngTarget.value);
     return {
@@ -289,6 +315,81 @@ export default class extends Controller {
           document.querySelector('meta[name="csrf-token"]')?.content || "",
       },
     };
+  }
+
+  finishSearch(event) {
+    if (event.isComposing) return;
+    event.preventDefault();
+    if (this.toolbarTarget.contains(event.currentTarget))
+      event.currentTarget.blur();
+  }
+
+  openFilters() {
+    const selected = new Set(this.selectedCategories());
+    this.draftCategoryTargets.forEach((input) => {
+      input.checked = selected.has(input.value);
+    });
+    this.draftSortTarget.value = this.sortTarget.value;
+    this.filterDialogTarget.hidden = false;
+    this.filterDialogTarget.showModal();
+    this.filterButtonTarget.setAttribute("aria-expanded", "true");
+  }
+
+  closeFilters() {
+    if (this.filterDialogTarget.open) this.filterDialogTarget.close();
+    this.filtersClosed();
+  }
+
+  filtersClosed() {
+    if (this.filterDialogTarget.open) return;
+    this.filterDialogTarget.hidden = true;
+    this.filterButtonTarget.setAttribute("aria-expanded", "false");
+  }
+
+  layoutChanged() {
+    const desktop = window.matchMedia("(min-width: 40rem)").matches;
+    const destination = desktop ? this.desktopSearchTarget : this.toolbarTarget;
+    if (this.searchFieldTarget.parentElement !== destination)
+      destination.prepend(this.searchFieldTarget);
+    this.desktopSearchTarget.hidden = !desktop;
+    if (desktop && this.filterDialogTarget.open) this.closeFilters();
+  }
+
+  resetDraft() {
+    this.draftCategoryTargets.forEach((input) => (input.checked = false));
+    this.draftSortTarget.value = DEFAULT_SORT;
+  }
+
+  applyFilters() {
+    const selected = new Set(
+      this.draftCategoryTargets
+        .filter((input) => input.checked)
+        .map((input) => input.value),
+    );
+    this.categoryTargets.forEach((input) => {
+      input.checked = selected.has(input.value);
+    });
+    this.sortTarget.value = this.draftSortTarget.value;
+    this.closeFilters();
+    this.filter();
+  }
+
+  clearSearchAndOrder() {
+    this.searchTarget.value = "";
+    this.sortTarget.value = DEFAULT_SORT;
+    this.filter();
+  }
+
+  updateFilterControls() {
+    const customOrder = this.sortTarget.value !== DEFAULT_SORT;
+    const filtersActive = customOrder || this.selectedCategories().length > 0;
+    this.filterButtonTarget.dataset.active = String(filtersActive);
+    this.filterButtonTarget.setAttribute(
+      "aria-label",
+      filtersActive ? "Filters (active)" : "Filters",
+    );
+    this.clearSearchOrderTarget.hidden =
+      !customOrder && this.searchTarget.value.trim() === "";
   }
 
   async refresh() {
@@ -343,31 +444,28 @@ export default class extends Controller {
     const ids = new Set();
     let total = 0;
     categories.forEach((category) => {
+      if (category.resources.length === 0) return;
       const section = document.createElement("section");
-      section.className = "mt-7 first:mt-0";
+      section.className = "mt-4 first:mt-0 sm:mt-7";
       const heading = document.createElement("h3");
-      heading.className = "mb-3 text-lg font-semibold text-stone-900";
+      heading.className =
+        "mb-1.5 text-sm font-semibold text-sage-700 sm:mb-3 sm:text-lg sm:text-stone-900";
       heading.textContent = category.name;
       const count = document.createElement("span");
-      count.className = "ml-2.5 text-sm font-normal text-stone-600";
+      count.className =
+        "ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm";
       count.textContent = `${category.resources.length} ${category.resources.length === 1 ? "card" : "cards"}`;
       heading.append(count);
       section.append(heading);
       const grid = document.createElement("div");
-      grid.className = "grid grid-cols-1 items-start gap-[18px] lg:grid-cols-2";
+      grid.className =
+        "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
       category.resources.forEach((resource) => {
         ids.add(resource.id);
         total += 1;
         grid.append(this.card(resource));
       });
-      if (category.resources.length === 0) {
-        const empty = document.createElement("p");
-        empty.className = "text-stone-600";
-        empty.textContent = "No matching resources in this category.";
-        section.append(empty);
-      } else {
-        section.append(grid);
-      }
+      section.append(grid);
       fragment.append(section);
     });
     if (total === 0) {
@@ -375,20 +473,19 @@ export default class extends Controller {
       const empty = document.createElement("div");
       empty.className =
         "rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600";
-      empty.textContent =
-        this.selectedCategories().length === 0
-          ? "No resources are available to display."
-          : "No resources match the selected categories.";
+      if (this.searchTarget.value.trim()) {
+        empty.textContent = "No resources match your search.";
+      } else if (this.selectedCategories().length) {
+        empty.textContent = "No resources match the selected categories.";
+      } else {
+        empty.textContent = "No resources are available to display.";
+      }
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    const scope =
-      this.selectedCategories().length === 0
-        ? "All available resources · "
-        : "";
-    this.countTarget.textContent = `${scope}${ids.size} ${ids.size === 1 ? "resource" : "resources"} · ${total} ${total === 1 ? "card" : "cards"} across ${categories.length} ${categories.length === 1 ? "category" : "categories"}`;
+    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
     this.hasResults = total > 0;
-    this.statusTarget.textContent = "Live preview";
+    this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
     this.generateTarget.disabled = !this.hasResults || this.generating;
   }
@@ -396,13 +493,14 @@ export default class extends Controller {
   card(resource) {
     const article = document.createElement("article");
     article.className =
-      "min-w-0 overflow-hidden rounded-[10px] border border-stone-300 bg-white text-stone-800";
+      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
     const title = document.createElement("h4");
     title.className =
-      "border-b border-stone-200 bg-stone-100 px-4 py-[13px] font-semibold [overflow-wrap:anywhere]";
+      "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
     title.textContent = resource.title;
     const details = document.createElement("dl");
-    details.className = "grid gap-[9px] px-4 pt-[14px] pb-4";
+    details.className =
+      "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";
     resource.fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "[overflow-wrap:anywhere]";
@@ -427,7 +525,7 @@ export default class extends Controller {
     this.printErrorTarget.hidden = true;
     this.generating = true;
     this.generateTarget.disabled = true;
-    this.generateTarget.textContent = "Preparing printout…";
+    this.generateLabelTarget.textContent = "Preparing printout…";
     this.printRequest = new AbortController();
     try {
       const response = await fetch(this.formTarget.action, {
@@ -480,7 +578,7 @@ export default class extends Controller {
       if (revision === this.revision) {
         this.generating = false;
         this.generateTarget.disabled = !this.hasResults;
-        this.generateTarget.textContent = "Generate printout";
+        this.generateLabelTarget.textContent = "Generate printout";
       }
     }
   }
