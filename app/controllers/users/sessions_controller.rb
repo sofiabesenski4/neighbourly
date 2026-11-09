@@ -24,11 +24,11 @@ class Users::SessionsController < Devise::SessionsController
       chat_id = request.headers[GuestChatSession::SAVE_CHAT_HEADER]
       if chat_id.present?
         guest = GuestChatSession.new(request.headers[GuestChatSession::HEADER])
-        @saved_guest_chat = guest.save_chat(chat_id, user)
+        @saved_guest_chat = guest.save_chats(chat_id, user)
         if @saved_guest_chat
-          flash[:notice] = "Chat saved to your account."
+          flash[:notice] = "Your guest chat history was saved to your account."
         else
-          flash[:alert] = "This guest chat is no longer available to save."
+          flash[:alert] = "There are no guest chats available to save."
         end
       end
     end

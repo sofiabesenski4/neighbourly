@@ -16,21 +16,23 @@ RSpec.describe "Guest chats", type: :request do
     allow(ChatResponseJob).to receive(:perform_later)
   end
 
-  def start_guest_chat
-    post start_chat_path, params: {chat: {prompt: question, model: "untrusted-model"}}, headers: tab_headers
+  def start_guest_chat(headers: tab_headers)
+    post start_chat_path, params: {chat: {prompt: question, model: "untrusted-model"}}, headers: headers
     expect(response.location).to match(%r{/guest-chats/\d+\z})
     Chat.last
   end
 
-  it "saves only the selected guest conversation after successful sign-in" do
+  it "saves all active conversations from the originating tab after successful sign-in" do
     chat = start_guest_chat
     other_chat = start_guest_chat
+    different_tab_chat = start_guest_chat(headers: {"X-Neighbourly-Guest-Token" => SecureRandom.hex(32)})
     user = User.create!(email: "save-guest@example.com", password: "password123")
     headers = tab_headers.merge("X-Neighbourly-Guest-Chat" => chat.id.to_s)
     guest_stream = "chat_#{chat.id}"
 
     post user_session_path, params: {user: {email: user.email, password: "wrong-password"}}, headers: headers
     expect(chat.reload).to be_guest
+    expect(other_chat.reload).to be_guest
 
     expect {
       post user_session_path, params: {user: {email: user.email, password: "password123"}}, headers: headers
@@ -39,7 +41,9 @@ RSpec.describe "Guest chats", type: :request do
     expect(chat.reload.user).to eq(user)
     expect(chat.guest_session_digest).to be_nil
     expect(chat.stream_name).not_to eq(guest_stream)
-    expect(other_chat.reload).to be_guest
+    expect(other_chat.reload.user).to eq(user)
+    expect(other_chat.guest_session_digest).to be_nil
+    expect(different_tab_chat.reload).to be_guest
     follow_redirect!
     expect(response.body).to include(question)
 
