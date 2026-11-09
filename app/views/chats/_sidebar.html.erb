@@ -3,8 +3,8 @@
   New chat
 <% end %>
 
-<h2 class="mt-6 mb-2 px-3 text-xs font-medium text-stone-400">Recent</h2>
-<nav aria-label="Recent conversations" class="min-h-0 flex-1 overflow-y-auto space-y-1">
+<h2 class="mt-6 mb-2 px-3 text-xs font-medium text-stone-400">Chat history</h2>
+<nav aria-label="Conversation history" class="min-h-0 flex-1 overflow-y-auto space-y-1">
   <% @recent_chats.each do |recent_chat| %>
     <% active = chat.persisted? && recent_chat.id == chat.id %>
     <div class="conversation-row group relative flex items-center rounded-lg <%= active ? "bg-stone-200" : "hover:bg-stone-200" %>" data-chat-row="<%= recent_chat.id %>" data-controller="conversation-menu">
@@ -29,6 +29,6 @@
   <% end %>
 </nav>
 
-<% if user_signed_in? %>
-  <%= link_to "All chats", chats_path, class: "mt-4 block rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-200 hover:text-stone-800" %>
+<% if user_signed_in? && policy(:model).index? %>
+  <%= link_to "Models", models_path, class: "mt-4 block rounded-lg px-3 py-2 text-xs text-stone-500 hover:bg-stone-200 hover:text-stone-800" %>
 <% end %>

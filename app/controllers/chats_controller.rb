@@ -2,10 +2,9 @@ class ChatsController < ApplicationController
   include ChatAccess
 
   before_action :prepare_landing_question, only: :create, if: :landing_question_request?
-  before_action :authenticate_user!, except: [:new, :create, :show, :destroy]
   before_action :set_chat, only: [:show, :destroy]
   before_action :set_recent_chats, only: [:new, :show]
-  after_action :verify_authorized, except: :index
+  after_action :verify_authorized
 
   # Account limits are per user. Guest limits are per IP so opening a new
   # tab does not reset the budget for starting chats.
@@ -17,10 +16,6 @@ class ChatsController < ApplicationController
     by: :chat_budget_key,
     with: -> { chat_start_limit_exceeded("You've started a lot of chats in the past hour. Please try again later.") },
     only: :create, name: "sustained"
-
-  def index
-    @chats = policy_scope(Chat).order(created_at: :desc)
-  end
 
   def new
     @chat = Chat.new
@@ -112,7 +107,7 @@ class ChatsController < ApplicationController
         redirect_to new_chat_path, notice: "Chat was successfully destroyed.", status: :see_other
       end
     else
-      redirect_to @chat.guest? ? new_chat_path : chats_path, notice: "Chat was successfully destroyed.", status: :see_other
+      redirect_to new_chat_path, notice: "Chat was successfully destroyed.", status: :see_other
     end
   end
 

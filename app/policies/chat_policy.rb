@@ -1,10 +1,6 @@
 # frozen_string_literal: true
 
 class ChatPolicy < ApplicationPolicy
-  def index?
-    user.is_a?(User)
-  end
-
   def show?
     if user.is_a?(GuestChatSession)
       user.owns?(record)

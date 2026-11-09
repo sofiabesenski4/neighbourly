@@ -133,7 +133,7 @@ RSpec.describe "Guest chats", type: :request do
     expect(response).to redirect_to(new_chat_path)
 
     sign_in admin
-    get chats_path
+    get new_chat_path
     expect(response.body).to include(chat_path(account_chat))
     expect(response.body).not_to include(guest_chat_path(chat), question)
     get guest_chat_path(chat), headers: tab_headers

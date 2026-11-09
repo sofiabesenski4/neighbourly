@@ -57,17 +57,18 @@ RSpec.describe "Chats", type: :system do
       expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is Ruby on Rails?", hash_including(model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String))
     end
 
-    it "lists existing chats on the index page" do
-      chat = user.chats.create!
-      # The index renders message count and creation date
+    it "opens a saved chat from the workspace after visiting the old list URL" do
+      chat = user.chats.create!(title: "Saved conversation")
       visit chats_path
 
-      expect(page).to have_content("Chats")
-      expect(page).to have_content(chat.created_at.strftime("%B %d, %Y"))
+      expect(page).to have_current_path(new_chat_path)
+      expect(page).not_to have_link("All chats")
+      within("#chat_sidebar") { click_link "Saved conversation" }
+      expect(page).to have_current_path(chat_path(chat))
     end
 
     it "hides the admin-only Models link" do
-      visit chats_path
+      visit new_chat_path
 
       expect(page).not_to have_link("Models")
     end
@@ -81,16 +82,6 @@ RSpec.describe "Chats", type: :system do
 
       expect(page).to have_content("Hi there")
       expect(page).to have_content("Hello! How can I help?")
-    end
-
-    it "destroys a chat from the index page" do
-      user.chats.create!
-
-      visit chats_path
-      click_button "Destroy"
-
-      expect(page).to have_content("Chat was successfully destroyed.", count: 1)
-      expect(Chat.count).to eq(0)
     end
 
     it "allows selecting an AI model for the chat" do
@@ -123,10 +114,12 @@ RSpec.describe "Chats", type: :system do
     before { login_as(admin, scope: :user) }
 
     it "links to the Models page" do
-      visit chats_path
-      click_link "Models"
+      visit new_chat_path
+      within("#chat_sidebar") { click_link "Models" }
 
       expect(page).to have_current_path(models_path)
+      within("main") { click_link "Chats" }
+      expect(page).to have_current_path(new_chat_path)
     end
   end
 
