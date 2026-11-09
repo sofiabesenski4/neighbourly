@@ -42,7 +42,7 @@ RSpec.describe "Conversation message visibility", type: :system do
     perform_enqueued_jobs do
       placeholder = chat.messages.create!(role: "assistant", content: "")
     end
-    expect(page).to have_css("#message_#{placeholder.id}")
+    expect(page).to have_css("#message_#{placeholder.id}", visible: :all)
     placeholder.broadcast_append_chunk("A public streamed answer")
 
     expect(page).to have_text("A public streamed answer")
@@ -51,13 +51,10 @@ RSpec.describe "Conversation message visibility", type: :system do
   end
 
   it "removes a placeholder when the completed assistant message contains tool calls" do
+    placeholder = chat.messages.create!(role: "assistant", content: "")
     visit chat_path(chat)
     expect(page).to have_css("turbo-cable-stream-source[connected]", visible: :all)
-    placeholder = nil
-    perform_enqueued_jobs do
-      placeholder = chat.messages.create!(role: "assistant", content: "")
-    end
-    expect(page).to have_css("#message_#{placeholder.id}")
+    expect(page).to have_css("#message_#{placeholder.id}", visible: :all)
 
     perform_enqueued_jobs do
       Message.transaction do
@@ -66,7 +63,7 @@ RSpec.describe "Conversation message visibility", type: :system do
       end
     end
 
-    expect(page).not_to have_css("#message_#{placeholder.id}")
+    expect(page).not_to have_css("#message_#{placeholder.id}", visible: :all)
     expect(page).not_to have_text("Private", exact: false)
     expect(chat.messages).to include(placeholder)
   end
