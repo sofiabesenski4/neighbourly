@@ -25,13 +25,17 @@ module ContentPipeline
 
       Rails.logger.info "[ContentPipeline] Parsed #{chunks.size} chunks from #{@source.name}"
 
-      written = chunks.each_with_index.filter_map do |chunk, index|
-        document = upsert_document(chunk)
-        Rails.logger.info "[ContentPipeline] Embedded chunk #{index + 1}/#{chunks.size}"
-        document
+      written = []
+      begin
+        chunks.each_with_index do |chunk, index|
+          document = upsert_document(chunk)
+          written << document if document
+          Rails.logger.info "[ContentPipeline] Embedded chunk #{index + 1}/#{chunks.size}"
+        end
+      ensure
+        # Rows saved before a later row fails are kept, so they are enriched too.
+        enqueue_enrichment(written) if @source.enrich_documents?
       end
-
-      enqueue_enrichment(written) if @source.enrich_documents?
       @source.update!(last_fetched_at: Time.current)
 
       Rails.logger.info "[ContentPipeline] Finished ingesting #{@source.name}: #{chunks.size} documents"
