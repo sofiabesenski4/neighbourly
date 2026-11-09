@@ -68,9 +68,10 @@ RSpec.describe "Conversation options", type: :system do
 
   it "supports keyboard access and Escape without deleting" do
     visit chat_path(chat)
+    # Wait for the browser to finish applying the composer's initial autofocus.
+    expect(page).to have_css("#message_content:focus")
     row = find("#chat_sidebar [data-chat-row='#{chat.id}']")
     link = row.find_link("Meal options")
-    # Establish the tab sequence's starting point before the composer can autofocus.
     link.execute_script("this.focus()")
     expect(row).to have_css("a:focus", text: "Meal options")
     link.send_keys(:tab)
