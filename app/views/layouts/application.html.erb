@@ -11,10 +11,6 @@
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    <% if guest_support_page || printout_page %>
-      <%# Turbo must load a new document when crossing the PDF frame policy boundary. %>
-      <meta name="support-document-policy" content="pdf-frame" data-turbo-track="reload">
-    <% end %>
     <% if guest_chat_page || content_for?(:sign_in_page) %>
       <meta name="turbo-cache-control" content="no-cache">
     <% end %>
