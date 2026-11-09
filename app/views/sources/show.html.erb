@@ -12,6 +12,9 @@
   <div class="flex flex-wrap items-center gap-3 text-sm text-stone-600">
     <span class="admin-badge bg-stone-100 text-stone-600"><%= @source.source_type.upcase %></span>
     <%= render "ingestion_status", source: @source %>
+    <% if @source.enrich_documents? %>
+      <span class="admin-badge bg-sage-100 text-sage-800">AI summaries</span>
+    <% end %>
     <span><%= pluralize(@documents.count, "document") %></span>
     <% if @source.last_fetched_at %>
       <span>Last ingested <%= time_ago_in_words(@source.last_fetched_at) %> ago</span>

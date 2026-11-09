@@ -31,7 +31,7 @@ module ContentPipeline
         document
       end
 
-      enqueue_enrichment(written) if @source.csv?
+      enqueue_enrichment(written) if @source.enrich_documents?
       @source.update!(last_fetched_at: Time.current)
 
       Rails.logger.info "[ContentPipeline] Finished ingesting #{@source.name}: #{chunks.size} documents"

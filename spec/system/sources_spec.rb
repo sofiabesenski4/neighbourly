@@ -198,6 +198,7 @@ RSpec.describe "Sources", type: :system do
 
         fill_in "Source name", with: "Drop-in Centres"
         select "CSV (spreadsheet rows)", from: "Data type"
+        check "Summarize and categorize rows with AI (CSV only)"
 
         file = create_temp_file("centres.csv", "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n")
         attach_file "Upload file", file.path
@@ -211,6 +212,23 @@ RSpec.describe "Sources", type: :system do
         expect(document.metadata).to include("Address" => "100 Harbour St")
         expect(document.content).to eq("Harbour Meals is a local service.\n\nName: Harbour Meals\nAddress: 100 Harbour St")
         expect(document.enriched_at).to be_present
+        expect(page).to have_content("AI summaries")
+      end
+
+      it "keeps rows as uploaded when AI summaries are not chosen" do
+        visit new_source_path
+
+        fill_in "Source name", with: "Drop-in Centres"
+        select "CSV (spreadsheet rows)", from: "Data type"
+        attach_file "Upload file", create_temp_file("centres.csv", "Name,Address\nHarbour Meals,100 Harbour St\n").path
+
+        perform_enqueued_jobs { click_button "Upload and ingest" }
+
+        document = Document.find_by!(title: "Harbour Meals")
+        expect(document.content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
+        expect(document.enriched_at).to be_nil
+        expect(RubyLLM).not_to have_received(:chat)
+        expect(page).not_to have_content("AI summaries")
       end
 
       it "shows an error and keeps no source when the CSV is malformed" do

@@ -34,6 +34,14 @@
       <%= form.text_field :css_selector, placeholder: "e.g. .main-content, article", class: "admin-input", aria: { describedby: "source_selector_hint" } %>
     </div>
 
+    <div class="rounded-xl border border-stone-200 bg-stone-50 p-4">
+      <div class="flex items-center gap-3">
+        <%= form.check_box :enrich_documents, class: "admin-checkbox", aria: { describedby: "source_enrich_hint" } %>
+        <%= form.label :enrich_documents, "Summarize and categorize rows with AI (CSV only)", class: "admin-label flex min-h-11 items-center" %>
+      </div>
+      <p id="source_enrich_hint" class="ml-7 text-sm leading-6 text-stone-500">Optional. An AI model writes a title, a short summary and categories for each row. Each row costs one model call.</p>
+    </div>
+
     <div class="space-y-2">
       <%= form.label :file, "Upload file", class: "admin-label" %>
       <p id="source_file_hint" class="text-xs leading-5 text-stone-500">Choose a .json, .html, or .csv file to ingest.</p>

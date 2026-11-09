@@ -16,7 +16,7 @@ class EnrichDocumentJob < ApplicationJob
   discard_on ActiveJob::DeserializationError
 
   def perform(document)
-    return if document.enriched_at? || !document.source.csv?
+    return if document.enriched_at? || !document.source.enrich_documents?
 
     ContentPipeline::Enricher.new(document).enrich!
   end

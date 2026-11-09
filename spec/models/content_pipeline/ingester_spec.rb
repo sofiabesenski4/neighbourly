@@ -124,7 +124,7 @@ RSpec.describe ContentPipeline::Ingester do
     end
 
     context "with a CSV source" do
-      let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv") }
+      let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true) }
       let(:csv) { "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n" }
 
       it "creates one embedded document per row with the row in metadata" do
@@ -142,6 +142,12 @@ RSpec.describe ContentPipeline::Ingester do
         allow_any_instance_of(ContentPipeline::Fetcher).to receive(:call).and_return(csv)
 
         expect { ingester.call }.to have_enqueued_job(EnrichDocumentJob).exactly(2).times
+      end
+
+      it "queues no enrichment when the source did not opt in" do
+        source.update!(enrich_documents: false)
+
+        expect { ingester.ingest(csv) }.not_to have_enqueued_job(EnrichDocumentJob)
       end
 
       it "queues enrichment only for rows this ingestion wrote" do

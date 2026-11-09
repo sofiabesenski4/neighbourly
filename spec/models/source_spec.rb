@@ -112,6 +112,17 @@ RSpec.describe Source, type: :model do
     end
   end
 
+  describe "#enrich_documents?" do
+    it "is off unless an admin opts in" do
+      expect(build_source(source_type: "csv", url: nil).enrich_documents?).to be false
+      expect(build_source(source_type: "csv", url: nil, enrich_documents: true).enrich_documents?).to be true
+    end
+
+    it "is off for sources other than CSV, whatever was chosen" do
+      expect(build_source(source_type: "html", enrich_documents: true).enrich_documents?).to be false
+    end
+  end
+
   describe ".form_entry_source" do
     it "creates a form source if none exists" do
       expect { Source.form_entry_source }.to change(Source, :count).by(1)
