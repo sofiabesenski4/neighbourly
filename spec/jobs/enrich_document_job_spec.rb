@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe EnrichDocumentJob do
   include ActiveJob::TestHelper
 
-  let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv") }
+  let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true) }
   let(:document) { source.documents.create!(content: "Name: Harbour Meals", external_id: "1", metadata: {"Name" => "Harbour Meals"}) }
   let(:enricher) { instance_double(ContentPipeline::Enricher, enrich!: true) }
 
@@ -21,6 +21,14 @@ RSpec.describe EnrichDocumentJob do
 
   it "skips a document that is already enriched" do
     document.update!(enriched_at: Time.current)
+
+    described_class.perform_now(document)
+
+    expect(enricher).not_to have_received(:enrich!)
+  end
+
+  it "skips documents whose source did not opt in" do
+    source.update!(enrich_documents: false)
 
     described_class.perform_now(document)
 

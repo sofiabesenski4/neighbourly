@@ -42,6 +42,11 @@ class Source < ApplicationRecord
     source_type == "csv"
   end
 
+  # Only CSV rows are enriched, so the choice means nothing for other types.
+  def enrich_documents?
+    csv? && super
+  end
+
   def self.form_entry_source
     find_or_create_by!(source_type: "form") do |s|
       s.name = "Form Entries"

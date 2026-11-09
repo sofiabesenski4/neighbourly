@@ -6,9 +6,9 @@ namespace :sources do
     puts "Ingested #{count} documents from '#{source.name}'"
   end
 
-  desc "Summarize and categorize CSV documents not yet enriched, for one source or all"
+  desc "Summarize and categorize CSV documents not yet enriched, for one opted-in source or all"
   task :enrich, [:source_id] => :environment do |_t, args|
-    sources = Source.csv_sources
+    sources = Source.csv_sources.where(enrich_documents: true)
     sources = sources.where(id: args[:source_id]) if args[:source_id]
     documents = Document.where(source: sources, enriched_at: nil)
     failed = 0

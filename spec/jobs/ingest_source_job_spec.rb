@@ -5,7 +5,7 @@ RSpec.describe IngestSourceJob do
 
   let(:csv) { "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n" }
   let(:source) do
-    Source.create!(name: "Drop-in Centres", source_type: "csv", upload_content: csv, ingestion_status: :pending)
+    Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true, upload_content: csv, ingestion_status: :pending)
   end
 
   before do
@@ -31,6 +31,15 @@ RSpec.describe IngestSourceJob do
 
     described_class.perform_now(source)
 
+    expect(EnrichDocumentJob).not_to have_been_enqueued
+  end
+
+  it "does not queue enrichment when the source did not opt in" do
+    source.update!(enrich_documents: false)
+
+    described_class.perform_now(source)
+
+    expect(source.documents.count).to eq(2)
     expect(EnrichDocumentJob).not_to have_been_enqueued
   end
 
