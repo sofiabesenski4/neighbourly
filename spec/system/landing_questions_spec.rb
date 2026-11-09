@@ -82,30 +82,38 @@ RSpec.describe "Landing question composer", type: :system do
     expect(page).not_to have_content("A question from the last visitor")
   end
 
-  it "saves the current guest chat after correcting a failed sign-in" do
+  it "saves both guest chats after correcting a failed sign-in" do
     visit root_path
     fill_in "What are you looking for?", with: "Where are the free meals?"
     click_button "Start chat", exact: true
     expect(page).to have_content("Where are the free meals?")
+    first_chat = Chat.last
+
+    click_link "New chat", exact: true
+    fill_in "Prompt", with: "Where can I find shelter?"
+    click_button "Start new chat"
+    expect(page).to have_content("Where can I find shelter?")
     guest_chat = Chat.last
 
-    click_link "Sign in to save your chat"
-    expect(page).to have_checked_field("Save this chat to my account")
+    click_link "Sign in to save your chats"
+    expect(page).to have_checked_field("Save guest chats")
     fill_in "Email address", with: user.email
     fill_in "Password", with: "wrong-password"
     click_button "Sign in", exact: true
     expect(page).to have_content("Invalid email or password.")
-    expect(page).to have_checked_field("Save this chat to my account")
+    expect(page).to have_checked_field("Save guest chats")
     expect(guest_chat.reload).to be_guest
 
     fill_in "Email address", with: user.email
     fill_in "Password", with: "password123"
     click_button "Sign in", exact: true
     expect(page).to have_current_path(chat_path(guest_chat))
-    expect(page).to have_content("Where are the free meals?")
+    expect(page).to have_content("Where can I find shelter?")
     expect(guest_chat.reload.user).to eq(user)
+    expect(first_chat.reload.user).to eq(user)
     expect(page).to have_link(href: chat_path(guest_chat), exact: true)
     page.refresh
+    find_link("Where are the free meals?", href: chat_path(first_chat)).click
     expect(page).to have_content("Where are the free meals?")
   end
 
@@ -116,8 +124,8 @@ RSpec.describe "Landing question composer", type: :system do
     expect(page).to have_content("Find shelter tonight")
     guest_chat = Chat.last
 
-    click_link "Sign in to save your chat"
-    uncheck "Save this chat to my account"
+    click_link "Sign in to save your chats"
+    uncheck "Save guest chats"
     fill_in "Email address", with: user.email
     fill_in "Password", with: "password123"
     click_button "Sign in", exact: true
