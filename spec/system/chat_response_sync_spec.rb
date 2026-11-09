@@ -3,11 +3,16 @@ require "rails_helper"
 RSpec.describe "Chat response reconciliation", type: :system do
   let(:user) { User.create!(email: "response-sync@example.com", password: "password123") }
   let(:chat) { user.chats.create!(title: "Community resources") }
+  let(:model) { RubyLLM::Model.new(id: "claude-haiku-4-5", name: "Claude Haiku", provider: "anthropic") }
 
   before do
     driven_by(:selenium_chrome_headless)
     login_as(user, scope: :user)
     allow(ChatResponseJob).to receive(:perform_later)
+    # Keep first-chat setup independent of a full model catalogue import.
+    allow(RubyLLM).to receive(:models).and_return(RubyLLM::Models.new([model]))
+    allow(RubyLLM.config).to receive(:default_model).and_return(model.id)
+    allow(RubyLLM.config).to receive(:anthropic_api_key).and_return("configured-for-test")
   end
 
   def resume_page
