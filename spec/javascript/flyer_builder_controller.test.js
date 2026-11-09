@@ -265,6 +265,8 @@ test("sends a chosen location to the preview in the request body", async () => {
   controller.previewErrorTarget = { hidden: true };
   controller.setLoading = () => {};
   controller.selectedCategories = () => ["17"];
+  controller.searchTarget = { value: "meal" };
+  controller.sortTarget = { value: "desc" };
   controller.render = () => {};
   controller.hasLatTarget = true;
   controller.latTarget.value = "48.427";
@@ -283,6 +285,8 @@ test("sends a chosen location to the preview in the request body", async () => {
         // Nothing in the URL: Rails would let a `flyer` there replace the body's.
         assert.equal(url.search, "");
         assert.deepEqual(options.body.getAll("flyer[categories][]"), ["17"]);
+        assert.equal(options.body.get("flyer[query]"), "meal");
+        assert.equal(options.body.get("flyer[sort]"), "desc");
       },
     );
   } finally {
