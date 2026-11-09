@@ -155,6 +155,7 @@ RSpec.describe "Landing question composer", type: :system do
     find("nav[aria-label='Main navigation']").click_link "Printout", exact: true
     expect(page).to have_current_path(new_flyer_path)
     expect(page.evaluate_script("window.guestPrintoutViolations")).to eq([])
+    click_button "Skip distances"
     click_button "Generate printout"
     expect(page).to have_link("Open PDF", href: /\Ablob:/)
     expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)

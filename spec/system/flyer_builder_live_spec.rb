@@ -119,7 +119,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     source.documents.create!(title: "Bravo meals", content: "Meals", categories: [food])
     source.documents.create!(title: "Charlie meals", content: "Meals", categories: [food])
     page.current_window.resize_to(1280, 900)
-    visit new_flyer_path
+    visit_builder
 
     section = find("h3", text: "Meals").ancestor("[data-flyer-builder-target='cards'] > section")
     cards = section.all("article", count: 3)
@@ -132,7 +132,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   end
 
   it "searches alongside desktop categories and keeps the query when switching to mobile" do
-    visit new_flyer_path
+    visit_builder
     expect(page).to have_css("article h4", text: "Alpha meals")
 
     within("aside[aria-label='Resource filters']") do
@@ -160,7 +160,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   it "searches and applies draft filters from the mobile toolbar" do
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
-    visit new_flyer_path
+    visit_builder
 
     title = find("h1", text: "Build your resource guide")
     expect(page).to have_text("Print a guide with addresses, hours, and contacts.")
@@ -337,7 +337,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       expect(page).to have_css("article h4", text: "Alpha meals")
       expect(page).to have_field("Meals", type: "checkbox")
-      expect(page).to have_text("Choose what to include")
+      expect(page).to have_text("Print a guide with addresses, hours, and contacts.")
       expect(page).to have_no_button("Use my location")
       expect(page).to have_no_field("Enter a place")
     end
@@ -366,7 +366,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_text("Distances from: 919 Pandora Ave.")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
-      expect(page).to have_text("1 resource · 1 card")
+      expect(page).to have_text("1 resource included")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       click_button "Generate printout"
 
@@ -435,7 +435,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       continue_with_place("919 Pandora Ave")
       check "Meals"
-      expect(page).to have_text("1 resource · 1 card")
+      expect(page).to have_text("1 resource included")
       click_button "Generate printout"
       expect(page).to have_link("Open printout", href: /\Ablob:/)
 
@@ -448,7 +448,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       click_button "Skip distances"
 
       expect(page).to have_checked_field("Meals")
-      expect(page).to have_text("1 resource · 1 card")
+      expect(page).to have_text("1 resource included")
       expect(page).to have_no_css("article", text: "Distance:")
       expect(page).to have_button("Generate printout", disabled: false)
     end

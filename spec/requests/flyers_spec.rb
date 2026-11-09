@@ -19,7 +19,7 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).not_to include("Choose what to include. Your guide updates as you go.",
         "A resource in two selected categories appears in both sections.", "Your guide", "Live preview")
       document = Nokogiri::HTML(response.body)
-      heading = document.at_css("h2#flyer-preview-heading[data-flyer-builder-target='count']")
+      heading = document.at_css("h2#flyer-preview-heading[data-flyer-builder-target~='count']")
       expect(heading["aria-live"]).to eq("polite")
       icon = document.at_css("button[data-flyer-builder-target='generate'] svg")
       expect(icon["fill"]).to eq("none")
