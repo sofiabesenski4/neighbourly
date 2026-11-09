@@ -182,7 +182,7 @@ class FlyersController < ApplicationController
     if unexpected.any?
       @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}")
     elsif invalid_fields.any?
-      invalid_fields.each { |field| @flyer.errors.add(field, "must be provided as text") }
+      invalid_fields.each { |field| @flyer.errors.add(field, "must be text") }
     else
       @flyer.errors.add(:categories, "must be provided as a list")
     end
