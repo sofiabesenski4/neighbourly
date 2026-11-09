@@ -36,8 +36,8 @@ RSpec.describe "Rate limiting", type: :request do
       attempt(user.email, password: "password123")
       expect(flash[:alert]).to match(/too many sign-in attempts for that account/i)
 
-      get chats_path
-      expect(response).to redirect_to(new_user_session_path)
+      get new_chat_path
+      expect(response.body).to include("Guest chat.")
     end
 
     it "does not lock out a different account on the same connection" do
@@ -46,8 +46,9 @@ RSpec.describe "Rate limiting", type: :request do
       attempt(other_user.email, password: "password123")
 
       expect(flash[:alert]).to be_nil
-      get chats_path
+      get new_chat_path
       expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Sign out")
     end
 
     it "is case-insensitive about the account being guessed" do

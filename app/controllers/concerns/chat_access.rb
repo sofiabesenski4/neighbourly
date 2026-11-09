@@ -36,8 +36,8 @@ module ChatAccess
   end
 
   def set_recent_chats
-    chats = user_signed_in? ? current_user.chats : policy_scope(Chat)
-    @recent_chats = chats.order(created_at: :desc, id: :desc).limit(30).includes(:first_user_message)
+    chats = user_signed_in? ? current_user.chats : policy_scope(Chat).limit(30)
+    @recent_chats = chats.order(created_at: :desc, id: :desc).includes(:first_user_message)
   end
 
   def chat_budget_key

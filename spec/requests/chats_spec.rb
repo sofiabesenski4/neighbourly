@@ -9,41 +9,18 @@ RSpec.describe "Chats", type: :request do
   let(:chat) { owner.chats.create! }
 
   describe "GET /chats" do
-    before do
-      chat
-      other_user.chats.create!
+    it "redirects a signed-in visitor to the workspace" do
+      sign_in owner
+
+      get chats_path
+
+      expect(response).to redirect_to(new_chat_path)
     end
 
-    context "as the owner" do
-      before { sign_in owner }
+    it "redirects a guest to the public workspace" do
+      get chats_path
 
-      it "only shows the user's own chats" do
-        get chats_path
-
-        expect(response).to have_http_status(:ok)
-        expect(response.body).to include(chat_path(chat))
-        expect(response.body).not_to include(chat_path(other_user.chats.first))
-      end
-    end
-
-    context "as an admin" do
-      before { sign_in admin }
-
-      it "shows all chats" do
-        get chats_path
-
-        expect(response).to have_http_status(:ok)
-        expect(response.body).to include(chat_path(chat))
-        expect(response.body).to include(chat_path(other_user.chats.first))
-      end
-    end
-
-    context "when not signed in" do
-      it "redirects to sign in" do
-        get chats_path
-
-        expect(response).to redirect_to(new_user_session_path)
-      end
+      expect(response).to redirect_to(new_chat_path)
     end
   end
 
@@ -108,7 +85,7 @@ RSpec.describe "Chats", type: :request do
       expect(html.at_css("h1").text).to eq("New conversation")
     end
 
-    it "keeps an admin's personal sidebar separate from the full chat list" do
+    it "keeps the workspace sidebar personal for admins" do
       sign_in admin
       own_chat = admin.chats.create!
       chat
@@ -120,7 +97,7 @@ RSpec.describe "Chats", type: :request do
       expect(sidebar.css("a").map { |link| link["href"] }).not_to include(chat_path(chat))
     end
 
-    it "shows the 30 most recent conversations" do
+    it "lists older conversations after the newest 30" do
       sign_in owner
       oldest_chat = owner.chats.create!(created_at: 2.days.ago)
       recent_chats = Array.new(30) { owner.chats.create! }
@@ -128,8 +105,7 @@ RSpec.describe "Chats", type: :request do
       get new_chat_path
 
       links = Nokogiri::HTML(response.body).css("#chat_sidebar nav a").map { |link| link["href"] }
-      expect(links).to eq(recent_chats.reverse.map { |recent_chat| chat_path(recent_chat) })
-      expect(links).not_to include(chat_path(oldest_chat))
+      expect(links).to eq(recent_chats.reverse.map { |recent_chat| chat_path(recent_chat) } + [chat_path(oldest_chat)])
     end
   end
 
@@ -143,6 +119,7 @@ RSpec.describe "Chats", type: :request do
         expect {
           delete chat_path(delete_chat)
         }.to change(Chat, :count).by(-1)
+        expect(response).to redirect_to(new_chat_path)
       end
     end
 
