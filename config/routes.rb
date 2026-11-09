@@ -2,7 +2,7 @@ Rails.application.routes.draw do
   post "start-chat", to: "chats#create", as: :start_chat, defaults: {entrypoint: "landing"}
   get "guest-chats/:id", to: "chats#show", as: :guest_chat, defaults: {guest_entry: true}
 
-  resources :chats do
+  resources :chats, only: [:new, :create, :show, :destroy] do
     resources :messages, only: [:create]
     resources :chat_responses, only: [] do
       get :latest, on: :collection
@@ -10,6 +10,7 @@ Rails.application.routes.draw do
       post :stop, on: :member
     end
   end
+  get "chats", to: redirect("/chats/new", status: 302), as: nil
   resources :models, only: [:index, :show], constraints: {id: /[^\/]+/} do
     collection do
       post :refresh
@@ -30,7 +31,6 @@ Rails.application.routes.draw do
       patch :validate
     end
   end
-  resources :chats
   resources :flyers, only: [:new, :create] do
     # POST is for a preview with a location, which shouldn't appear in a URL.
     match :preview, on: :collection, via: [:get, :post]

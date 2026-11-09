@@ -30,7 +30,7 @@ RSpec.describe "Support page navigation", type: :request do
     landing_links = navigation.css("a").map { |link| [link["href"], link.text.squish, link.at_css("svg")&.to_html] }
     chat = user.chats.create!(model: model)
 
-    [new_chat_path, chat_path(chat), chats_path].each do |path|
+    [new_chat_path, chat_path(chat)].each do |path|
       get path
       expect(response).to have_http_status(:ok)
       expect(navigation.css("a").map { |link| [link["href"], link.text.squish, link.at_css("svg")&.to_html] }).to eq(landing_links)
