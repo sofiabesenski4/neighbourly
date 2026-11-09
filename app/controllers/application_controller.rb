@@ -19,7 +19,7 @@ class ApplicationController < ActionController::Base
   private
 
   def guest_support_controller?
-    %w[pages chats messages chat_responses].include?(controller_path) && !user_signed_in?
+    %w[pages chats messages chat_responses users/sessions].include?(controller_path) && !user_signed_in?
   end
 
   def enforce_basic_auth

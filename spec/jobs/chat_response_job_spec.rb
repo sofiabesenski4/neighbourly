@@ -107,7 +107,7 @@ RSpec.describe ChatResponseJob, type: :job do
         perform_enqueued_jobs do
           described_class.perform_now(chat.id, "Where are shelters?")
         end
-      }.to have_broadcasted_to("chat_#{chat.id}").with(
+      }.to have_broadcasted_to(chat.stream_name).with(
         satisfy("shows the original question without reference instructions") do |payload|
           payload.include?('action="append"') && payload.include?("Where are shelters?") && !payload.include?("reference instructions")
         end
@@ -147,7 +147,7 @@ RSpec.describe ChatResponseJob, type: :job do
         2.times do
           expect { described_class.perform_now(chat.id, "Hello") }.to raise_error(RubyLLM::Error)
         end
-      }.to have_broadcasted_to("chat_#{chat.id}").with(
+      }.to have_broadcasted_to(chat.stream_name).with(
         a_string_including('action="append"', 'target="messages"', "id=\"chat_#{chat.id}_reply_failed\"")
       ).exactly(2).times
     end
@@ -160,7 +160,7 @@ RSpec.describe ChatResponseJob, type: :job do
 
       expect {
         described_class.perform_now(chat.id, "Hello again")
-      }.to have_broadcasted_to("chat_#{chat.id}").with(
+      }.to have_broadcasted_to(chat.stream_name).with(
         a_string_including('action="remove"', "target=\"chat_#{chat.id}_reply_failed\"")
       )
     end
@@ -172,7 +172,7 @@ RSpec.describe ChatResponseJob, type: :job do
         expect {
           described_class.perform_now(chat.id, "Hello")
         }.to raise_error(error.class)
-          .and have_broadcasted_to("chat_#{chat.id}").with(a_string_including("the assistant couldn't reply"))
+          .and have_broadcasted_to(chat.stream_name).with(a_string_including("the assistant couldn't reply"))
       end
     end
   end
@@ -219,7 +219,7 @@ RSpec.describe ChatResponseJob, type: :job do
         expect {
           described_class.perform_now(chat.id, "Hello")
         }.to raise_error(error.class)
-          .and have_broadcasted_to("chat_#{chat.id}").with(a_string_including("the assistant couldn't reply"))
+          .and have_broadcasted_to(chat.stream_name).with(a_string_including("the assistant couldn't reply"))
       end
     end
   end

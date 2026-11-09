@@ -19,10 +19,26 @@ class Users::SessionsController < Devise::SessionsController
   #   super
   # end
 
-  # POST /resource/sign_in
-  # def create
-  #   super
-  # end
+  def create
+    super do |user|
+      chat_id = request.headers[GuestChatSession::SAVE_CHAT_HEADER]
+      if chat_id.present?
+        guest = GuestChatSession.new(request.headers[GuestChatSession::HEADER])
+        @saved_guest_chat = guest.save_chat(chat_id, user)
+        if @saved_guest_chat
+          flash[:notice] = "Chat saved to your account."
+        else
+          flash[:alert] = "This guest chat is no longer available to save."
+        end
+      end
+    end
+  end
+
+  protected
+
+  def after_sign_in_path_for(resource)
+    @saved_guest_chat ? chat_path(@saved_guest_chat) : super
+  end
 
   # DELETE /resource/sign_out
   # def destroy

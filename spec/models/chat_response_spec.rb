@@ -97,14 +97,14 @@ RSpec.describe ChatResponse, type: :model do
     first.complete!
     enqueue("A newer question")
 
-    expect { first.broadcast_status }.not_to have_broadcasted_to("chat_#{chat.id}")
+    expect { first.broadcast_status }.not_to have_broadcasted_to(chat.stream_name)
   end
 
   it "reloads the latest state before broadcasting a delayed status" do
     response = enqueue
     described_class.find(response.id).update!(status: "writing")
 
-    expect { response.broadcast_status }.to have_broadcasted_to("chat_#{chat.id}").with(
+    expect { response.broadcast_status }.to have_broadcasted_to(chat.stream_name).with(
       a_string_including("Writing a response")
     )
   end

@@ -20,6 +20,11 @@ class Chat < ApplicationRecord
     guest_session_digest.present?
   end
 
+  # A guest subscription issued before sign-in cannot receive account messages.
+  def stream_name
+    guest? ? "chat_#{id}" : "account_#{user_id}_chat_#{id}"
+  end
+
   def response_in_progress?
     chat_responses.active.exists?
   end
@@ -29,7 +34,7 @@ class Chat < ApplicationRecord
   end
 
   def broadcast_title
-    broadcast_update_to "chat_#{id}",
+    broadcast_update_to stream_name,
       targets: "[data-chat-title='#{id}'], head title",
       partial: "chats/title",
       locals: {chat: self}
@@ -37,14 +42,14 @@ class Chat < ApplicationRecord
 
   def broadcast_reply_failed
     # Turbo replaces an existing direct child with the same ID on append.
-    broadcast_append_to "chat_#{id}",
+    broadcast_append_to stream_name,
       target: "messages",
       partial: "messages/reply_failed",
       locals: {chat: self}
   end
 
   def broadcast_reply_succeeded
-    broadcast_remove_to "chat_#{id}", target: "chat_#{id}_reply_failed"
+    broadcast_remove_to stream_name, target: "chat_#{id}_reply_failed"
   end
 
   private
