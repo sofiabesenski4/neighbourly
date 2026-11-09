@@ -1,0 +1,653 @@
+[
+  {
+    "id": "our-place-society-001",
+    "post_title": "Our Place Society",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "919 Pandora Ave"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-388-7112"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Shelter and drop-in support"
+      },
+      {
+        "name": "Showers"
+      },
+      {
+        "name": "Storage"
+      },
+      {
+        "name": "Clothing and household items"
+      }
+    ],
+    "notes": "The guide lists breakfast 7–8am, lunch 12–1pm, and dinner 5–6:30pm seven days a week. Coffee service is listed at 8–10am, 2–4pm, and 6–8pm when volunteers are available. Also listed for day lockers, long-term storage bins, showers, phone/mail/messaging services, outreach, and seasonal shelter information.",
+    "intake_info": "For storage, day lockers are available from 8am until capacity; pickup listed 7–7:30pm. Hours and services may vary. Call ahead where indicated in the guide."
+  },
+  {
+    "id": "rock-bay-landing-002",
+    "post_title": "Rock Bay Landing (Victoria Cool Aid Society)",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "535 Ellice St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-383-1951"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Emergency shelter"
+      },
+      {
+        "name": "Harm reduction"
+      },
+      {
+        "name": "Health services"
+      },
+      {
+        "name": "ID replacement"
+      },
+      {
+        "name": "Legal clinics"
+      }
+    ],
+    "notes": "The guide describes 24/7 co-ed and women’s-only options, trans-inclusive service, and pets allowed. Bed signup starts at 7am and bed giveaway is at 1pm; shelter curfew is listed as 2–5am. The guide also lists resident services and access to health support.",
+    "intake_info": "The 2022 guide says bed signup starts at 7am and beds are given out at 1pm. Confirm current availability and intake directly."
+  },
+  {
+    "id": "sandy-merriman-house-003",
+    "post_title": "Sandy Merriman House",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "809 Burdett Ave"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-480-1408"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Emergency shelter"
+      },
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Showers"
+      },
+      {
+        "name": "Free phone"
+      }
+    ],
+    "notes": "For women at risk of or experiencing homelessness, including trans women, gender-fluid and non-binary people, age 19+. The guide says bed signup starts at 7:30am and beds are assigned at 2pm. Some services were marked residents-only due to COVID-19 in the 2022 guide.",
+    "intake_info": "Call ahead to confirm current eligibility, space and intake."
+  },
+  {
+    "id": "salvation-army-arc-004",
+    "post_title": "Salvation Army Addictions Rehabilitation Centre (ARC)",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "525 Johnson St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-384-3396"
+        }
+      }
+    ],
+    "beds": {
+      "availability": 105,
+      "full": false
+    },
+    "taxonomies": [
+      {
+        "name": "Transitional housing"
+      },
+      {
+        "name": "Emergency shelter"
+      },
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Substance use support"
+      },
+      {
+        "name": "Clothing and household items"
+      }
+    ],
+    "notes": "The guide lists 84 transitional beds and 21 emergency shelter beds. Emergency shelter intake time is listed as 1pm, for men 19+. Meals are listed Monday–Friday at noon. Transitional beds have a daily rate or $550/month including meals, according to the guide.",
+    "intake_info": "The guide advises calling ahead to confirm space/intake. Addictions rehabilitation intake listed Monday–Friday 8:30am–4:30pm."
+  },
+  {
+    "id": "the-cridge-transition-house-005",
+    "post_title": "The Cridge Transition House",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      }
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-479-3963"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Transition house"
+      },
+      {
+        "name": "Family violence support"
+      },
+      {
+        "name": "Shelter"
+      }
+    ],
+    "notes": "A safe place for self-identified women, with or without children, escaping violence or abuse in their homes.",
+    "intake_info": "The guide lists the phone line as available 24/7."
+  },
+  {
+    "id": "the-arbutus-shelter-006",
+    "post_title": "The Arbutus Shelter",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "2916 Douglas St (around back)"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-360-0093"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Shelter"
+      }
+    ],
+    "notes": "Listed in the guide’s emergency shelter section."
+  },
+  {
+    "id": "out-of-the-rain-youth-shelter-007",
+    "post_title": "Out of the Rain Youth Shelter",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "1450 Elford St (location may change)"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-415-3856"
+        }
+      }
+    ],
+    "age_range": {
+      "min": 15,
+      "max": 25
+    },
+    "taxonomies": [
+      {
+        "name": "Youth emergency shelter"
+      },
+      {
+        "name": "Seasonal shelter"
+      }
+    ],
+    "notes": "Youth shelter for ages 15–25. The guide lists overnight hours as 8:30pm–8am and seasonal operation from October 15 to April 15. Pets may be allowed; check the schedule.",
+    "intake_info": "Confirm current location, schedule and pet policy before attending."
+  },
+  {
+    "id": "kiwanis-emergency-youth-shelter-008",
+    "post_title": "Kiwanis Emergency Youth Shelter (KEYS)",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "2117 Vancouver St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-386-8282"
+        }
+      }
+    ],
+    "age_range": {
+      "min": 13,
+      "max": 18
+    },
+    "taxonomies": [
+      {
+        "name": "Youth emergency shelter"
+      },
+      {
+        "name": "Youth and family mediation"
+      }
+    ],
+    "notes": "The guide lists 1–7 day stays, counsellors, meals, laundry, hygiene supplies, and youth/family mediation.",
+    "intake_info": "Open 24/7. Intake Monday–Friday; no intake from 9am–1pm, according to the guide."
+  },
+  {
+    "id": "rainbow-kitchen-009",
+    "post_title": "Rainbow Kitchen",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "500 Admirals Rd"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-384-2069"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Food support"
+      }
+    ],
+    "notes": "Meals Monday–Friday starting at 8:30am; first come, first served. Bread and produce depend on availability. The guide also mentions a Christmas meal on December 25."
+  },
+  {
+    "id": "mustard-seed-010",
+    "post_title": "The Mustard Seed",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "625 Queens Ave"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-953-1575"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Food bank"
+      },
+      {
+        "name": "Clothing"
+      },
+      {
+        "name": "Foot care"
+      },
+      {
+        "name": "Hair cuts"
+      },
+      {
+        "name": "Family services"
+      }
+    ],
+    "notes": "The guide lists weekday lunch from noon–1pm, coffee and afternoon programs, a Friday Street Cafe at 6pm, and Saturday Agape Lunch at noon. It also lists a clothing boutique, foot care on Tuesdays 11am–2pm subject to nurse availability, and family services.",
+    "intake_info": "For foot care, the guide advises calling to check whether the nurse is available. For haircuts, call around 9am to check whether the chaplain/hairdresser is in."
+  },
+  {
+    "id": "anawim-house-011",
+    "post_title": "Anawim House",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "973 Caledonia Ave"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-382-0283"
+        }
+      }
+    ],
+    "age_range": {
+      "min": 19
+    },
+    "taxonomies": [
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Showers"
+      },
+      {
+        "name": "Laundry"
+      }
+    ],
+    "notes": "For adults 19+ who are abstinent from substances. Breakfast is listed Monday, Tuesday, Thursday and Friday at 10am. Lunch signup is 10–11am on those days, with a maximum of 20 lunches. Showers and laundry listed Monday, Tuesday, Thursday and Friday 9:30am–3pm."
+  },
+  {
+    "id": "9-10-club-soup-kitchen-012",
+    "post_title": "9-10 Club Soup Kitchen",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "St Andrew’s Cathedral, 740 View St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "778-440-7687"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Meals"
+      },
+      {
+        "name": "Food support"
+      }
+    ],
+    "notes": "Breakfast is listed Monday–Friday, 8–10am. The guide says bagged soup-to-go meals were available during COVID-19 and the service was open on statutory holidays except Christmas Day."
+  },
+  {
+    "id": "avi-aids-vancouver-island-013",
+    "post_title": "AVI (AIDS Vancouver Island)",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "713 Johnson St, 3rd Floor"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-384-2366"
+        }
+      },
+      {
+        "contact": {
+          "phone_number": "250-889-0268"
+        }
+      },
+      {
+        "contact": {
+          "phone_number": "250-896-2849"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Harm reduction"
+      },
+      {
+        "name": "Overdose prevention"
+      },
+      {
+        "name": "Peer support"
+      },
+      {
+        "name": "Nursing care"
+      },
+      {
+        "name": "Counselling and referrals"
+      }
+    ],
+    "notes": "The guide lists naloxone, overdose prevention, safer drug-use and safer-sex supplies, peer support, nursing care, harm-reduction counselling and referrals. Main hours listed Monday–Friday 10am–3pm; inreach daily 3–10pm; mobile harm reduction Wednesday–Friday noon–4pm in the Victoria area."
+  },
+  {
+    "id": "daily-dose-society-014",
+    "post_title": "Daily Dose Society",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "820 Cormorant St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-800-0569"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Harm reduction"
+      },
+      {
+        "name": "Substance use support"
+      },
+      {
+        "name": "Naloxone"
+      },
+      {
+        "name": "Outreach"
+      },
+      {
+        "name": "Transportation support"
+      }
+    ],
+    "notes": "The guide lists supply distribution, a naloxone program, support for substitution drug therapies, outreach and education for adults and teens, and COVID testing. Wheels for Recovery provides free transportation for people in substance-use recovery to important appointments and other services."
+  },
+  {
+    "id": "solid-015",
+    "post_title": "SOLID (Society of Living Illicit Drug Users)",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "1056 North Park St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-298-9497"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Peer support"
+      },
+      {
+        "name": "Harm reduction"
+      },
+      {
+        "name": "Support groups"
+      },
+      {
+        "name": "Naloxone training"
+      }
+    ],
+    "notes": "The guide lists peer support, safer substance-use information, Women’s Night, Indigenous Women’s Action Group, Women’s Hep C Group and naloxone training. Outreach times are listed daily 8:30–10:30am and Monday–Friday 8:30–10:30pm.",
+    "intake_info": "The guide lists office hours as 9am–4pm and peer support office hours Monday–Friday from 3pm; confirm current schedules."
+  },
+  {
+    "id": "the-harbour-016",
+    "post_title": "The Harbour Supervised Consumption Site",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "941 Pandora Ave"
+    },
+    "taxonomies": [
+      {
+        "name": "Supervised consumption"
+      },
+      {
+        "name": "Harm reduction"
+      },
+      {
+        "name": "Counselling"
+      },
+      {
+        "name": "Medical support"
+      },
+      {
+        "name": "Naloxone"
+      }
+    ],
+    "notes": "The guide describes consumption booths, post-use areas, counselling, medical help, naloxone kits, education and support. Hours listed as 8am–8pm, seven days a week."
+  },
+  {
+    "id": "safe-inhalation-site-017",
+    "post_title": "Safe Inhalation Site",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "926 Pandora Ave"
+    },
+    "taxonomies": [
+      {
+        "name": "Supervised consumption"
+      },
+      {
+        "name": "Harm reduction"
+      }
+    ],
+    "notes": "Hours listed in the guide as 8am–6:30pm, seven days a week."
+  },
+  {
+    "id": "cool-aid-access-health-centre-018",
+    "post_title": "Cool Aid Access Health Centre",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "713 Johnson St"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-385-8469"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Primary health care"
+      },
+      {
+        "name": "Health services"
+      }
+    ],
+    "notes": "The guide says the centre was accepting new patients. Listed hours: Monday and Tuesday 9am–6pm, Wednesday and Thursday 9am–8pm, Friday 9am–3pm. Same-day booking for patients only.",
+    "intake_info": "Call or email; the guide lists same-day booking for patients."
+  },
+  {
+    "id": "cool-aid-dental-019",
+    "post_title": "Cool Aid Dental Clinic",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "713 Johnson St, 2nd Floor"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-383-5957"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Dental care"
+      },
+      {
+        "name": "Health services"
+      }
+    ],
+    "notes": "The guide lists hours Monday–Thursday 9am–4pm and Friday 8:30am–3pm.",
+    "intake_info": "Call or email to make an appointment, according to the guide."
+  },
+  {
+    "id": "the-law-centre-020",
+    "post_title": "The Law Centre",
+    "location": {
+      "city": {
+        "label": "Victoria",
+        "value": "victoria"
+      },
+      "street_address": "225-850 Burdett Ave"
+    },
+    "contact": [
+      {
+        "contact": {
+          "phone_number": "250-385-1221"
+        }
+      }
+    ],
+    "taxonomies": [
+      {
+        "name": "Legal support"
+      },
+      {
+        "name": "Legal advice"
+      },
+      {
+        "name": "Family law"
+      },
+      {
+        "name": "Civil law"
+      },
+      {
+        "name": "Criminal law"
+      }
+    ],
+    "notes": "The guide describes free legal advice for small cases, criminal, civil and family law. Switchboard hours listed as 8am–noon and 1–4pm; office hours listed Monday–Friday 9:30am–noon and 1:15–3:30pm."
+  }
+]
