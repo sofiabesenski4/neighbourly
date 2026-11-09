@@ -39,8 +39,12 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     click_button "Generate printout"
 
-    expect(page).to have_link("Open PDF", href: /\Ablob:/)
-    expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)
+    # The person opens the printout in a new tab. Nothing tries to print it from a frame,
+    # and focus moves to the link so keyboard users can open it straight away.
+    expect(page).to have_link("Open printout", href: /\Ablob:/)
+    expect(find_link("Open printout")[:target]).to eq("_blank")
+    expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Open printout")
+    expect(page).to have_no_css("iframe", visible: :all)
   end
 
   it "updates cards and print availability when categories are selected and cleared" do
@@ -163,7 +167,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     # Keeps a copy of the PDF as the page turns it into a link. Fetching the link
     # afterwards isn't possible, because the site's security policy blocks that, as
-    # it should: the page only ever shows the PDF in a frame or a new tab.
+    # it should: the page only ever opens the PDF in a new tab.
     def capture_printout
       page.execute_script <<~JAVASCRIPT
         const createObjectURL = URL.createObjectURL.bind(URL);
@@ -228,7 +232,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       click_button "Generate printout"
 
-      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_link("Open printout", href: /\Ablob:/)
       expect(printed_text).to include("Alpha meals")
       expect(printed_text).not_to include("Distance")
     end
@@ -247,7 +251,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       click_button "Generate printout"
 
-      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_link("Open printout", href: /\Ablob:/)
       expect(printed_text).to include("Distances are from 919 Pandora Ave", "Distance: 1.1 km straight-line, about 17 min walk")
     end
 
@@ -258,7 +262,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       find_field("Enter a place").send_keys("919 Pandora Ave", :return)
 
       expect(page).to have_text("Distances from: 919 Pandora Ave.")
-      expect(page).to have_no_link("Open PDF")
+      expect(page).to have_no_link("Open printout")
       expect(page).to have_current_path(new_flyer_path)
     end
 
@@ -299,7 +303,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_text("We can't check 919 Pandora Ave right now")
       click_button "Generate printout"
 
-      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_link("Open printout", href: /\Ablob:/)
       expect(printed_text).to include("Alpha meals", "Distances aren't shown")
       expect(printed_text).not_to include("Distance:")
     end
@@ -314,14 +318,13 @@ RSpec.describe "Live resource guide builder", type: :system do
       check "Meals"
       expect(page).to have_text("1 resource · 1 card")
       click_button "Generate printout"
-      expect(page).to have_link("Open PDF", href: /\Ablob:/)
+      expect(page).to have_link("Open printout", href: /\Ablob:/)
 
       click_button "Change"
 
       expect(page).to have_text("Where should we measure distances from?")
       expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
-      expect(page).to have_no_link("Open PDF")
-      expect(page).to have_no_css('iframe[title="Printable resource guide"]', visible: :all)
+      expect(page).to have_no_link("Open printout")
 
       click_button "Skip distances"
 
@@ -386,7 +389,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_button("Generate printout", disabled: false)
       # Long enough for the slow reply to have arrived if it hadn't been cancelled.
       page.evaluate_async_script("setTimeout(arguments[0], 1500)")
-      expect(page).to have_no_link("Open PDF")
+      expect(page).to have_no_link("Open printout")
     end
 
     # Uses Chrome's real location API and permission system. Chrome's developer tools
@@ -422,7 +425,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
 
         click_button "Generate printout"
-        expect(page).to have_link("Open PDF", href: /\Ablob:/)
+        expect(page).to have_link("Open printout", href: /\Ablob:/)
         expect(printed_text).to include("Distances are from your location", "Distance: 1.1 km")
         expect(printed_text).not_to include("48.42", "123.36")
       end
