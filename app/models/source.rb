@@ -7,6 +7,10 @@ class Source < ApplicationRecord
   broadcasts_refreshes
   after_commit -> { broadcast_refresh_later_to "sources" }, on: [:update, :destroy]
 
+  # A blank URL is stored as NULL. The unique index on url allows any number
+  # of NULLs but only one empty string, so sources without a URL would clash.
+  normalizes :url, with: ->(url) { url.strip.presence }
+
   validates :name, presence: true
   validates :url, presence: true, unless: -> { form? || api? || csv? }
   validates :url, uniqueness: true, if: -> { url.present? }
