@@ -13,6 +13,10 @@ class EnrichDocumentJob < ApplicationJob
   retry_on RubyLLM::RateLimitError, RubyLLM::OverloadedError, RubyLLM::ServerError, RubyLLM::ServiceUnavailableError,
     Faraday::TimeoutError, Faraday::ConnectionFailed,
     wait: :polynomially_longer, attempts: 5
+  # Replies vary from call to call, so a reply without usable JSON or a
+  # summary is worth asking for again, but only a couple of times. Rows that
+  # still fail are left for sources:enrich.
+  retry_on ContentPipeline::Enricher::InvalidResponse, wait: 30.seconds, attempts: 3
   discard_on ActiveJob::DeserializationError
 
   def perform(document)

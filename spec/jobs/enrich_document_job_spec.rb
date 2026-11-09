@@ -70,6 +70,12 @@ RSpec.describe EnrichDocumentJob do
     expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
   end
 
+  it "asks again later when the model's reply cannot be used" do
+    allow(enricher).to receive(:enrich!).and_raise(ContentPipeline::Enricher::InvalidResponse, "The model returned no summary.")
+
+    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+  end
+
   it "retries later when the model is rate limited" do
     allow(enricher).to receive(:enrich!).and_raise(RubyLLM::RateLimitError, "slow down")
 
