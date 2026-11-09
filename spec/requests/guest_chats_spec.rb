@@ -22,6 +22,60 @@ RSpec.describe "Guest chats", type: :request do
     Chat.last
   end
 
+  it "saves only the selected guest conversation after successful sign-in" do
+    chat = start_guest_chat
+    other_chat = start_guest_chat
+    user = User.create!(email: "save-guest@example.com", password: "password123")
+    headers = tab_headers.merge("X-Neighbourly-Guest-Chat" => chat.id.to_s)
+    guest_stream = "chat_#{chat.id}"
+
+    post user_session_path, params: {user: {email: user.email, password: "wrong-password"}}, headers: headers
+    expect(chat.reload).to be_guest
+
+    expect {
+      post user_session_path, params: {user: {email: user.email, password: "password123"}}, headers: headers
+    }.not_to change(Chat, :count)
+    expect(response).to redirect_to(chat_path(chat))
+    expect(chat.reload.user).to eq(user)
+    expect(chat.guest_session_digest).to be_nil
+    expect(chat.stream_name).not_to eq(guest_stream)
+    expect(other_chat.reload).to be_guest
+    follow_redirect!
+    expect(response.body).to include(question)
+
+    other_browser = open_session
+    other_browser.get guest_chat_path(chat), headers: tab_headers
+    expect(URI.parse(other_browser.response.location).path).to eq(new_chat_path)
+    allow(ActionCable.server).to receive(:broadcast).and_call_original
+    chat.messages.create!(role: "user", content: "Private account follow-up")
+    expect(ActionCable.server).to have_received(:broadcast).with(chat.stream_name, any_args)
+    expect(ActionCable.server).not_to have_received(:broadcast).with(guest_stream, any_args)
+  end
+
+  it "does not save a guest conversation without the originating tab key" do
+    chat = start_guest_chat
+    user = User.create!(email: "wrong-tab@example.com", password: "password123")
+    headers = {"X-Neighbourly-Guest-Chat" => chat.id.to_s, "X-Neighbourly-Guest-Token" => SecureRandom.hex(32)}
+
+    post user_session_path, params: {user: {email: user.email, password: "password123"}}, headers: headers
+
+    expect(response).to redirect_to(root_path)
+    expect(chat.reload).to be_guest
+  end
+
+  it "does not save an expired guest conversation even with the correct tab key" do
+    chat = start_guest_chat
+    user = User.create!(email: "expired-guest@example.com", password: "password123")
+
+    travel 25.hours do
+      post user_session_path, params: {user: {email: user.email, password: "password123"}},
+        headers: tab_headers.merge("X-Neighbourly-Guest-Chat" => chat.id.to_s)
+
+      expect(response).to redirect_to(root_path)
+      expect(chat.reload).to be_guest
+    end
+  end
+
   it "opens the chat workspace without creating a chat or running a model" do
     expect { get new_chat_path }.not_to change(Chat, :count)
 

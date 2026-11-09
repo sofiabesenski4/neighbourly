@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <% guest_chat_page = !user_signed_in? && (content_for?(:landing_page) || content_for?(:chat_workspace)) %>
 <% printout_page = controller_name == "flyers" %>
-<% guest_support_page = guest_chat_page || (printout_page && !user_signed_in?) %>
+<% guest_support_page = guest_chat_page || (!user_signed_in? && (printout_page || content_for?(:sign_in_page))) %>
 <html class="h-full">
   <head>
     <title><%= content_for(:title) || "Neighbourly Resources" %></title>
@@ -11,11 +11,11 @@
     <meta name="mobile-web-app-capable" content="yes">
     <%= csrf_meta_tags %>
     <%= csp_meta_tag %>
-    <% if guest_chat_page || printout_page %>
+    <% if guest_support_page || printout_page %>
       <%# Turbo must load a new document when crossing the PDF frame policy boundary. %>
       <meta name="support-document-policy" content="pdf-frame" data-turbo-track="reload">
     <% end %>
-    <% if guest_chat_page %>
+    <% if guest_chat_page || content_for?(:sign_in_page) %>
       <meta name="turbo-cache-control" content="no-cache">
     <% end %>
 

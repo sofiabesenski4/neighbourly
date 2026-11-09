@@ -171,7 +171,7 @@ class ChatResponse < ApplicationRecord
       reload
       return unless self.class.where(chat_id: chat_id).maximum(:id) == id
 
-      broadcast_replace_to "chat_#{chat_id}",
+      broadcast_replace_to parent.stream_name,
         target: "chat_#{chat_id}_response_status",
         partial: "chats/response_status",
         locals: {chat: parent, response: self}
