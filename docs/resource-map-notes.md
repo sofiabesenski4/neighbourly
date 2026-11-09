@@ -199,6 +199,10 @@ Not part of the current goal, but easy to add later:
   so partial home addresses aren't sent to the geocoder as someone types.
 - Walking-time rings on the map.
 - Real walking routes, driving or transit times.
+- Turbo on the links into the builder. They use `data-turbo="false"` only so that the
+  builder's own security policy, which allowed PDF frames, applied on arrival. The printout
+  now opens in a new tab and that exception is gone, so the links could use Turbo again.
+  Check that the location screen still starts clean on a Turbo visit before changing them.
 
 ## Environment and tooling
 

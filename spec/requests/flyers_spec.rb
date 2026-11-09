@@ -18,11 +18,14 @@ RSpec.describe "Flyers", type: :request do
       expect(response.body).to include('data-controller="flyer-builder"', "Generate printout", "Your guide")
     end
 
-    it "allows only local PDF blobs to be embedded on the builder screen" do
+    # The printout opens in its own tab, so this screen needs no exception to the
+    # app-wide policy against embedded content.
+    it "keeps the app-wide policy against embedded content on the builder screen" do
       get new_flyer_path
 
       csp = response.headers.fetch("Content-Security-Policy")
-      expect(csp).to include("frame-src blob:", "object-src blob:", "script-src 'self'", "frame-ancestors 'none'")
+      expect(csp).to include("frame-src 'none'", "object-src 'none'", "script-src 'self'", "frame-ancestors 'none'")
+      expect(csp).not_to include("blob:")
     end
 
     it "preserves an explicit category selection in the form" do

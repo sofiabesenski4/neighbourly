@@ -457,29 +457,21 @@ export default class extends Controller {
       }
       const blob = await response.blob();
       if (revision !== this.revision || !this.element.isConnected) return;
+      // The person opens the PDF themselves, in a new tab, and prints it from the
+      // browser's PDF viewer. The page doesn't try to print it automatically:
+      // - Printing from a hidden frame was unreliable. The frame's load event fires
+      //   before the browser's PDF viewer has drawn the pages, so print() sometimes
+      //   printed blank pages, and browsers give no event for "finished drawing".
+      // - A blob: document takes this page's security policy, whose
+      //   frame-ancestors 'none' stops it being shown in a frame at all (Safari).
+      // - Opening the tab from here, rather than from a click, would be stopped by
+      //   popup blockers, because the fetch above means it's no longer a click.
       this.pdfUrl = URL.createObjectURL(blob);
       this.pdfLinkTarget.href = this.pdfUrl;
       this.printoutTarget.hidden = false;
-      this.printFrame = document.createElement("iframe");
-      this.printFrame.className = "fixed right-0 bottom-0 h-px w-px border-0";
-      this.printFrame.title = "Printable resource guide";
-      this.printFrame.setAttribute("aria-hidden", "true");
-      this.printFrame.tabIndex = -1;
-      this.printFrame.addEventListener(
-        "load",
-        () => {
-          if (revision !== this.revision) return;
-          try {
-            this.printFrame.contentWindow.focus();
-            this.printFrame.contentWindow.print();
-          } catch {
-            // The visible PDF link supports browsers without automatic PDF printing.
-          }
-        },
-        { once: true },
-      );
-      this.printFrame.src = this.pdfUrl;
-      this.element.append(this.printFrame);
+      // Moving focus here lets keyboard and screen reader users reach the new
+      // button straight away, rather than searching the page for it.
+      this.pdfLinkTarget.focus();
     } catch (error) {
       if (error.name === "AbortError" || revision !== this.revision) return;
       this.printErrorTarget.textContent = error.message;
@@ -493,9 +485,9 @@ export default class extends Controller {
     }
   }
 
+  // A tab the person already opened keeps its copy of the PDF after the link is
+  // revoked here, so this only stops the page offering an out-of-date printout.
   clearPrintout() {
-    this.printFrame?.remove();
-    this.printFrame = null;
     if (this.pdfUrl) URL.revokeObjectURL(this.pdfUrl);
     this.pdfUrl = null;
     this.pdfLinkTarget.removeAttribute("href");
