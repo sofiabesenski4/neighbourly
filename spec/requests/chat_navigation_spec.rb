@@ -81,11 +81,11 @@ RSpec.describe "Support page navigation", type: :request do
     end
   end
 
-  it "opens the guest workspace with the PDF frame policy" do
+  it "keeps the app-wide policy against embedded content in the guest workspace" do
     get new_chat_path
 
     expect(response).to have_http_status(:ok)
     csp = response.headers.fetch("Content-Security-Policy")
-    expect(csp).to include("frame-src blob:", "object-src 'none'", "script-src 'self'")
+    expect(csp).to include("frame-src 'none'", "object-src 'none'", "script-src 'self'")
   end
 end
