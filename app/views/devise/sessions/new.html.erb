@@ -11,7 +11,7 @@
       </p>
     </div>
 
-    <%= form_for(resource, as: resource_name, url: session_path(resource_name), html: { class: "mt-6 space-y-6" }) do |f| %>
+    <%= form_for(resource, as: resource_name, url: session_path(resource_name), html: { class: "mt-6 space-y-6", data: { guest_chat_sign_in: true } }) do |f| %>
       <div class="rounded-md shadow-sm space-y-4">
         <div>
           <%= f.label :email, "Email address", class: "block text-sm font-medium text-stone-900 mb-2" %>
@@ -30,6 +30,14 @@
           <%= f.label :remember_me, class: "ml-2 block text-sm text-stone-700" %>
         </div>
       <% end %>
+
+      <fieldset data-guest-chat-save hidden class="rounded-lg border border-stone-200 bg-white p-3 text-sm">
+        <label class="flex items-center gap-2 font-medium text-stone-900">
+          <input type="checkbox" class="accent-sage-700" checked>
+          Save this chat to my account
+        </label>
+        <p class="mt-1 text-stone-600">You can find it in your chat history after signing in.</p>
+      </fieldset>
 
       <div>
         <%= f.submit "Sign in", class: "group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-sage-600 hover:bg-sage-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sage-500 transition-colors" %>

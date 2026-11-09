@@ -23,7 +23,12 @@
       </button>
       <h1 data-chat-title="<%= chat.id %>" class="min-w-0 flex-1 truncate text-sm font-medium text-stone-700"><%= chat_title(chat) %></h1>
       <% unless user_signed_in? %>
-        <p class="w-full text-xs text-stone-600">Guest chat. Refreshing or closing this tab ends access to your conversation.</p>
+        <p class="w-full text-xs text-stone-600">
+          Guest chat. Refreshing or closing this tab ends access to your conversation.
+          <% if chat.persisted? %>
+            <%= link_to "Sign in to save your chat", new_user_session_path, class: "font-medium text-sage-800 underline" %>
+          <% end %>
+        </p>
       <% end %>
     </header>
 

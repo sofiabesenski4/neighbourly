@@ -25,7 +25,7 @@ class Message < ApplicationRecord
     return unless conversation_visible?
 
     broadcast_safely do
-      broadcast_append_to "chat_#{chat_id}",
+      broadcast_append_to chat.stream_name,
         target: "message_#{id}_content",
         content: ERB::Util.html_escape(content.to_s)
     end
@@ -35,7 +35,7 @@ class Message < ApplicationRecord
     return unless role == "assistant" && conversation_visible?
 
     broadcast_safely do
-      broadcast_replace_to "chat_#{chat_id}",
+      broadcast_replace_to chat.stream_name,
         target: "message_#{id}_rag_context",
         partial: "messages/rag_context",
         locals: {message: self, show_report_button: true}
@@ -53,12 +53,12 @@ class Message < ApplicationRecord
   end
 
   def broadcast_conversation_append
-    broadcast_safely { broadcast_append_to "chat_#{chat_id}", target: "messages" }
+    broadcast_safely { broadcast_append_to chat.stream_name, target: "messages" }
   end
 
   def broadcast_conversation_update
     if conversation_visible?
-      broadcast_safely { broadcast_replace_to "chat_#{chat_id}" }
+      broadcast_safely { broadcast_replace_to chat.stream_name }
     elsif CONVERSATION_ROLES.include?(role_before_last_save)
       # An assistant placeholder can turn into a tool call after streaming.
       # Remove its visible shell without rendering the internal payload.
@@ -67,7 +67,7 @@ class Message < ApplicationRecord
   end
 
   def broadcast_conversation_removal
-    broadcast_safely { broadcast_remove_to "chat_#{chat_id}" }
+    broadcast_safely { broadcast_remove_to chat.stream_name }
   end
 
   def broadcast_initial_chat_title

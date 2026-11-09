@@ -38,7 +38,7 @@ RSpec.describe Message, type: :model do
         chat.messages.create!(role: "tool", content: "Private tool result")
         create_tool_call_message
       end
-    }.not_to have_broadcasted_to("chat_#{chat.id}")
+    }.not_to have_broadcasted_to(chat.stream_name)
   end
 
   it "does not broadcast updates or deletions of hidden system and tool records" do
@@ -51,7 +51,7 @@ RSpec.describe Message, type: :model do
           message.destroy!
         end
       end
-    }.not_to have_broadcasted_to("chat_#{chat.id}")
+    }.not_to have_broadcasted_to(chat.stream_name)
   end
 
   it "removes a visible placeholder when it becomes a tool request" do
@@ -64,7 +64,7 @@ RSpec.describe Message, type: :model do
           message.update!(content: "Private tool request")
         end
       end
-    }.to have_broadcasted_to("chat_#{chat.id}").with(
+    }.to have_broadcasted_to(chat.stream_name).with(
       a_string_including('action="remove"', "target=\"message_#{message.id}\"")
     )
 
@@ -81,7 +81,7 @@ RSpec.describe Message, type: :model do
         message.broadcast_append_chunk("Private chunk")
         message.broadcast_rag_context
       end
-    }.not_to have_broadcasted_to("chat_#{chat.id}")
+    }.not_to have_broadcasted_to(chat.stream_name)
   end
 
   it "continues streaming public assistant text" do
@@ -89,7 +89,7 @@ RSpec.describe Message, type: :model do
 
     expect {
       message.broadcast_append_chunk("A public answer")
-    }.to have_broadcasted_to("chat_#{chat.id}").with(
+    }.to have_broadcasted_to(chat.stream_name).with(
       a_string_including("target=\"message_#{message.id}_content\"", "A public answer")
     )
   end

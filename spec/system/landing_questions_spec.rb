@@ -82,6 +82,51 @@ RSpec.describe "Landing question composer", type: :system do
     expect(page).not_to have_content("A question from the last visitor")
   end
 
+  it "saves the current guest chat after correcting a failed sign-in" do
+    visit root_path
+    fill_in "What are you looking for?", with: "Where are the free meals?"
+    click_button "Start chat", exact: true
+    expect(page).to have_content("Where are the free meals?")
+    guest_chat = Chat.last
+
+    click_link "Sign in to save your chat"
+    expect(page).to have_checked_field("Save this chat to my account")
+    fill_in "Email address", with: user.email
+    fill_in "Password", with: "wrong-password"
+    click_button "Sign in", exact: true
+    expect(page).to have_content("Invalid email or password.")
+    expect(page).to have_checked_field("Save this chat to my account")
+    expect(guest_chat.reload).to be_guest
+
+    fill_in "Email address", with: user.email
+    fill_in "Password", with: "password123"
+    click_button "Sign in", exact: true
+    expect(page).to have_current_path(chat_path(guest_chat))
+    expect(page).to have_content("Where are the free meals?")
+    expect(guest_chat.reload.user).to eq(user)
+    expect(page).to have_link(href: chat_path(guest_chat), exact: true)
+    page.refresh
+    expect(page).to have_content("Where are the free meals?")
+  end
+
+  it "lets the visitor sign in without saving the guest chat" do
+    visit root_path
+    fill_in "What are you looking for?", with: "Find shelter tonight"
+    click_button "Start chat", exact: true
+    expect(page).to have_content("Find shelter tonight")
+    guest_chat = Chat.last
+
+    click_link "Sign in to save your chat"
+    uncheck "Save this chat to my account"
+    fill_in "Email address", with: user.email
+    fill_in "Password", with: "password123"
+    click_button "Sign in", exact: true
+
+    expect(page).to have_button("Sign out")
+    expect(guest_chat.reload).to be_guest
+    expect(user.chats).to be_empty
+  end
+
   it "keeps a guest conversation while using Printout in the same tab" do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
     source = Source.create!(name: "Local guide", source_type: "api")
