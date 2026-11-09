@@ -65,6 +65,17 @@ RSpec.describe Source, type: :model do
       source = build_source(source_type: "csv", url: nil)
       expect(source).to be_valid
     end
+
+    it "stores a blank url as nil" do
+      expect(build_source(source_type: "csv", url: "  ").url).to be_nil
+    end
+
+    it "allows several sources without a url" do
+      Source.create!(name: "First upload", source_type: "csv", url: "")
+      second = Source.create!(name: "Second upload", source_type: "csv", url: "")
+
+      expect(second.reload.url).to be_nil
+    end
   end
 
   describe "scopes" do
