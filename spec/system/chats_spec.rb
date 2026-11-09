@@ -113,26 +113,14 @@ RSpec.describe "Chats", type: :system do
 
     before { login_as(admin, scope: :user) }
 
-    it "links to the Models page" do
-      visit new_chat_path
+    it "links to Models from the workspace after visiting the old chat list URL" do
+      visit chats_path
+      expect(page).to have_current_path(new_chat_path)
       within("#chat_sidebar") { click_link "Models" }
 
       expect(page).to have_current_path(models_path)
       within("main") { click_link "Chats" }
       expect(page).to have_current_path(new_chat_path)
-    end
-  end
-
-  context "when logged in as an admin" do
-    let(:admin) { User.create!(email: "chatadmin@example.com", password: "password123", admin: true) }
-
-    before { login_as(admin, scope: :user) }
-
-    it "links to the Models page" do
-      visit chats_path
-      click_link "Models"
-
-      expect(page).to have_current_path(models_path)
     end
   end
 end
