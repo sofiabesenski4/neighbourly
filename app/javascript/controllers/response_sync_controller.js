@@ -13,6 +13,7 @@ export default class extends Controller {
     this.assistantIds = new Map();
     this.boundary = "0";
     this.needsReconcile = false;
+    this.lastTerminalReply = null;
     this.beforeStream = this.beforeStream.bind(this);
     this.resume = this.resume.bind(this);
     document.addEventListener("turbo:before-stream-render", this.beforeStream);
@@ -66,6 +67,16 @@ export default class extends Controller {
     }
     this.assistantIds.set(responseId, assistantId);
     this.remember(token);
+    const terminalReply = `${responseId}:${token[1]}`;
+    if (
+      element.dataset.responding === "false" &&
+      assistantId &&
+      this.lastTerminalReply !== terminalReply
+    ) {
+      // Completion can arrive even if the browser missed the assistant message.
+      this.lastTerminalReply = terminalReply;
+      this.scheduleReconcile();
+    }
     this.schedulePoll();
   }
 
@@ -119,9 +130,7 @@ export default class extends Controller {
         if (snapshot) {
           // This HTTP batch lost a race with Cable. Recheck its historical gap.
           this.boundary = "0";
-          this.needsReconcile = true;
-          clearTimeout(this.reconcile);
-          this.reconcile = setTimeout(() => this.refresh(), 0);
+          this.scheduleReconcile();
         }
         return;
       }
@@ -185,6 +194,7 @@ export default class extends Controller {
   async refresh() {
     if (!this.active || this.request || document.hidden || !this.hasUrlValue)
       return;
+    clearTimeout(this.reconcile);
     const request = new AbortController();
     this.request = request;
     this.needsReconcile = false;
@@ -221,12 +231,16 @@ export default class extends Controller {
       if (this.request === request) {
         this.request = null;
         this.schedulePoll();
-        if (this.needsReconcile) {
-          clearTimeout(this.reconcile);
-          this.reconcile = setTimeout(() => this.refresh(), 0);
-        }
+        if (this.needsReconcile) this.scheduleReconcile();
       }
     }
+  }
+
+  scheduleReconcile() {
+    this.needsReconcile = true;
+    if (this.request) return;
+    clearTimeout(this.reconcile);
+    this.reconcile = setTimeout(() => this.refresh(), 0);
   }
 
   schedulePoll() {
