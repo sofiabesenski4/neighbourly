@@ -28,7 +28,7 @@ RSpec.describe "sources rake tasks" do
   end
 
   describe "sources:enrich" do
-    let(:csv_source) { Source.create!(name: "Drop-in Centres", source_type: "csv") }
+    let(:csv_source) { Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true) }
     let!(:pending) { csv_source.documents.create!(content: "Name: A", external_id: "a", metadata: {"Name" => "A"}) }
     let!(:failing) { csv_source.documents.create!(content: "Name: B", external_id: "b", metadata: {"Name" => "B"}) }
     let(:enriched) { [] }
@@ -83,10 +83,17 @@ RSpec.describe "sources rake tasks" do
     end
 
     it "limits enrichment to one source when given an ID" do
-      other = Source.create!(name: "Other", source_type: "csv")
+      other = Source.create!(name: "Other", source_type: "csv", enrich_documents: true)
       other.documents.create!(content: "Name: D", external_id: "d", metadata: {"Name" => "D"})
 
       expect { Rake::Task["sources:enrich"].invoke(other.id) }.to output(/Enriching 1 documents/).to_stdout
+    end
+
+    it "leaves sources that did not opt in alone" do
+      opted_out = Source.create!(name: "Opted out", source_type: "csv")
+      opted_out.documents.create!(content: "Name: E", external_id: "e", metadata: {"Name" => "E"})
+
+      expect { Rake::Task["sources:enrich"].invoke(opted_out.id) }.to output(/Enriching 0 documents/).to_stdout
     end
   end
 
