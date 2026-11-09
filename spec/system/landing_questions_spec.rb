@@ -157,8 +157,9 @@ RSpec.describe "Landing question composer", type: :system do
     expect(page.evaluate_script("window.guestPrintoutViolations")).to eq([])
     click_button "Skip distances"
     click_button "Generate printout"
-    expect(page).to have_link("Open PDF", href: /\Ablob:/)
-    expect(page).to have_css('iframe[title="Printable resource guide"][src^="blob:"]', visible: :all)
+    expect(page).to have_link("Open printout", href: /\Ablob:/)
+    expect(find_link("Open printout")[:target]).to eq("_blank")
+    expect(page).to have_no_css("iframe", visible: :all)
     expect(page.evaluate_script("window.guestPrintoutViolations")).not_to include("frame-src", "object-src")
 
     page.go_back
