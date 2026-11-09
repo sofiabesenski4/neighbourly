@@ -150,6 +150,18 @@ RSpec.describe ContentPipeline::Ingester do
         expect { ingester.ingest(csv) }.not_to have_enqueued_job(EnrichDocumentJob)
       end
 
+      it "still queues enrichment for rows saved before a later row fails" do
+        calls = 0
+        allow(ContentPipeline::Embedder).to receive(:embed) do
+          calls += 1
+          raise RubyLLM::Error, "embedding service unavailable" if calls == 2
+          fake_vector
+        end
+
+        expect { ingester.ingest(csv) }.to raise_error(ActiveRecord::RecordNotSaved)
+        expect(EnrichDocumentJob).to have_been_enqueued.with(source.documents.find_by!(title: "Harbour Meals"))
+      end
+
       it "queues enrichment only for rows this ingestion wrote" do
         ingester.ingest(csv)
         source.documents.find_by!(title: "Harbour Meals").update!(enriched_at: Time.current)
