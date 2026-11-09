@@ -14,6 +14,38 @@ RSpec.describe "Chat response reconciliation", type: :system do
     page.execute_script("window.dispatchEvent(new Event('focus'))")
   end
 
+  it "shows the first reply when its initial message broadcast was missed" do
+    visit new_chat_path
+    fill_in "Prompt", with: "Find meals in Victoria"
+    click_button "Start new chat"
+
+    expect(page).to have_text("Getting ready")
+    expect(page).to have_css("turbo-cable-stream-source[connected]", visible: :all)
+    page.document.synchronize do
+      synced = page.evaluate_script(<<~JS)
+        (() => {
+          const workspace = document.querySelector('[data-controller~="response-sync"]');
+          const sync = window.Stimulus.getControllerForElementAndIdentifier(workspace, 'response-sync');
+          return Boolean(sync && sync.boundary !== '0' && !sync.request);
+        })()
+      JS
+      raise Capybara::ElementNotFound unless synced
+    end
+
+    record = user.chats.last.latest_response
+    allow(ActionCable.server).to receive(:broadcast).and_wrap_original do |broadcast, stream, html, **options|
+      unless html.include?('action="append" target="messages"') && html.include?('aria-label="Assistant message"')
+        broadcast.call(stream, html, **options)
+      end
+    end
+    answer = record.chat.messages.create!(role: "assistant", content: "")
+    answer.update!(content: "Try Rainbow Kitchen.")
+    record.update!(assistant_message: answer, status: "completed")
+
+    expect(page).to have_css("[data-responding='false']", visible: :all)
+    expect(page).to have_css("#message_#{answer.id}", text: "Try Rainbow Kitchen.", count: 1)
+  end
+
   it "echoes a saved question over HTTP and recovers a missed final answer without Cable" do
     allow(ActionCable.server).to receive(:broadcast)
     visit chat_path(chat)
