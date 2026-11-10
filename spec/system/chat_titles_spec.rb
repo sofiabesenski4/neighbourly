@@ -37,12 +37,14 @@ RSpec.describe "Automatic chat titles", type: :system do
   end
 
   it "renders generated titles as plain text" do
+    title = "<img src=x onerror=alert(1)>"
+    chat.update!(title: title)
     visit chat_path(chat)
-    expect(page).to have_css("turbo-cable-stream-source[connected]", visible: :all)
 
-    chat.update!(title: "<img src=x onerror=alert(1)>")
-
-    expect(page).to have_css("h1", text: "<img src=x onerror=alert(1)>")
-    expect(page).not_to have_css("h1 img, #chat_sidebar img", visible: :all)
+    expect(page).to have_css("h1", text: title)
+    expect(page).to have_css("#chat_sidebar a[aria-current='page']", text: title)
+    expect(page).to have_css("#chat_drawer a[aria-current='page']", text: title, visible: :all)
+    expect(page).to have_title(title)
+    expect(page).not_to have_css("h1 img, #chat_sidebar img, #chat_drawer img", visible: :all)
   end
 end

@@ -24,6 +24,22 @@ RSpec.describe ChatTitleJob, type: :job do
     expect(RubyLLM).to have_received(:chat).with(model: chat.model.model_id, provider: chat.model.provider)
   end
 
+  it "broadcasts generated markup as plain text" do
+    title = "<img src=x onerror=alert(1)>"
+    allow(response).to receive(:content).and_return(title)
+
+    expect {
+      described_class.perform_now(chat.id)
+    }.to have_broadcasted_to(chat.stream_name).with(
+      satisfy("contains the title as text without HTML elements") do |payload|
+        template = Nokogiri::HTML.fragment(payload).at_css("turbo-stream[action='update'] template")
+        template&.text == title && template.element_children.empty?
+      end
+    )
+
+    expect(chat.reload.title).to eq(title)
+  end
+
   it "excludes system instructions and tool payloads and bounds the transcript" do
     chat.messages.create!(role: "system", content: "Private reference instructions")
     chat.messages.create!(role: "tool", content: "Internal tool payload")
