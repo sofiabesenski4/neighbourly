@@ -30,3 +30,7 @@ category_names = [
 category_names.each do |name|
   Category.find_or_create_by!(name: name)
 end
+
+# Real resource listings to develop against. Not loaded in other environments,
+# which get their resources from ingested sources.
+load Rails.root.join("db/seeds/greater_victoria_resources.rb") if Rails.env.development?

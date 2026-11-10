@@ -15,14 +15,26 @@ RSpec.describe "Flyers", type: :request do
       Flyer.available_categories.each_value do |label|
         expect(response.body).to include(ERB::Util.html_escape(label))
       end
-      expect(response.body).to include('data-controller="flyer-builder"', "Generate printout", "Your guide")
+      expect(response.body).to include('data-controller="flyer-builder"', "Generate printout")
+      expect(response.body).not_to include("Choose what to include. Your guide updates as you go.",
+        "A resource in two selected categories appears in both sections.", "Your guide", "Live preview")
+      document = Nokogiri::HTML(response.body)
+      heading = document.at_css("h2#flyer-preview-heading[data-flyer-builder-target~='count']")
+      expect(heading["aria-live"]).to eq("polite")
+      icon = document.at_css("button[data-flyer-builder-target='generate'] svg")
+      expect(icon["fill"]).to eq("none")
+      expect(icon["stroke"]).to eq("currentColor")
+      expect(icon["aria-hidden"]).to eq("true")
     end
 
-    it "allows only local PDF blobs to be embedded on the builder screen" do
+    # The printout opens in its own tab, so this screen needs no exception to the
+    # app-wide policy against embedded content.
+    it "keeps the app-wide policy against embedded content on the builder screen" do
       get new_flyer_path
 
       csp = response.headers.fetch("Content-Security-Policy")
-      expect(csp).to include("frame-src blob:", "object-src blob:", "script-src 'self'", "frame-ancestors 'none'")
+      expect(csp).to include("frame-src 'none'", "object-src 'none'", "script-src 'self'", "frame-ancestors 'none'")
+      expect(csp).not_to include("blob:")
     end
 
     it "preserves an explicit category selection in the form" do
@@ -84,6 +96,26 @@ RSpec.describe "Flyers", type: :request do
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("application/pdf")
       expect(response.body).to eq("%PDF-1.4 fake")
+    end
+
+    it "prints the same matching resources in the same order as the preview" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food, shelter])
+      source.documents.create!(title: "Zebra meals", content: "Meals", categories: [shelter])
+      source.documents.create!(title: "Other clinic", content: "Clinic", categories: [health])
+      filters = {flyer: {query: "meals", sort: "desc"}}
+
+      get preview_flyers_path(format: :json), params: filters
+      expect(response).to have_http_status(:ok)
+      names = response.parsed_body.fetch("categories").flat_map { |section| section.fetch("resources").pluck("title") }
+      expect(names).to eq(["Zebra meals", "Alpha meals"])
+
+      post flyers_path, params: filters
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text.scan(/(?:Zebra|Alpha) meals/)).to eq(names)
+      expect(text).not_to include("Other clinic")
     end
 
     it "generates the unfiltered guide when nothing is selected" do

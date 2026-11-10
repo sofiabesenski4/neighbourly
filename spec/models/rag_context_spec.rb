@@ -21,14 +21,16 @@ RSpec.describe RagContext do
         )
       end
 
-      it "prepends reference documents to the user's question" do
+      it "returns reference instructions separately from the user's question" do
         result = rag_context.augment("Where can I find shelter?")
 
-        expect(result.prompt).to include("REFERENCE DOCUMENTS")
-        expect(result.prompt).to include("Test Shelter")
-        expect(result.prompt).to include("City: Vancouver")
-        expect(result.prompt).to include("Source: BC 211 Shelters, URL: https://example.com/api")
-        expect(result.prompt).to include("Where can I find shelter?")
+        expect(result.instructions).to include("REFERENCE DOCUMENTS")
+        expect(result.instructions).to include("Test Shelter")
+        expect(result.instructions).to include("City: Vancouver")
+        expect(result.instructions).to include("Source: BC 211 Shelters")
+        expect(result.instructions).to include("[ref:#{source.documents.first.id}]")
+        expect(result.instructions).not_to include("https://example.com/api")
+        expect(result.instructions).not_to include("Where can I find shelter?")
       end
 
       it "returns the matched documents" do
@@ -43,7 +45,7 @@ RSpec.describe RagContext do
         expect(ContentPipeline::Embedder).to have_received(:embed).with("Where can I find shelter?")
       end
 
-      it "numbers multiple documents" do
+      it "uses stable document IDs rather than retrieval positions" do
         source.documents.create!(
           content: "Another Shelter\nCity: Victoria",
           title: "Another Shelter",
@@ -52,16 +54,26 @@ RSpec.describe RagContext do
         )
 
         result = rag_context.augment("shelters?")
-        expect(result.prompt).to include("[1]")
-        expect(result.prompt).to include("[2]")
+        result.documents.each do |document|
+          expect(result.instructions).to include("[ref:#{document.id}]")
+        end
         expect(result.documents.length).to eq(2)
+      end
+
+      it "asks for supported reference markers without guessing source URLs" do
+        result = rag_context.augment("shelters?")
+
+        expect(result.instructions).to include("Cite a reference only when it supports the claim")
+        expect(result.instructions).to include("Do not invent markers")
+        expect(result.instructions).to include("Do not write, guess, or reconstruct reference URLs")
+        expect(result.instructions).to include("do not comment on whether a URL is available")
       end
     end
 
     context "when no documents exist at all" do
-      it "returns the original content unchanged" do
+      it "returns no reference instructions" do
         result = rag_context.augment("Hello")
-        expect(result.prompt).to eq("Hello")
+        expect(result.instructions).to be_nil
         expect(result.documents).to be_empty
       end
     end

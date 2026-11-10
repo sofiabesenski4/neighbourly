@@ -1,6 +1,9 @@
 module MessagesHelper
-  def default_model_display_name
-    "Default: #{RubyLLM.models.find(RubyLLM.config.default_model).label}"
+  def reference_source_url(source)
+    uri = URI.parse(source.url.to_s)
+    uri.to_s if uri.is_a?(URI::HTTP) && uri.host.present?
+  rescue URI::InvalidURIError
+    nil
   end
 
   def tool_result_partial(message)

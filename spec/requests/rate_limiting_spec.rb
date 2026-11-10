@@ -36,8 +36,8 @@ RSpec.describe "Rate limiting", type: :request do
       attempt(user.email, password: "password123")
       expect(flash[:alert]).to match(/too many sign-in attempts for that account/i)
 
-      get chats_path
-      expect(response).to redirect_to(new_user_session_path)
+      get new_chat_path
+      expect(response.body).to include("Guest chat.")
     end
 
     it "does not lock out a different account on the same connection" do
@@ -46,8 +46,9 @@ RSpec.describe "Rate limiting", type: :request do
       attempt(other_user.email, password: "password123")
 
       expect(flash[:alert]).to be_nil
-      get chats_path
+      get new_chat_path
       expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Sign out")
     end
 
     it "is case-insensitive about the account being guessed" do
@@ -258,12 +259,18 @@ RSpec.describe "Rate limiting", type: :request do
 
     it "allows requests up to the burst limit" do
       expect {
-        10.times { post chat_messages_path(chat), params: params }
+        10.times do
+          post chat_messages_path(chat), params: params
+          chat.chat_responses.last&.complete!
+        end
       }.to have_enqueued_job(ChatResponseJob).exactly(10).times
     end
 
     it "turns the next request away with an explanation" do
-      10.times { post chat_messages_path(chat), params: params }
+      10.times do
+        post chat_messages_path(chat), params: params
+        chat.chat_responses.last&.complete!
+      end
 
       expect {
         post chat_messages_path(chat), params: params
@@ -274,7 +281,10 @@ RSpec.describe "Rate limiting", type: :request do
     end
 
     it "counts per user rather than per IP" do
-      10.times { post chat_messages_path(chat), params: params }
+      10.times do
+        post chat_messages_path(chat), params: params
+        chat.chat_responses.last&.complete!
+      end
       other_chat = other_user.chats.create!
       sign_in other_user
 

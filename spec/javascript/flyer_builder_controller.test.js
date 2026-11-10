@@ -265,6 +265,8 @@ test("sends a chosen location to the preview in the request body", async () => {
   controller.previewErrorTarget = { hidden: true };
   controller.setLoading = () => {};
   controller.selectedCategories = () => ["17"];
+  controller.searchTarget = { value: "meal" };
+  controller.sortTarget = { value: "desc" };
   controller.render = () => {};
   controller.hasLatTarget = true;
   controller.latTarget.value = "48.427";
@@ -283,6 +285,8 @@ test("sends a chosen location to the preview in the request body", async () => {
         // Nothing in the URL: Rails would let a `flyer` there replace the body's.
         assert.equal(url.search, "");
         assert.deepEqual(options.body.getAll("flyer[categories][]"), ["17"]);
+        assert.equal(options.body.get("flyer[query]"), "meal");
+        assert.equal(options.body.get("flyer[sort]"), "desc");
       },
     );
   } finally {
@@ -424,6 +428,8 @@ test("clearing every category requests and renders the complete guide", async ()
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.revision = 0;
     controller.previewUrlValue = "/flyers/preview.json";
+    controller.searchTarget = { value: "" };
+    controller.sortTarget = { value: "default" };
     controller.previewErrorTarget = { hidden: true };
     controller.setLoading = () => {};
     controller.selectedCategories = () => selected;
@@ -442,6 +448,12 @@ test("clearing every category requests and renders the complete guide", async ()
       [],
     );
     assert.deepEqual(rendered.at(-1), [{ key: "17", resources: [] }]);
+
+    controller.searchTarget.value = " free meals ";
+    controller.sortTarget.value = "desc";
+    await controller.refresh();
+    assert.equal(requests[2].searchParams.get("flyer[query]"), "free meals");
+    assert.equal(requests[2].searchParams.get("flyer[sort]"), "desc");
   } finally {
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;
@@ -514,10 +526,12 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.countTarget = {};
     controller.statusTarget = {};
     controller.generateTarget = {};
+    controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
     controller.generating = false;
 
     controller.render([
+      { name: "Empty category", resources: [] },
       {
         name: "Food",
         resources: ["Alpha", "Bravo", "Charlie", "Delta"].map(
@@ -526,6 +540,12 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       },
     ]);
 
+    assert.equal(controller.cardsTarget.children.length, 1);
+    assert.equal(
+      controller.cardsTarget.children[0].children[0].textContent,
+      "Food",
+    );
+    assert.equal(controller.countTarget.textContent, "4 resources included");
     const grid = controller.cardsTarget.children[0].children[1];
     assert.match(grid.className, /grid-cols-1/);
     assert.match(grid.className, /lg:grid-cols-2/);
@@ -534,6 +554,19 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       grid.children.map((card) => card.children[0].textContent),
       ["Alpha", "Bravo", "Charlie", "Delta"],
     );
+    controller.render([
+      { name: "Food", resources: [{ id: 1, title: "Alpha", fields: [] }] },
+      { name: "Health", resources: [{ id: 1, title: "Alpha", fields: [] }] },
+    ]);
+    assert.equal(controller.countTarget.textContent, "1 resource included");
+    controller.render([{ name: "Empty category", resources: [] }]);
+    assert.equal(controller.countTarget.textContent, "0 resources included");
+    assert.equal(controller.cardsTarget.children.length, 1);
+    assert.equal(
+      controller.cardsTarget.children[0].textContent,
+      "No resources are available to display.",
+    );
+    assert.equal(controller.generateTarget.disabled, true);
   } finally {
     globalThis.document = previousDocument;
   }
@@ -571,6 +604,8 @@ test("a delayed preview response cannot replace a newer selection", async () => 
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.revision = 0;
     controller.previewUrlValue = "/flyers/preview.json";
+    controller.searchTarget = { value: "" };
+    controller.sortTarget = { value: "default" };
     controller.previewErrorTarget = { hidden: true };
     controller.setLoading = () => {};
     controller.selectedCategories = () => selected;
