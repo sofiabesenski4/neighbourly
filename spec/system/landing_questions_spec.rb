@@ -32,14 +32,14 @@ RSpec.describe "Landing question composer", type: :system do
     expect(ChatResponseJob).not_to have_received(:perform_later)
   end
 
-  it "starts a guest conversation with a multiline question" do
+  it "starts a guest conversation with Enter after adding a line with Shift+Enter" do
     visit root_path
     fill_in "What are you looking for?", with: "Find a meal"
-    find_field("What are you looking for?").send_keys(:enter, "near downtown")
+    find_field("What are you looking for?").send_keys([:shift, :enter], "near downtown")
     question = "Find a meal\nnear downtown"
     expect(page).to have_field("What are you looking for?", with: question)
     expect(ChatResponseJob).not_to have_received(:perform_later)
-    click_button "Start chat", exact: true
+    find_field("What are you looking for?").send_keys(:enter)
 
     expect(page).to have_content("Chat was successfully created.")
     expect(page).to have_current_path(guest_chat_path(Chat.last))
