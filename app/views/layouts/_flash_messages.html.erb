@@ -1,9 +1,5 @@
 <% if notice.present? || alert.present? %>
-  <% top_classes = if shared_navigation
-       user_signed_in? && current_user.admin? ? "top-52 sm:top-36" : "top-36 sm:top-20"
-     else
-       "top-20"
-     end %>
+  <% top_classes = user_signed_in? && current_user.admin? ? "top-52 sm:top-36" : "top-36 sm:top-20" %>
   <div aria-label="Notifications" data-turbo-temporary class="pointer-events-none fixed inset-x-4 <%= top_classes %> z-50 flex flex-col items-end gap-3 sm:left-auto sm:w-96">
     <% { notice: notice, alert: alert }.each do |kind, message| %>
       <% next if message.blank? %>
