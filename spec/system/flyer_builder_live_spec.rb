@@ -144,6 +144,54 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(widths[2]).to be_within(1).of(grid_width)
   end
 
+  it "pins the full-height desktop panel once the introduction scrolls past" do
+    source = Source.find_by!(name: "Local")
+    18.times { |index| source.documents.create!(title: "Extra meal #{index}", content: "Meals", categories: [food]) }
+    page.current_window.resize_to(1280, 700)
+    visit_builder
+    expect(page).to have_css("article h4", text: "Extra meal 17")
+
+    panel = find("aside[aria-label='Resource filters']")
+    expect(panel.evaluate_script("this.getBoundingClientRect().height")).to be_within(1).of(page.evaluate_script("window.innerHeight"))
+    expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be > 0
+    panel.execute_script("window.scrollTo(0, window.scrollY + this.getBoundingClientRect().top + 50)")
+    expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be_within(1).of(0)
+    expect(find("[data-flyer-builder-target='locationSummaryRow']").evaluate_script("this.getBoundingClientRect().bottom")).to be < 0
+  ensure
+    page.current_window.resize_to(1280, 900)
+  end
+
+  it "scrolls long category lists independently on desktop and mobile" do
+    24.times { |index| Category.create!(name: "Service category #{index + 1}") }
+    page.current_window.resize_to(1280, 900)
+    visit_builder
+
+    within("aside[aria-label='Resource filters']") do
+      list = find("[aria-label='Category list']")
+      expect(list.evaluate_script("getComputedStyle(this).overflowY")).to eq("auto")
+      expect(list.evaluate_script("this.scrollHeight > this.clientHeight")).to be(true)
+      list.execute_script("this.scrollTop = this.scrollHeight")
+      expect(list.evaluate_script("this.scrollTop")).to be > 0
+      expect(page).to have_field("Service category 24")
+    end
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    find("button[aria-label='Filters']").click
+    within("#flyer-filters") do
+      list = find("[aria-label='Category list']")
+      expect(list.evaluate_script("getComputedStyle(this).overflowY")).to eq("auto")
+      expect(list.evaluate_script("this.scrollHeight > this.clientHeight")).to be(true)
+      list.execute_script("this.scrollTop = this.scrollHeight")
+      expect(list.evaluate_script("this.scrollTop")).to be > 0
+      check "Service category 24"
+      click_button "Apply filters"
+    end
+    expect(page).to have_text("No resources match the selected categories.")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "searches alongside desktop categories and keeps the query when switching to mobile" do
     visit_builder
     expect(page).to have_css("article h4", text: "Alpha meals")
