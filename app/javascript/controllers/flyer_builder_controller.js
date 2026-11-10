@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 
 const DEFAULT_SORT = "default";
+const DISTANCE_SORT = "distance";
 
 export default class extends Controller {
   static targets = [
@@ -9,6 +10,8 @@ export default class extends Controller {
     "toolbar",
     "sidebar",
     "desktopSearch",
+    "desktopSort",
+    "desktopSortOption",
     "searchField",
     "search",
     "sort",
@@ -116,6 +119,7 @@ export default class extends Controller {
     this.locationStepTarget.hidden = true;
     this.builderStepTarget.hidden = false;
     this.subtitleTarget.hidden = false;
+    this.updateFilterControls();
     this.builderHeadingTarget.focus();
     this.refresh();
   }
@@ -352,7 +356,32 @@ export default class extends Controller {
     if (this.searchFieldTarget.parentElement !== destination)
       destination.prepend(this.searchFieldTarget);
     this.desktopSearchTarget.hidden = !desktop;
+    if (!desktop) this.desktopSortTarget.open = false;
     if (desktop && this.filterDialogTarget.open) this.closeFilters();
+  }
+
+  closeDesktopSort() {
+    if (!this.desktopSortTarget.open) return;
+    this.desktopSortTarget.open = false;
+    this.desktopSortTarget.querySelector("summary").focus();
+  }
+
+  hoverDesktopSort(event) {
+    if (event.pointerType === "mouse") this.desktopSortTarget.open = true;
+  }
+
+  leaveDesktopSort(event) {
+    if (
+      event.pointerType === "mouse" &&
+      !this.desktopSortTarget.contains(document.activeElement)
+    )
+      this.desktopSortTarget.open = false;
+  }
+
+  applyDesktopSort(event) {
+    this.sortTarget.value = event.params.order;
+    this.closeDesktopSort();
+    this.filter();
   }
 
   resetDraft() {
@@ -381,7 +410,27 @@ export default class extends Controller {
   }
 
   updateFilterControls() {
+    const canSortByDistance =
+      this.latTarget.value !== "" && this.lngTarget.value !== "";
+    if (!canSortByDistance && this.sortTarget.value === DISTANCE_SORT)
+      this.sortTarget.value = DEFAULT_SORT;
+    this.draftSortTarget.querySelector(
+      `option[value="${DISTANCE_SORT}"]`,
+    ).disabled = !canSortByDistance;
     const customOrder = this.sortTarget.value !== DEFAULT_SORT;
+    this.desktopSortOptionTargets.forEach((option) => {
+      const order = option.dataset.flyerBuilderOrderParam;
+      if (order === DISTANCE_SORT) {
+        option.disabled = !canSortByDistance;
+        option.title = canSortByDistance
+          ? ""
+          : "Choose a starting location to sort by distance";
+      }
+      option.setAttribute(
+        "aria-pressed",
+        String(order === this.sortTarget.value),
+      );
+    });
     const filtersActive = customOrder || this.selectedCategories().length > 0;
     this.filterButtonTarget.dataset.active = String(filtersActive);
     this.filterButtonTarget.setAttribute(

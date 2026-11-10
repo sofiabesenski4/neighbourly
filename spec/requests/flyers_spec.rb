@@ -130,6 +130,26 @@ RSpec.describe "Flyers", type: :request do
       expect(text).not_to include("Other clinic")
     end
 
+    it "sorts the preview and PDF nearest first, placing unknown distances last" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food], metadata: {lat: 48.44, lng: -123.36})
+      source.documents.create!(title: "Zebra meals", content: "Meals", categories: [food, shelter], metadata: {lat: 48.421, lng: -123.36})
+      source.documents.create!(title: "Aardvark meals", content: "Meals", categories: [shelter])
+      source.documents.create!(title: "Other clinic", content: "Clinic", categories: [health])
+      filters = {flyer: {categories: [food.id.to_s, shelter.id.to_s], query: "meals", sort: "distance", lat: "48.42", lng: "-123.36"}}
+
+      post preview_flyers_path(format: :json), params: filters
+      expect(response).to have_http_status(:ok)
+      names = response.parsed_body.fetch("categories").flat_map { |section| section.fetch("resources").pluck("title") }
+      expect(names).to eq(["Zebra meals", "Alpha meals", "Aardvark meals"])
+
+      post flyers_path, params: filters
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text.scan(/(?:Zebra|Alpha|Aardvark) meals/)).to eq(names)
+    end
+
     it "generates the unfiltered guide when nothing is selected" do
       expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
 
