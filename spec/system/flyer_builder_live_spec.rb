@@ -546,7 +546,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       urls = page.evaluate_script("window.previewUrls")
-      expect(urls.join).to include("/flyers/preview")
+      expect(urls.join).to include("/printout/preview")
       expect(urls.join).not_to match(/48\.42|123\.36|Pandora/)
     end
 
