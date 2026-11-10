@@ -97,6 +97,40 @@
   .admin-empty-state {
     @apply rounded-2xl border border-dashed border-stone-200 bg-white px-6 py-12 text-center text-sm text-stone-500;
   }
+
+  .admin-label {
+    @apply block text-sm font-medium text-stone-700;
+  }
+
+  .admin-input {
+    @apply block min-h-11 w-full min-w-0 rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm text-stone-900 outline-none transition-colors placeholder:text-stone-400 focus:border-sage-600 focus:ring-2 focus:ring-sage-100;
+  }
+
+  .admin-checkbox {
+    @apply h-4 w-4 shrink-0 rounded border-stone-400 accent-sage-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600;
+  }
+
+  .admin-file-input {
+    @apply block min-h-11 w-full min-w-0 rounded-xl border border-dashed border-stone-300 bg-stone-50 p-3 text-sm text-stone-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600;
+  }
+
+  .admin-file-input::file-selector-button {
+    @apply mr-3 cursor-pointer rounded-lg border-0 bg-sage-100 px-3 py-2 text-sm font-medium text-sage-800;
+  }
+
+  .admin-file-input:hover::file-selector-button {
+    @apply bg-sage-200;
+  }
+
+  .admin-form .field_with_errors {
+    display: contents;
+  }
+
+  .admin-form .field_with_errors .admin-input,
+  .admin-input[aria-invalid="true"],
+  .admin-file-input[aria-invalid="true"] {
+    @apply border-red-400 focus:ring-red-100;
+  }
 }
 
 /* Scoped to assistant replies; user messages retain their original text. */
