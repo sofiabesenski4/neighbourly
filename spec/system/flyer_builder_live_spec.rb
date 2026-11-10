@@ -27,7 +27,19 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
-  it "loads a new document from the homepage before generating a PDF" do
+  it "opens the generated PDF in a new tab with one click" do
+    visit_builder
+    expect(page).to have_button("Generate printout", disabled: false)
+
+    printout = window_opened_by { click_button "Generate printout" }
+    expect(page).to have_link("Open printout", href: /\Ablob:/)
+    pdf_url = find_link("Open printout")[:href]
+    within_window(printout) { expect(page).to have_current_path(pdf_url, url: true) }
+  ensure
+    printout&.close
+  end
+
+  it "offers the PDF link when the browser blocks the new tab" do
     visit root_path
     page.execute_script("window.flyerNavigationSentinel = true")
 
@@ -37,6 +49,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page.evaluate_script("window.flyerNavigationSentinel")).to be_nil
+    page.execute_script("window.open = () => null")
 
     click_button "Generate printout"
 
@@ -500,7 +513,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         sleep 1
         generate.call(**options)
       end
-      click_button "Generate printout"
+      printout = window_opened_by { click_button "Generate printout" }
       expect(page).to have_button("Preparing printout…", disabled: true)
       click_button "Change"
       click_button "Skip distances"
@@ -509,6 +522,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       # Long enough for the slow reply to have arrived if it hadn't been cancelled.
       page.evaluate_async_script("setTimeout(arguments[0], 1500)")
       expect(page).to have_no_link("Open printout")
+      expect(page.windows).not_to include(printout)
     end
 
     # Uses Chrome's real location API and permission system. Chrome's developer tools
