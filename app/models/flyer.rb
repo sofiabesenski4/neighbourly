@@ -8,7 +8,7 @@ class Flyer
 
   DEFAULT_SORT = "default"
   DISTANCE_SORT = "distance"
-  SORT_OPTIONS = {"By category" => DEFAULT_SORT, "By name (A–Z)" => "asc", "By name (Z–A)" => "desc", "By distance" => DISTANCE_SORT}.freeze
+  SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
   QUERY_LIMIT = 160
 
   attribute :categories, default: -> { [] }
