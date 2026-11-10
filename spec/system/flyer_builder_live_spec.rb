@@ -182,6 +182,9 @@ RSpec.describe "Live resource guide builder", type: :system do
       list = find("[aria-label='Category list']")
       expect(list.evaluate_script("getComputedStyle(this).overflowY")).to eq("auto")
       expect(list.evaluate_script("this.scrollHeight > this.clientHeight")).to be(true)
+      list_bottom = list.evaluate_script("this.getBoundingClientRect().bottom")
+      footer_top = find("footer").evaluate_script("this.getBoundingClientRect().top")
+      expect(footer_top - list_bottom).to be_between(0, 24)
       list.execute_script("this.scrollTop = this.scrollHeight")
       expect(list.evaluate_script("this.scrollTop")).to be > 0
       check "Service category 24"
@@ -226,37 +229,38 @@ RSpec.describe "Live resource guide builder", type: :system do
     search_right = find_field("Search resources").evaluate_script("this.getBoundingClientRect().right")
     sort = find("summary[aria-label='Sort resources']")
     expect(sort.evaluate_script("this.getBoundingClientRect().left")).to be >= search_right
-    expect(page).to have_no_button("By name (Z–A)")
+    expect(page).to have_no_button("Name (Z–A)")
     sort.hover
-    options = ["By category", "By name (A–Z)", "By name (Z–A)", "By distance"]
-    within("[aria-label='Sort order']") do
+    options = ["Category", "Name (A–Z)", "Name (Z–A)", "Distance"]
+    within("[aria-labelledby='desktop-sort-heading']") do
       expect(all("button").map(&:text)).to eq(options)
-      expect(page).to have_css("button[aria-pressed='true']", text: "By category")
-      expect(page).to have_button("By distance", disabled: true)
+      expect(page).to have_css("button[aria-pressed='true']", text: "Category")
+      expect(page).to have_button("Distance", disabled: true)
     end
-    click_button "By name (Z–A)"
+    click_button "Name (Z–A)"
     expect(page).to have_css("article:first-child h4", text: "Gamma noticeboard")
     expect(page).to have_css("article:nth-child(2) h4", text: "Beta clinic")
     expect(all("article h4").map(&:text)).to eq(["Gamma noticeboard", "Beta clinic", "Alpha meals"])
     sort.send_keys(:enter)
-    expect(page).to have_button("By name (A–Z)")
+    expect(page).to have_button("Name (A–Z)")
+    expect(page).to have_css("button[aria-pressed='true']", text: "Name (Z–A)")
     sort.send_keys(:escape)
-    expect(page).to have_no_button("By name (A–Z)")
+    expect(page).to have_no_button("Name (A–Z)")
 
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
     find("button[aria-label='Filters (active)']").click
     within("#flyer-filters") do
-      expect(page).to have_select("Sort order", options: options, selected: "By name (Z–A)")
+      expect(page).to have_select("Sort by", options: options, selected: "Name (Z–A)")
       expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
-      select "By name (A–Z)", from: "Sort order"
+      select "Name (A–Z)", from: "Sort by"
       click_button "Apply filters"
     end
     expect(page).to have_css("article:first-child h4", text: "Alpha meals")
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
     find("summary[aria-label='Sort resources']").hover
-    expect(page).to have_css("button[aria-pressed='true']", text: "By name (A–Z)")
-    click_button "By category"
+    expect(page).to have_css("button[aria-pressed='true']", text: "Name (A–Z)")
+    click_button "Category"
     expect(page).to have_css("h3", text: "Health Care")
     expect(page).to have_css("h3", text: "Meals")
   ensure
@@ -285,7 +289,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_unchecked_field("Meals")
       check "Meals"
       check "Health Care"
-      select "By name (Z–A)", from: "Sort order"
+      select "Name (Z–A)", from: "Sort by"
       click_button "Apply filters"
     end
     expect(page).to have_no_css("dialog[open]")
@@ -444,7 +448,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       continue_with_place("919 Pandora Ave")
       find("summary[aria-label='Sort resources']").hover
-      click_button "By distance"
+      click_button "Distance"
       expect(page).to have_css("article:nth-child(2) h4", text: "Alpha meals")
       expect(all("article h4").map(&:text)).to eq(["Beta clinic", "Alpha meals", "Gamma noticeboard"])
 
@@ -452,7 +456,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
       find("button[aria-label='Filters (active)']").click
       within("#flyer-filters") do
-        expect(page).to have_select("Sort order", selected: "By distance")
+        expect(page).to have_select("Sort by", selected: "Distance")
         expect(page).to have_css("option[value='distance']:not([disabled])", visible: :all)
         find("button[aria-label='Close filters']").click
       end
@@ -462,7 +466,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_css("h3", text: "Meals")
       find("button[aria-label='Filters']").click
       within("#flyer-filters") do
-        expect(page).to have_select("Sort order", selected: "By category")
+        expect(page).to have_select("Sort by", selected: "Category")
         expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
       end
     ensure

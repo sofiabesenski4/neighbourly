@@ -88,20 +88,26 @@
           <div class="min-w-0 flex-1" role="search" aria-label="Find resources for your guide" hidden data-flyer-builder-target="desktopSearch"></div>
           <details class="relative hidden shrink-0 sm:block" data-flyer-builder-target="desktopSort"
                    data-action="pointerenter->flyer-builder#hoverDesktopSort pointerleave->flyer-builder#leaveDesktopSort keydown.esc->flyer-builder#closeDesktopSort">
-            <summary aria-label="Sort resources" title="Sort resources"
+            <summary aria-label="Sort resources"
                      class="grid size-7.5 cursor-pointer list-none place-items-center rounded-lg border border-stone-200 text-stone-700 hover:bg-sage-50 focus-visible:outline-sage-600 [&::-webkit-details-marker]:hidden">
               <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M8 4v16m-4-4 4 4 4-4m4 4V4m-4 4 4-4 4 4" />
               </svg>
             </summary>
-            <div class="absolute top-full right-0 z-20 w-48 pt-1">
-              <div class="rounded-lg border border-stone-200 bg-white p-1 shadow-lg" role="group" aria-label="Sort order">
+            <div class="absolute top-full right-0 z-20 w-max min-w-32 pt-1">
+              <div class="rounded-xl border border-stone-200 bg-white p-1 shadow-md" role="group" aria-labelledby="desktop-sort-heading">
+                <p id="desktop-sort-heading" class="px-2 pt-1 pb-0.5 text-[10px] font-medium tracking-wide text-stone-500 uppercase">Sort by</p>
                 <% Flyer::SORT_OPTIONS.each do |label, order| %>
                   <button type="button" aria-pressed="<%= @flyer.sort == order %>"
-                          class="block min-h-11 w-full cursor-pointer rounded-md px-3 text-left text-sm text-stone-800 hover:bg-sage-50 focus-visible:outline-sage-600 aria-pressed:bg-sage-100 aria-pressed:font-semibold disabled:cursor-not-allowed disabled:text-stone-500"
+                          class="group flex min-h-7 w-full cursor-pointer items-center justify-between gap-3 rounded-md px-2 text-left text-xs text-stone-800 hover:bg-stone-50 focus-visible:outline-sage-600 aria-pressed:bg-sage-50 aria-pressed:font-semibold aria-pressed:text-sage-900 disabled:cursor-not-allowed disabled:text-stone-500"
                           <% if order == Flyer::DISTANCE_SORT %>disabled title="Choose a starting location to sort by distance"<% end %>
                           data-flyer-builder-target="desktopSortOption" data-action="flyer-builder#applyDesktopSort"
-                          data-flyer-builder-order-param="<%= order %>"><%= label %></button>
+                          data-flyer-builder-order-param="<%= order %>">
+                    <span><%= label %></span>
+                    <svg aria-hidden="true" class="invisible size-3 shrink-0 text-sage-700 group-aria-pressed:visible" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="m3 8 3 3 7-7" />
+                    </svg>
+                  </button>
                 <% end %>
               </div>
             </div>
