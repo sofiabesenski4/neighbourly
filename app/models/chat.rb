@@ -1,7 +1,11 @@
 class Chat < ApplicationRecord
   acts_as_chat
 
-  GUEST_LIFETIME = 24.hours
+  guest_lifetime_hours = Integer(ENV.fetch("GUEST_CHAT_LIFETIME_HOURS", "24"), 10, exception: false)
+  unless guest_lifetime_hours&.positive?
+    raise ArgumentError, "GUEST_CHAT_LIFETIME_HOURS must be a positive whole number of hours"
+  end
+  GUEST_LIFETIME = guest_lifetime_hours.hours
 
   belongs_to :user, optional: true
   has_one :first_user_message, -> { where(role: "user").order(:id) }, class_name: "Message"
