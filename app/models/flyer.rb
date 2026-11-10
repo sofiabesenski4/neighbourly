@@ -1,12 +1,19 @@
-# Optional category filters for a printable flyer. An empty selection means
-# all eligible resources.
+# Optional search and filters for a printable flyer. An empty selection means
+# all eligible resources in the default guide order.
 # Not persisted; it validates the selection before handing it to
 # FlyerGenerator.
 class Flyer
   include ActiveModel::Model
   include ActiveModel::Attributes
 
+  DEFAULT_SORT = "default"
+  DISTANCE_SORT = "distance"
+  SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
+  QUERY_LIMIT = 160
+
   attribute :categories, default: -> { [] }
+  attribute :query, :string, default: ""
+  attribute :sort, :string, default: DEFAULT_SORT
 
   # Optional place to measure distances from, as typed. FlyerOrigin looks it up when
   # the printout is generated, not here, because validating also runs for the live
@@ -22,6 +29,8 @@ class Flyer
   validates :near, length: {maximum: 200}
   validate :categories_are_available
   validate :coordinates_are_usable
+  validates :query, length: {maximum: QUERY_LIMIT}
+  validates :sort, inclusion: {in: SORT_OPTIONS.values}
 
   # Use the same persisted categories as the resource form. String IDs match
   # submitted checkbox values without coercing malformed input into an ID.
@@ -56,6 +65,17 @@ class Flyer
     return unless latitude&.between?(-90, 90) && longitude&.between?(-180, 180)
 
     GeoPoint.new(lat: latitude.round(3), lng: longitude.round(3))
+  end
+
+  def query=(value)
+    super(value.to_s.strip)
+  end
+
+  def filters
+    {categories: categories}.tap do |filters|
+      filters[:query] = query if query.present?
+      filters[:sort] = sort if sort != DEFAULT_SORT
+    end
   end
 
   private

@@ -32,11 +32,16 @@ RSpec.describe "Chats", type: :system do
     expect(Chat.last.user).to eq(user)
   end
 
-  it "prevents guest users from creating chats" do
+  it "shows the guest composer and requires JavaScript to submit it" do
     visit new_chat_path
 
-    expect(page).to have_content("Sign in to your account")
-    expect(page).not_to have_content("New chat")
+    expect(page).to have_content("Guest chat.")
+    expect(page).to have_link("Sign in", href: new_user_session_path)
+    fill_in "Prompt", with: "Where can I find a meal?"
+
+    expect { click_button "Start new chat" }.not_to change(Chat, :count)
+    expect(page).to have_content("Enable JavaScript and reopen Chat to start a guest conversation.")
+    expect(page).to have_field("Prompt", with: "Where can I find a meal?")
   end
 
   context "when logged in" do
@@ -49,20 +54,21 @@ RSpec.describe "Chats", type: :system do
       click_button "Start new chat"
 
       chat = Chat.last
-      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is Ruby on Rails?")
+      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "What is Ruby on Rails?", hash_including(model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String))
     end
 
-    it "lists existing chats on the index page" do
-      chat = user.chats.create!
-      # The index renders message count and creation date
+    it "opens a saved chat from the workspace after visiting the old list URL" do
+      chat = user.chats.create!(title: "Saved conversation")
       visit chats_path
 
-      expect(page).to have_content("Chats")
-      expect(page).to have_content(chat.created_at.strftime("%B %d, %Y"))
+      expect(page).to have_current_path(new_chat_path)
+      expect(page).not_to have_link("All chats")
+      within("#chat_sidebar") { click_link "Saved conversation" }
+      expect(page).to have_current_path(chat_path(chat))
     end
 
     it "hides the admin-only Models link" do
-      visit chats_path
+      visit new_chat_path
 
       expect(page).not_to have_link("Models")
     end
@@ -78,20 +84,10 @@ RSpec.describe "Chats", type: :system do
       expect(page).to have_content("Hello! How can I help?")
     end
 
-    it "destroys a chat from the index page" do
-      user.chats.create!
-
-      visit chats_path
-      click_button "Destroy"
-
-      expect(page).to have_content("Chat was successfully destroyed.", count: 1)
-      expect(Chat.count).to eq(0)
-    end
-
     it "allows selecting an AI model for the chat" do
       visit new_chat_path
 
-      expect(page).to have_select("chat_model", options: ["Default: Anthropic - Claude Haiku", "Anthropic - Claude Haiku", "Anthropic - Claude Sonnet"])
+      expect(page).to have_select("chat_model", options: ["Anthropic - Claude Haiku", "Anthropic - Claude Sonnet"])
 
       select "Anthropic - Claude Sonnet", from: "chat_model"
       fill_in "Prompt", with: "Tell me about Rails"
@@ -108,7 +104,7 @@ RSpec.describe "Chats", type: :system do
       fill_in "Message", with: "Follow-up question"
       click_button "Send message"
 
-      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question")
+      expect(ChatResponseJob).to have_received(:perform_later).with(chat.id, "Follow-up question", hash_including(model: chat.model_id, provider: chat.provider.to_s, response_id: Integer, attempt_token: String))
     end
   end
 
@@ -117,24 +113,14 @@ RSpec.describe "Chats", type: :system do
 
     before { login_as(admin, scope: :user) }
 
-    it "links to the Models page" do
+    it "links to Models from the workspace after visiting the old chat list URL" do
       visit chats_path
-      click_link "Models"
+      expect(page).to have_current_path(new_chat_path)
+      within("#chat_sidebar") { click_link "Models" }
 
       expect(page).to have_current_path(models_path)
-    end
-  end
-
-  context "when logged in as an admin" do
-    let(:admin) { User.create!(email: "chatadmin@example.com", password: "password123", admin: true) }
-
-    before { login_as(admin, scope: :user) }
-
-    it "links to the Models page" do
-      visit chats_path
-      click_link "Models"
-
-      expect(page).to have_current_path(models_path)
+      within("main") { click_link "Chats" }
+      expect(page).to have_current_path(new_chat_path)
     end
   end
 end

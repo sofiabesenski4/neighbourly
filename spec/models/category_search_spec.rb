@@ -37,6 +37,18 @@ RSpec.describe CategorySearch do
     expect(section.resources).to eq([listing])
   end
 
+  it "matches searchable card fields and sorts resources once across categories" do
+    alpha = resource("Alpha pantry", [meals, shelters], description: "Hot meals")
+    zebra = resource("Zebra program", [shelters], description: "Hot meals")
+    resource("Other meal program", [meals], description: "Hot meals")
+    resource("Unrelated", [shelters], description: "Cold drinks")
+
+    sections = described_class.call(categories: [shelters.id.to_s], query: " HOT MEALS ", sort: "desc")
+
+    expect(sections.map(&:name)).to eq(["Resources"])
+    expect(sections.first.resources).to eq([zebra, alpha])
+  end
+
   it "uses associations exclusively, ignoring stale category metadata" do
     listing = resource("Shelter", [shelters], categories: ["Meals"], resource_categories: ["food"])
     metadata_only = resource("Metadata only", [], categories: ["Meals"], resource_categories: ["food"])

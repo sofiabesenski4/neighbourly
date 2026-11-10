@@ -13,8 +13,28 @@ application.register("submit-spinner", SubmitSpinnerController);
 import DialogController from "./dialog_controller";
 application.register("dialog", DialogController);
 
-import MobileMenuController from "./mobile_menu_controller";
-application.register("mobile-menu", MobileMenuController);
-
 import FlyerBuilderController from "./flyer_builder_controller";
 application.register("flyer-builder", FlyerBuilderController);
+import FlashController from "./flash_controller";
+application.register("flash", FlashController);
+
+import MarkdownController from "./markdown_controller";
+application.register("markdown", MarkdownController);
+
+import ChatWorkspaceController from "./chat_workspace_controller";
+application.register("chat-workspace", ChatWorkspaceController);
+
+import ConversationMenuController from "./conversation_menu_controller";
+application.register("conversation-menu", ConversationMenuController);
+
+import ComposerController from "./composer_controller";
+application.register("composer", ComposerController);
+
+import ChatScrollController from "./chat_scroll_controller";
+application.register("chat-scroll", ChatScrollController);
+
+import ResponseSyncController from "./response_sync_controller";
+application.register("response-sync", ResponseSyncController);
+
+import CitationsController from "./citations_controller";
+application.register("citations", CitationsController);
