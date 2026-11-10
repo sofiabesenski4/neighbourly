@@ -38,7 +38,7 @@
     <div class="flex-1 px-4 py-5">
       <label for="flyer-filter-order" class="block text-sm font-semibold">Sort order</label>
       <select id="flyer-filter-order" class="mt-1.5 min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-base" data-flyer-builder-target="draftSort">
-        <%= options_for_select(Flyer::SORT_OPTIONS) %>
+        <%= options_for_select(Flyer::SORT_OPTIONS, selected: @flyer.sort, disabled: Flyer::DISTANCE_SORT) %>
       </select>
 
       <fieldset class="mt-5">

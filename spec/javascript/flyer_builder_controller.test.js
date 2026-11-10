@@ -24,6 +24,7 @@ function locationController() {
   controller.locationSummaryTarget = stub({ textContent: "" });
   controller.printErrorTarget = stub({ hidden: true });
   controller.clearPrintout = () => {};
+  controller.updateFilterControls = () => {};
   controller.refresh = () => {};
   return controller;
 }
