@@ -3,6 +3,7 @@ require "rails_helper"
 RSpec.describe "Administration interface", type: :system do
   let(:admin) { User.create!(email: "admin-interface@example.com", password: "password123", admin: true) }
   let(:model) { RubyLLM::Model.new(id: "claude-haiku-4-5", name: "Claude Haiku", provider: "anthropic") }
+  let(:member) { User.create!(email: "admin-form-member@example.com", password: "password123") }
   let(:source) { Source.create!(name: "Community support directory", source_type: "html", url: "https://example.com/#{"community-resources-" * 12}") }
   let(:document) { source.documents.create!(title: "Harbour community support", content: "Local meals and community services.", metadata: {city: "Victoria"}) }
 
@@ -99,5 +100,33 @@ RSpec.describe "Administration interface", type: :system do
     expect(page).to have_current_path(source_path(source))
     expect(page).to have_content(document.title)
     expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+  end
+
+  it "keeps editing forms usable on a phone and preserves validation feedback" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 844, deviceScaleFactor: 1, mobile: true)
+
+    [new_source_path, new_document_path, edit_user_path(member)].each do |path|
+      visit path
+
+      expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+      within("main") do
+        all("input:not([type='hidden']):not([type='checkbox']), textarea, select").each do |field|
+          expect(field.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+          expect(field.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+        end
+      end
+    end
+
+    fill_in "Email", with: ""
+    click_button "Update User"
+    expect(page).to have_css("[role='alert']", text: "Email can't be blank")
+    expect(page).to have_field("Email", with: "")
+
+    visit new_source_path
+    fill_in "Source name", with: "Community data"
+    click_button "Upload and ingest"
+    expect(page).to have_css("[role='alert']", text: "File must be provided")
+    expect(page).to have_field("Source name", with: "Community data")
   end
 end
