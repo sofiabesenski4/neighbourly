@@ -132,14 +132,18 @@ RSpec.describe "Landing questions", type: :request do
     expect(ChatResponseJob).to have_received(:perform_later).exactly(5).times
   end
 
-  it "keeps the entered text on screen if temporary draft storage is unavailable" do
+  it "starts the signed-in chat even if temporary draft storage is unavailable" do
     sign_in user
-    allow(Rails.cache).to receive(:write).and_return(false)
-    post start_chat_path, params: {chat: {prompt: question}}
+    allow(Rails.cache).to receive(:write).and_return(nil)
 
-    expect(response).to have_http_status(:service_unavailable)
-    expect(Nokogiri::HTML5(response.body).text).to include("We couldn't keep your question. Please try again.")
-    expect(submitted_question).to eq(question)
-    expect(ChatResponseJob).not_to have_received(:perform_later)
+    expect {
+      post start_chat_path, params: {chat: {prompt: question}}
+    }.to change(user.chats, :count).by(1).and change(ChatResponse, :count).by(1)
+
+    chat = user.chats.last
+    expect(response).to redirect_to(chat_path(chat))
+    expect(chat.latest_response.user_message.content).to eq(question)
+    expect(ChatResponseJob).to have_received(:perform_later).once
+    expect(request.session[:landing_question_token]).to be_nil
   end
 end
