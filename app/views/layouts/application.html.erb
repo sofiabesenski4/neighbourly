@@ -48,6 +48,8 @@
          :printout
        elsif content_for?(:chat_workspace) || controller_name == "chats"
          :chat
+       elsif administration_page?
+         :admin
        end %>
     <%= render "shared/navigation", active_tab: active_tab %>
 
@@ -65,7 +67,14 @@
       <% if guest_chat_page %>
         <noscript><p class="p-3 text-sm text-stone-700">Enable JavaScript to use guest chat.</p></noscript>
       <% end %>
-      <%= yield %>
+      <% if administration_page? %>
+        <div class="flex min-w-0 items-start gap-8">
+          <%= render "admin/navigation" %>
+          <div class="min-w-0 flex-1"><%= yield %></div>
+        </div>
+      <% else %>
+        <%= yield %>
+      <% end %>
     </main>
   </body>
 </html>

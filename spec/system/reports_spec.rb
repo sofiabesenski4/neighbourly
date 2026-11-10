@@ -34,9 +34,12 @@ RSpec.describe "Reports", type: :system do
   context "as an admin" do
     before { login_as(admin, scope: :user) }
 
-    it "shows the Reports link in the nav" do
+    it "makes Moderation reachable through the admin console" do
       visit root_path
-      expect(page).to have_link("Moderation", href: reports_path)
+      click_link "Admin console", exact: true
+      within("[aria-label='Administration sections']") do
+        expect(page).to have_link("Moderation", href: reports_path)
+      end
     end
 
     it "shows an empty state when no reports exist" do

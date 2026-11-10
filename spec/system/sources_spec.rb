@@ -45,9 +45,12 @@ RSpec.describe "Sources", type: :system do
   context "as an admin" do
     before { login_as(admin, scope: :user) }
 
-    it "shows the Sources link in the nav" do
+    it "makes Sources reachable through the admin console" do
       visit root_path
-      expect(page).to have_link("Sources")
+      click_link "Admin console", exact: true
+      within("[aria-label='Administration sections']") do
+        expect(page).to have_link("Sources", href: sources_path)
+      end
     end
 
     it "lists existing sources on the index page" do
