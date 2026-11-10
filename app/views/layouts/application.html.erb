@@ -42,21 +42,18 @@
   <body class="<%= body_classes %>" data-guest-chat-page="<%= guest_chat_page %>" data-guest-support-page="<%= guest_support_page %>" <% if guest_support_page %> data-turbo-prefetch="false"<% end %>>
     <!-- Navigation -->
     <% no_active_tab = content_for?(:landing_page) || content_for?(:sign_in_page) %>
-    <% shared_navigation = no_active_tab || content_for?(:chat_workspace) || %w[chats flyers].include?(controller_name) %>
-    <% if shared_navigation %>
-      <% active_tab = if no_active_tab
-           nil
-         elsif controller_name == "flyers"
-           :printout
-         else
-           :chat
-         end %>
-      <%= render "shared/navigation", active_tab: active_tab %>
-    <% else %>
-      <%= render "layouts/navigation" %>
-    <% end %>
+    <% active_tab = if no_active_tab
+         nil
+       elsif controller_name == "flyers"
+         :printout
+       elsif content_for?(:chat_workspace) || controller_name == "chats"
+         :chat
+       elsif administration_page?
+         :admin
+       end %>
+    <%= render "shared/navigation", active_tab: active_tab %>
 
-    <%= render "layouts/flash_messages", shared_navigation: shared_navigation %>
+    <%= render "layouts/flash_messages" %>
 
     <!-- Main Content -->
     <% main_spacing = if content_for?(:landing_page)
@@ -70,7 +67,14 @@
       <% if guest_chat_page %>
         <noscript><p class="p-3 text-sm text-stone-700">Enable JavaScript to use guest chat.</p></noscript>
       <% end %>
-      <%= yield %>
+      <% if administration_page? %>
+        <div class="flex min-w-0 items-start gap-8">
+          <%= render "admin/navigation" %>
+          <div class="min-w-0 flex-1"><%= yield %></div>
+        </div>
+      <% else %>
+        <%= yield %>
+      <% end %>
     </main>
   </body>
 </html>

@@ -27,7 +27,19 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
-  it "loads a new document from the homepage before generating a PDF" do
+  it "opens the generated PDF in a new tab with one click" do
+    visit_builder
+    expect(page).to have_button("Generate printout", disabled: false)
+
+    printout = window_opened_by { click_button "Generate printout" }
+    expect(page).to have_link("Open printout", href: /\Ablob:/)
+    pdf_url = find_link("Open printout")[:href]
+    within_window(printout) { expect(page).to have_current_path(pdf_url, url: true) }
+  ensure
+    printout&.close
+  end
+
+  it "offers the PDF link when the browser blocks the new tab" do
     visit root_path
     page.execute_script("window.flyerNavigationSentinel = true")
 
@@ -37,6 +49,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("nav a[aria-current='page']", text: "Printout")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page.evaluate_script("window.flyerNavigationSentinel")).to be_nil
+    page.execute_script("window.open = () => null")
 
     click_button "Generate printout"
 
@@ -131,6 +144,57 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(widths[2]).to be_within(1).of(grid_width)
   end
 
+  it "pins the full-height desktop panel once the introduction scrolls past" do
+    source = Source.find_by!(name: "Local")
+    18.times { |index| source.documents.create!(title: "Extra meal #{index}", content: "Meals", categories: [food]) }
+    page.current_window.resize_to(1280, 700)
+    visit_builder
+    expect(page).to have_css("article h4", text: "Extra meal 17")
+
+    panel = find("aside[aria-label='Resource filters']")
+    expect(panel.evaluate_script("this.getBoundingClientRect().height")).to be_within(1).of(page.evaluate_script("window.innerHeight"))
+    expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be > 0
+    panel.execute_script("window.scrollTo(0, window.scrollY + this.getBoundingClientRect().top + 50)")
+    expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be_within(1).of(0)
+    expect(find("[data-flyer-builder-target='locationSummaryRow']").evaluate_script("this.getBoundingClientRect().bottom")).to be < 0
+  ensure
+    page.current_window.resize_to(1280, 900)
+  end
+
+  it "scrolls long category lists independently on desktop and mobile" do
+    24.times { |index| Category.create!(name: "Service category #{index + 1}") }
+    page.current_window.resize_to(1280, 900)
+    visit_builder
+
+    within("aside[aria-label='Resource filters']") do
+      list = find("[aria-label='Category list']")
+      expect(list.evaluate_script("getComputedStyle(this).overflowY")).to eq("auto")
+      expect(list.evaluate_script("this.scrollHeight > this.clientHeight")).to be(true)
+      list.execute_script("this.scrollTop = this.scrollHeight")
+      expect(list.evaluate_script("this.scrollTop")).to be > 0
+      expect(page).to have_field("Service category 24")
+    end
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    find("button[aria-label='Filters']").click
+    within("#flyer-filters") do
+      list = find("[aria-label='Category list']")
+      expect(list.evaluate_script("getComputedStyle(this).overflowY")).to eq("auto")
+      expect(list.evaluate_script("this.scrollHeight > this.clientHeight")).to be(true)
+      list_bottom = list.evaluate_script("this.getBoundingClientRect().bottom")
+      footer_top = find("footer").evaluate_script("this.getBoundingClientRect().top")
+      expect(footer_top - list_bottom).to be_between(0, 24)
+      list.execute_script("this.scrollTop = this.scrollHeight")
+      expect(list.evaluate_script("this.scrollTop")).to be > 0
+      check "Service category 24"
+      click_button "Apply filters"
+    end
+    expect(page).to have_text("No resources match the selected categories.")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "searches alongside desktop categories and keeps the query when switching to mobile" do
     visit_builder
     expect(page).to have_css("article h4", text: "Alpha meals")
@@ -157,6 +221,52 @@ RSpec.describe "Live resource guide builder", type: :system do
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
+  it "reveals the same sort choices on desktop hover and in mobile filters" do
+    page.current_window.resize_to(1280, 900)
+    visit_builder
+    expect(page).to have_css("article h4", count: 3)
+
+    search_right = find_field("Search resources").evaluate_script("this.getBoundingClientRect().right")
+    sort = find("summary[aria-label='Sort resources']")
+    expect(sort.evaluate_script("this.getBoundingClientRect().left")).to be >= search_right
+    expect(page).to have_no_button("Name (Z–A)")
+    sort.hover
+    options = ["Category", "Name (A–Z)", "Name (Z–A)", "Distance"]
+    within("[aria-labelledby='desktop-sort-heading']") do
+      expect(all("button").map(&:text)).to eq(options)
+      expect(page).to have_css("button[aria-pressed='true']", text: "Category")
+      expect(page).to have_button("Distance", disabled: true)
+    end
+    click_button "Name (Z–A)"
+    expect(page).to have_css("article:first-child h4", text: "Gamma noticeboard")
+    expect(page).to have_css("article:nth-child(2) h4", text: "Beta clinic")
+    expect(all("article h4").map(&:text)).to eq(["Gamma noticeboard", "Beta clinic", "Alpha meals"])
+    sort.send_keys(:enter)
+    expect(page).to have_button("Name (A–Z)")
+    expect(page).to have_css("button[aria-pressed='true']", text: "Name (Z–A)")
+    sort.send_keys(:escape)
+    expect(page).to have_no_button("Name (A–Z)")
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    find("button[aria-label='Filters (active)']").click
+    within("#flyer-filters") do
+      expect(page).to have_select("Sort by", options: options, selected: "Name (Z–A)")
+      expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
+      select "Name (A–Z)", from: "Sort by"
+      click_button "Apply filters"
+    end
+    expect(page).to have_css("article:first-child h4", text: "Alpha meals")
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+    find("summary[aria-label='Sort resources']").hover
+    expect(page).to have_css("button[aria-pressed='true']", text: "Name (A–Z)")
+    click_button "Category"
+    expect(page).to have_css("h3", text: "Health Care")
+    expect(page).to have_css("h3", text: "Meals")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "searches and applies draft filters from the mobile toolbar" do
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
@@ -179,7 +289,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_unchecked_field("Meals")
       check "Meals"
       check "Health Care"
-      select "Resource name Z–A", from: "Sort order"
+      select "Name (Z–A)", from: "Sort by"
       click_button "Apply filters"
     end
     expect(page).to have_no_css("dialog[open]")
@@ -329,6 +439,38 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_no_field("Meals", type: "checkbox")
       expect(page).to have_no_button("Generate printout")
       expect(page).to have_no_text("Choose what to include")
+    end
+
+    it "enables distance sorting on both layouts and resets it when distances are skipped" do
+      allow(Geocoder).to receive(:locate).and_return(point)
+      Document.find_by!(title: "Beta clinic").update_columns(metadata: {lat: 48.421, lng: -123.36})
+      page.current_window.resize_to(1280, 900)
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
+      find("summary[aria-label='Sort resources']").hover
+      click_button "Distance"
+      expect(page).to have_css("article:nth-child(2) h4", text: "Alpha meals")
+      expect(all("article h4").map(&:text)).to eq(["Beta clinic", "Alpha meals", "Gamma noticeboard"])
+
+      page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+        width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+      find("button[aria-label='Filters (active)']").click
+      within("#flyer-filters") do
+        expect(page).to have_select("Sort by", selected: "Distance")
+        expect(page).to have_css("option[value='distance']:not([disabled])", visible: :all)
+        find("button[aria-label='Close filters']").click
+      end
+
+      click_button "Change"
+      click_button "Skip distances"
+      expect(page).to have_css("h3", text: "Meals")
+      find("button[aria-label='Filters']").click
+      within("#flyer-filters") do
+        expect(page).to have_select("Sort by", selected: "Category")
+        expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
+      end
+    ensure
+      page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
     end
 
     it "keeps the location controls out of the second screen" do
@@ -485,7 +627,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       urls = page.evaluate_script("window.previewUrls")
-      expect(urls.join).to include("/flyers/preview")
+      expect(urls.join).to include("/printout/preview")
       expect(urls.join).not_to match(/48\.42|123\.36|Pandora/)
     end
 
@@ -500,7 +642,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         sleep 1
         generate.call(**options)
       end
-      click_button "Generate printout"
+      printout = window_opened_by { click_button "Generate printout" }
       expect(page).to have_button("Preparing printout…", disabled: true)
       click_button "Change"
       click_button "Skip distances"
@@ -509,6 +651,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       # Long enough for the slow reply to have arrived if it hadn't been cancelled.
       page.evaluate_async_script("setTimeout(arguments[0], 1500)")
       expect(page).to have_no_link("Open printout")
+      expect(page.windows).not_to include(printout)
     end
 
     # Uses Chrome's real location API and permission system. Chrome's developer tools

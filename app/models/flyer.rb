@@ -7,7 +7,8 @@ class Flyer
   include ActiveModel::Attributes
 
   DEFAULT_SORT = "default"
-  SORT_OPTIONS = {"Guide order" => DEFAULT_SORT, "Resource name A–Z" => "asc", "Resource name Z–A" => "desc"}.freeze
+  DISTANCE_SORT = "distance"
+  SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
   QUERY_LIMIT = 160
 
   attribute :categories, default: -> { [] }

@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus";
 
 const DEFAULT_SORT = "default";
+const DISTANCE_SORT = "distance";
 
 export default class extends Controller {
   static targets = [
@@ -9,6 +10,8 @@ export default class extends Controller {
     "toolbar",
     "sidebar",
     "desktopSearch",
+    "desktopSort",
+    "desktopSortOption",
     "searchField",
     "search",
     "sort",
@@ -116,6 +119,7 @@ export default class extends Controller {
     this.locationStepTarget.hidden = true;
     this.builderStepTarget.hidden = false;
     this.subtitleTarget.hidden = false;
+    this.updateFilterControls();
     this.builderHeadingTarget.focus();
     this.refresh();
   }
@@ -352,7 +356,32 @@ export default class extends Controller {
     if (this.searchFieldTarget.parentElement !== destination)
       destination.prepend(this.searchFieldTarget);
     this.desktopSearchTarget.hidden = !desktop;
+    if (!desktop) this.desktopSortTarget.open = false;
     if (desktop && this.filterDialogTarget.open) this.closeFilters();
+  }
+
+  closeDesktopSort() {
+    if (!this.desktopSortTarget.open) return;
+    this.desktopSortTarget.open = false;
+    this.desktopSortTarget.querySelector("summary").focus();
+  }
+
+  hoverDesktopSort(event) {
+    if (event.pointerType === "mouse") this.desktopSortTarget.open = true;
+  }
+
+  leaveDesktopSort(event) {
+    if (
+      event.pointerType === "mouse" &&
+      !this.desktopSortTarget.contains(document.activeElement)
+    )
+      this.desktopSortTarget.open = false;
+  }
+
+  applyDesktopSort(event) {
+    this.sortTarget.value = event.params.order;
+    this.closeDesktopSort();
+    this.filter();
   }
 
   resetDraft() {
@@ -381,7 +410,27 @@ export default class extends Controller {
   }
 
   updateFilterControls() {
+    const canSortByDistance =
+      this.latTarget.value !== "" && this.lngTarget.value !== "";
+    if (!canSortByDistance && this.sortTarget.value === DISTANCE_SORT)
+      this.sortTarget.value = DEFAULT_SORT;
+    this.draftSortTarget.querySelector(
+      `option[value="${DISTANCE_SORT}"]`,
+    ).disabled = !canSortByDistance;
     const customOrder = this.sortTarget.value !== DEFAULT_SORT;
+    this.desktopSortOptionTargets.forEach((option) => {
+      const order = option.dataset.flyerBuilderOrderParam;
+      if (order === DISTANCE_SORT) {
+        option.disabled = !canSortByDistance;
+        option.title = canSortByDistance
+          ? ""
+          : "Choose a starting location to sort by distance";
+      }
+      option.setAttribute(
+        "aria-pressed",
+        String(order === this.sortTarget.value),
+      );
+    });
     const filtersActive = customOrder || this.selectedCategories().length > 0;
     this.filterButtonTarget.dataset.active = String(filtersActive);
     this.filterButtonTarget.setAttribute(
@@ -527,7 +576,16 @@ export default class extends Controller {
     this.generateTarget.disabled = true;
     this.generateLabelTarget.textContent = "Preparing printout…";
     this.printRequest = new AbortController();
+    const { signal } = this.printRequest;
+    // Open from the click, before the asynchronous PDF request can lose user activation.
+    const tab = window.open("about:blank", "_blank");
+    this.pendingPrintoutTab = tab;
     try {
+      if (tab) {
+        tab.opener = null;
+        tab.document.title = "Preparing printout";
+        tab.document.body.textContent = "Preparing your printout…";
+      }
       const response = await fetch(this.formTarget.action, {
         method: "POST",
         headers: {
@@ -537,7 +595,7 @@ export default class extends Controller {
         },
         credentials: "same-origin",
         body: new FormData(this.formTarget),
-        signal: this.printRequest.signal,
+        signal,
       });
       if (
         !response.ok ||
@@ -554,27 +612,27 @@ export default class extends Controller {
         );
       }
       const blob = await response.blob();
-      if (revision !== this.revision || !this.element.isConnected) return;
-      // The person opens the PDF themselves, in a new tab, and prints it from the
-      // browser's PDF viewer. The page doesn't try to print it automatically:
-      // - Printing from a hidden frame was unreliable. The frame's load event fires
-      //   before the browser's PDF viewer has drawn the pages, so print() sometimes
-      //   printed blank pages, and browsers give no event for "finished drawing".
-      // - A blob: document takes this page's security policy, whose
-      //   frame-ancestors 'none' stops it being shown in a frame at all (Safari).
-      // - Opening the tab from here, rather than from a click, would be stopped by
-      //   popup blockers, because the fetch above means it's no longer a click.
+      if (
+        signal.aborted ||
+        revision !== this.revision ||
+        !this.element.isConnected
+      )
+        return;
       this.pdfUrl = URL.createObjectURL(blob);
       this.pdfLinkTarget.href = this.pdfUrl;
       this.printoutTarget.hidden = false;
-      // Moving focus here lets keyboard and screen reader users reach the new
-      // button straight away, rather than searching the page for it.
-      this.pdfLinkTarget.focus();
+      if (this.isPreparingTab(tab)) {
+        tab.location.replace(this.pdfUrl);
+        this.pendingPrintoutTab = null;
+      } else {
+        this.pdfLinkTarget.focus();
+      }
     } catch (error) {
       if (error.name === "AbortError" || revision !== this.revision) return;
       this.printErrorTarget.textContent = error.message;
       this.printErrorTarget.hidden = false;
     } finally {
+      if (this.pendingPrintoutTab === tab) this.closePreparingTab();
       if (revision === this.revision) {
         this.generating = false;
         this.generateTarget.disabled = !this.hasResults;
@@ -583,9 +641,25 @@ export default class extends Controller {
     }
   }
 
+  isPreparingTab(tab) {
+    try {
+      return tab && !tab.closed && tab.location.href === "about:blank";
+    } catch {
+      // The user navigated the tab somewhere else while waiting.
+      return false;
+    }
+  }
+
+  closePreparingTab() {
+    const tab = this.pendingPrintoutTab;
+    if (this.isPreparingTab(tab)) tab.close();
+    this.pendingPrintoutTab = null;
+  }
+
   // A tab the person already opened keeps its copy of the PDF after the link is
   // revoked here, so this only stops the page offering an out-of-date printout.
   clearPrintout() {
+    this.closePreparingTab();
     if (this.pdfUrl) URL.revokeObjectURL(this.pdfUrl);
     this.pdfUrl = null;
     this.pdfLinkTarget.removeAttribute("href");

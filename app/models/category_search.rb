@@ -11,7 +11,7 @@ class CategorySearch
     end
   end
 
-  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, scope: Document.all)
+  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, origin: nil, scope: Document.all)
     selection = Flyer.new(categories: categories, query: query, sort: sort)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
@@ -46,8 +46,13 @@ class CategorySearch
       end
     end
 
-    if selection.sort != Flyer::DEFAULT_SORT
-      resources.sort_by! { |resource| [ResourceCard.new(resource).title.downcase, resource.id] }
+    by_distance = selection.sort == Flyer::DISTANCE_SORT
+    if selection.sort != Flyer::DEFAULT_SORT && (!by_distance || origin&.located?)
+      resources.sort_by! do |resource|
+        card = ResourceCard.new(resource, origin: origin)
+        name_order = [card.title.downcase, resource.id]
+        by_distance ? [card.distance_km || Float::INFINITY, *name_order] : name_order
+      end
       resources.reverse! if selection.sort == "desc"
       return [Section.new(category: nil, resources: resources, label: "Resources")]
     end

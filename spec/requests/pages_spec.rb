@@ -108,9 +108,8 @@ RSpec.describe "Pages", type: :request do
 
         navigation = Nokogiri::HTML(response.body).at_css("nav[aria-label='Main navigation']")
         expect(navigation.at_css("a[href='#{root_path}']").text.squish).to eq("neighbourly")
-        expect(navigation.at_css("a[href='#{users_path}']").text.squish).to eq("Users")
-        expect(navigation.at_css("a[href='#{sources_path}']").text.squish).to eq("Sources")
-        expect(navigation.at_css("a[href='#{reports_path}']").text.squish).to eq("Moderation")
+        expect(navigation.at_css("a[href='#{admin_path}']").text.squish).to eq("Admin console")
+        expect(navigation.css("a").map { |link| link["href"] }).to eq([root_path, new_chat_path, new_flyer_path, admin_path])
         sign_out_form = navigation.at_css("form[action='#{destroy_user_session_path}']")
         expect(sign_out_form.at_css("input[name='_method']")["value"]).to eq("delete")
         expect(sign_out_form.at_css("button").text.squish).to eq("Sign out")

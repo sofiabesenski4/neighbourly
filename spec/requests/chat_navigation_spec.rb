@@ -71,9 +71,8 @@ RSpec.describe "Support page navigation", type: :request do
       get path
 
       expect(navigation.text).to include(user.email)
-      [users_path, sources_path, reports_path].each do |destination|
-        expect(navigation.at_css("a[href='#{destination}']")).to be_present
-      end
+      expect(navigation.at_css("a[href='#{admin_path}']").text.squish).to eq("Admin console")
+      expect(navigation.at_css("[aria-label='Administration']")).to be_nil
       form = navigation.at_css("form[action='#{destroy_user_session_path}']")
       expect(form.at_css("button").text.squish).to eq("Sign out")
       expect(form.at_css("button")["data-turbo"]).to eq("false")
