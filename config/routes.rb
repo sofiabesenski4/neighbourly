@@ -22,6 +22,7 @@ Rails.application.routes.draw do
     passwords: "users/passwords"
   }
 
+  get "admin", to: "admin#index", as: :admin
   resources :users, only: [:index, :show, :edit, :update, :destroy]
   resources :sources, only: [:index, :show, :new, :create, :destroy]
   resources :documents, except: [:index]

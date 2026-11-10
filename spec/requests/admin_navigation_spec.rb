@@ -16,6 +16,10 @@ RSpec.describe "Administration navigation", type: :request do
     Nokogiri::HTML(response.body).at_css("nav[aria-label='Main navigation']")
   end
 
+  def administration
+    Nokogiri::HTML(response.body).at_css("nav[aria-label='Administration']")
+  end
+
   %w[users sources reports models].each do |section|
     it "shares the support header and selects the #{section} section" do
       sign_in admin
@@ -29,9 +33,10 @@ RSpec.describe "Administration navigation", type: :request do
       printout = navigation.at_css("a[href='#{new_flyer_path}']")
       expect(printout.text.squish).to eq("Printout")
       expect(printout["data-turbo"]).to eq("false")
-      administration = navigation.at_css("[aria-label='Administration']")
-      expect(administration.css("a").map { |link| link["href"] }).to eq([users_path, sources_path, reports_path, models_path])
-      expect(navigation.css("a[aria-current='page']").map { |link| link["href"] }).to eq([destination])
+      expect(navigation.css("a[aria-current='page']").map { |link| link["href"] }).to eq([admin_path])
+      expect(navigation.css("a").map { |link| link["href"] }).to eq([root_path, new_chat_path, new_flyer_path, admin_path])
+      expect(administration.css("a").map { |link| link["href"] }).to eq([admin_path, users_path, sources_path, reports_path, models_path])
+      expect(administration.at_css("a[aria-current='page']")["href"]).to eq(destination)
       expect(navigation.at_css("form[action='#{destroy_user_session_path}']")).to be_present
     end
   end
@@ -43,7 +48,8 @@ RSpec.describe "Administration navigation", type: :request do
       get destination
 
       expect(response).to have_http_status(:ok)
-      expect(navigation.at_css("a[aria-current='page']")["href"]).to eq(sources_path)
+      expect(administration.at_css("a[aria-current='page']")["href"]).to eq(sources_path)
+      expect(navigation.at_css("a[aria-current='page']")["href"]).to eq(admin_path)
     end
   end
 
@@ -51,8 +57,8 @@ RSpec.describe "Administration navigation", type: :request do
     sign_in user
     get root_path
 
-    expect(navigation.at_css("[aria-label='Administration']")).to be_nil
-    [users_path, sources_path, reports_path, models_path].each do |destination|
+    expect(administration).to be_nil
+    [admin_path, users_path, sources_path, reports_path, models_path].each do |destination|
       expect(navigation.at_css("a[href='#{destination}']")).to be_nil
     end
   end
@@ -60,7 +66,8 @@ RSpec.describe "Administration navigation", type: :request do
   it "does not show administration links to a guest" do
     get root_path
 
-    expect(navigation.at_css("[aria-label='Administration']")).to be_nil
+    expect(administration).to be_nil
+    expect(navigation.at_css("a[href='#{admin_path}']")).to be_nil
     expect(navigation.at_css("a[href='#{new_user_session_path}']")).to be_present
   end
 end

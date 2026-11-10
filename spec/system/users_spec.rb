@@ -15,10 +15,13 @@ RSpec.describe "Users", type: :system do
         login_as(admin_user, scope: :user)
       end
 
-      it "shows Users link in navigation" do
+      it "makes Users reachable through the admin console" do
         visit root_path
+        click_link "Admin console", exact: true
 
-        expect(page).to have_link("Users", href: users_path)
+        within("[aria-label='Administration sections']") do
+          expect(page).to have_link("Users", href: users_path)
+        end
       end
     end
 

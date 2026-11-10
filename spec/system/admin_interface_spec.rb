@@ -21,13 +21,16 @@ RSpec.describe "Administration interface", type: :system do
   end
 
   it "moves between administration and support pages through the shared header" do
-    visit users_path
+    visit root_path
     expect(find("nav[aria-label='Main navigation']")).to have_link("neighbourly", href: root_path)
+    within("nav[aria-label='Main navigation']") { click_link "Admin console", exact: true }
+    expect(page).to have_current_path(admin_path)
 
-    {"Sources" => sources_path, "Moderation" => reports_path, "Models" => models_path}.each do |label, destination|
-      within("[aria-label='Administration']") { click_link label, exact: true }
+    {"Users" => users_path, "Sources" => sources_path, "Moderation" => reports_path, "Models" => models_path}.each do |label, destination|
+      within("nav[aria-label='Administration']") { click_link label, exact: true }
       expect(page).to have_current_path(destination)
-      expect(page).to have_css("[aria-label='Administration'] a[aria-current='page']", text: label)
+      expect(page).to have_css("nav[aria-label='Administration'] a[aria-current='page']", text: label)
+      expect(page).to have_css("nav[aria-label='Main navigation'] a[aria-current='page']", text: "Admin console")
     end
 
     within("nav[aria-label='Main navigation']") { click_link "Chat", exact: true }
@@ -36,26 +39,34 @@ RSpec.describe "Administration interface", type: :system do
     expect(page).not_to have_css("[aria-label='Administration'] a[aria-current='page']")
   end
 
-  it "keeps administration links reachable on a narrow phone screen" do
+  it "uses one admin console entry on a narrow phone screen" do
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 320, height: 844, deviceScaleFactor: 1, mobile: true)
-    visit users_path
+    visit root_path
 
     within("nav[aria-label='Main navigation']") do
       expect(page).to have_link("Chat", href: new_chat_path)
       expect(page).to have_link("Printout", href: new_flyer_path)
       expect(page).to have_button("Sign out")
+      ["Chat", "Printout", "Admin console"].each do |label|
+        link = find_link(label, exact: true)
+        expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+        expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+      end
+      expect(page).not_to have_link("Users", href: users_path)
+      expect(page).not_to have_link("Sources", href: sources_path)
+      expect(page).not_to have_link("Moderation", href: reports_path)
+      expect(page).not_to have_link("Models", href: models_path)
+      click_link "Admin console", exact: true
     end
-    administration = find("[aria-label='Administration']")
-    administration.all("a").each do |link|
-      expect(link.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
-      expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+
+    expect(page).to have_current_path(admin_path)
+    expect(page).not_to have_css("nav[aria-label='Administration']")
+    within("[aria-label='Administration sections']") do
+      find("a[href='#{models_path}']").click
     end
-    models_link = administration.find_link("Models", exact: true)
-    expect(models_link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
-    models_link.click
     expect(page).to have_current_path(models_path)
-    expect(page).to have_css("[aria-label='Administration'] a[aria-current='page']", text: "Models")
+    expect(page).to have_css("nav[aria-label='Main navigation'] a[aria-current='page']", text: "Admin console")
   end
 
   it "contains wide management tables and keeps model details reachable on a phone" do
