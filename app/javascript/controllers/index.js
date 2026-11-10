@@ -13,9 +13,6 @@ application.register("submit-spinner", SubmitSpinnerController);
 import DialogController from "./dialog_controller";
 application.register("dialog", DialogController);
 
-import MobileMenuController from "./mobile_menu_controller";
-application.register("mobile-menu", MobileMenuController);
-
 import FlyerBuilderController from "./flyer_builder_controller";
 application.register("flyer-builder", FlyerBuilderController);
 import FlashController from "./flash_controller";
