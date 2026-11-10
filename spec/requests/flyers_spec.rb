@@ -7,7 +7,19 @@ RSpec.describe "Flyers", type: :request do
   let!(:shelter) { Category.create!(name: "Shelters") }
   let!(:harm_reduction) { Category.create!(name: "Harm Reduction Resources") }
 
-  describe "GET /flyers/new" do
+  it "uses /printout URLs and redirects old builder bookmarks with their filters" do
+    expect(new_flyer_path).to eq("/printout")
+    expect(flyers_path).to eq("/printout")
+    expect(preview_flyers_path).to eq("/printout/preview")
+    expect(locate_flyers_path).to eq("/printout/locate")
+
+    get "/flyers/new", params: {flyer: {categories: [food.id.to_s], sort: "desc"}}
+    expect(response).to redirect_to(new_flyer_path(flyer: {categories: [food.id.to_s], sort: "desc"}))
+    follow_redirect!
+    expect(response).to have_http_status(:ok)
+  end
+
+  describe "GET /printout" do
     it "shows every category without signing in" do
       get new_flyer_path
 
@@ -77,7 +89,7 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
-  describe "POST /flyers" do
+  describe "POST /printout" do
     it "hands the selected categories to the generator" do
       expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil).and_return(nil)
 
@@ -397,7 +409,7 @@ RSpec.describe "Flyers", type: :request do
 
   # The check behind the first screen's Continue button. It only says whether a place
   # can be found, so that the person can correct it before choosing categories.
-  describe "POST /flyers/locate" do
+  describe "POST /printout/locate" do
     def locate(near)
       post locate_flyers_path(format: :json), params: {flyer: {near: near}}
     end
@@ -467,7 +479,7 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
-  describe "GET /flyers/preview" do
+  describe "GET /printout/preview" do
     before do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
       source = Source.create!(name: "Local", source_type: "api")
