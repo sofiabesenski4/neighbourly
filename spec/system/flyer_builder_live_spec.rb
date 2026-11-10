@@ -226,9 +226,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit_builder
     expect(page).to have_css("article h4", count: 3)
 
-    search_right = find_field("Search resources").evaluate_script("this.getBoundingClientRect().right")
     sort = find("summary[aria-label='Sort resources']")
-    expect(sort.evaluate_script("this.getBoundingClientRect().left")).to be >= search_right
     expect(page).to have_no_button("Name (Z–A)")
     sort.hover
     options = ["Category", "Name (A–Z)", "Name (Z–A)", "Distance"]
