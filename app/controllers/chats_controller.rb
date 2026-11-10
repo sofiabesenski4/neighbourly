@@ -125,13 +125,9 @@ class ChatsController < ApplicationController
     end
     return unless user_signed_in?
 
-    token = @landing_question.remember(session[:landing_question_token])
-    unless token
-      render_landing_error("We couldn't keep your question. Please try again.", status: :service_unavailable)
-      return
-    end
-
-    session[:landing_question_token] = token
+    # A draft helps on retry, but chat creation does not depend on the cache.
+    token = @landing_question.remember(session.delete(:landing_question_token))
+    session[:landing_question_token] = token if token
   end
 
   def submitted_prompt
