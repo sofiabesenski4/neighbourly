@@ -43,7 +43,7 @@ RSpec.describe "Chats", type: :request do
 
         html = Nokogiri::HTML(response.body)
         expect(html.at_css("h1").text).to eq("Find food in Victoria")
-        expect(html.at_css("#chat_sidebar a[aria-current='page']").text).to eq("Find food in Victoria")
+        expect(html.at_css("#chat_sidebar a[aria-current='page']").text.squish).to eq("Find food in Victoria")
       end
     end
 
