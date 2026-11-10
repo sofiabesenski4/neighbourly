@@ -1,6 +1,5 @@
 <% if notice.present? || alert.present? %>
-  <% top_classes = user_signed_in? && current_user.admin? ? "top-52 sm:top-36" : "top-36 sm:top-20" %>
-  <div aria-label="Notifications" data-turbo-temporary class="pointer-events-none fixed inset-x-4 <%= top_classes %> z-50 flex flex-col items-end gap-3 sm:left-auto sm:w-96">
+  <div aria-label="Notifications" data-turbo-temporary class="pointer-events-none fixed inset-x-4 top-36 z-50 flex flex-col items-end gap-3 sm:left-auto sm:top-20 sm:w-96">
     <% { notice: notice, alert: alert }.each do |kind, message| %>
       <% next if message.blank? %>
       <% error = kind == :alert %>
