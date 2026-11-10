@@ -114,6 +114,9 @@ RSpec.describe "Administration interface", type: :system do
         all("input:not([type='hidden']):not([type='checkbox']), textarea, select").each do |field|
           expect(field.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
           expect(field.evaluate_script("this.getBoundingClientRect().left >= 0 && this.getBoundingClientRect().right <= window.innerWidth")).to be(true)
+          unless field[:type] == "submit"
+            expect(field.evaluate_script("parseFloat(getComputedStyle(this).fontSize)")).to be >= 16
+          end
         end
       end
     end
