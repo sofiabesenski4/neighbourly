@@ -42,6 +42,8 @@ BASIC_AUTH_ENABLED=false
 
 By default, the app uses `claude-haiku-4-5` for chat and `text-embedding-3-small` for embeddings. Chat uses `ANTHROPIC_API_KEY`, and embeddings use `OPENAI_API_KEY`. You can change the models with `DEFAULT_MODEL` and `EMBEDDING_MODEL`.
 
+Set `GUEST_CHAT_LIFETIME_HOURS` to a positive whole number to change how long guest chats remain accessible after creation. It defaults to `24`. Set the same value for the web app and background workers, then restart them. The setting applies to existing guest chats too. Chats saved to an account do not expire under this setting.
+
 ### AI Playground
 
 To use UVic's AI Playground locally, add these settings to your `.env` file:

@@ -71,7 +71,7 @@ RSpec.describe "Guest chats", type: :request do
     chat = start_guest_chat
     user = User.create!(email: "expired-guest@example.com", password: "password123")
 
-    travel 25.hours do
+    travel_to(chat.created_at + Chat::GUEST_LIFETIME + 1.second) do
       post user_session_path, params: {user: {email: user.email, password: "password123"}},
         headers: tab_headers.merge("X-Neighbourly-Guest-Chat" => chat.id.to_s)
 
@@ -204,7 +204,15 @@ RSpec.describe "Guest chats", type: :request do
     account = User.create!(email: "guest-cleanup-account@example.com", password: "password123")
     account_chat = account.chats.create!
 
-    travel 25.hours do
+    travel_to(chat.created_at + Chat::GUEST_LIFETIME - 1.second) do
+      get guest_chat_path(chat), headers: tab_headers
+      expect(response).to have_http_status(:ok)
+
+      ExpireGuestChatsJob.perform_now
+      expect(Chat.exists?(chat.id)).to be(true)
+    end
+
+    travel_to(chat.created_at + Chat::GUEST_LIFETIME + 1.second) do
       get guest_chat_path(chat), headers: tab_headers
       expect(response).to redirect_to(new_chat_path)
       follow_redirect!
