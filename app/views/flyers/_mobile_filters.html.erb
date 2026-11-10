@@ -25,8 +25,8 @@
 
 <dialog id="flyer-filters" class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none overscroll-contain bg-white p-0 text-stone-900"
         aria-labelledby="flyer-filters-heading" hidden data-flyer-builder-target="filterDialog" data-action="close->flyer-builder#filtersClosed">
-  <div class="flex min-h-full flex-col">
-    <header class="flex items-center justify-between border-b border-stone-200 px-4 py-2">
+  <div class="flex h-full flex-col">
+    <header class="flex shrink-0 items-center justify-between border-b border-stone-200 px-4 py-2">
       <h2 id="flyer-filters-heading" class="text-xl font-semibold">Filters</h2>
       <button type="button" autofocus class="grid size-11 cursor-pointer place-items-center rounded-lg text-stone-600 hover:bg-stone-100"
               aria-label="Close filters" data-action="flyer-builder#closeFilters">
@@ -35,16 +35,17 @@
         </svg>
       </button>
     </header>
-    <div class="flex-1 px-4 py-5">
-      <label for="flyer-filter-order" class="block text-sm font-semibold">Sort order</label>
-      <select id="flyer-filter-order" class="mt-1.5 min-h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-base" data-flyer-builder-target="draftSort">
-        <%= options_for_select(Flyer::SORT_OPTIONS) %>
+    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-5">
+      <label for="flyer-filter-order" class="block shrink-0 text-sm font-semibold">Sort by</label>
+      <select id="flyer-filter-order" class="mt-1.5 min-h-11 w-full shrink-0 rounded-lg border border-stone-300 bg-white px-3 text-base" data-flyer-builder-target="draftSort">
+        <%= options_for_select(Flyer::SORT_OPTIONS, selected: @flyer.sort, disabled: Flyer::DISTANCE_SORT) %>
       </select>
 
-      <fieldset class="mt-5">
+      <fieldset class="mt-5 flex min-h-0 flex-1 flex-col">
         <legend class="text-sm font-semibold">Categories</legend>
-        <p class="mt-1 mb-2.5 text-sm text-stone-600">Leave unchecked to include all categories.</p>
-        <div class="grid gap-1.5">
+        <p class="mt-1 mb-2.5 shrink-0 text-sm text-stone-600">Leave unchecked to include all categories.</p>
+        <div role="region" aria-label="Category list" tabindex="0"
+             class="grid min-h-20 flex-1 content-start gap-1.5 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] focus-visible:outline-sage-600">
           <% categories.each do |id, name| %>
             <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-stone-200 px-3 py-2 text-sm has-checked:border-sage-600 has-checked:bg-sage-50">
               <input type="checkbox" value="<%= id %>" class="size-4 shrink-0 accent-sage-600" data-flyer-builder-target="draftCategory">
@@ -54,7 +55,7 @@
         </div>
       </fieldset>
     </div>
-    <footer class="sticky bottom-0 flex gap-2 border-t border-stone-200 bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <footer class="flex shrink-0 gap-2 border-t border-stone-200 bg-white px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <button type="button" class="min-h-11 cursor-pointer rounded-lg border border-stone-300 px-4 text-sm font-semibold text-sage-700" data-action="flyer-builder#resetDraft">
         Reset
       </button>

@@ -8,7 +8,7 @@ function locationController() {
   const controller = Object.create(FlyerBuilderController.prototype);
   const stub = (extra = {}) => ({ hidden: false, focus: () => {}, ...extra });
   controller.locationRequest = 0;
-  controller.locateUrlValue = "/flyers/locate.json";
+  controller.locateUrlValue = "/printout/locate.json";
   controller.nearTarget = { value: "" };
   controller.latTarget = { value: "" };
   controller.lngTarget = { value: "" };
@@ -24,6 +24,7 @@ function locationController() {
   controller.locationSummaryTarget = stub({ textContent: "" });
   controller.printErrorTarget = stub({ hidden: true });
   controller.clearPrintout = () => {};
+  controller.updateFilterControls = () => {};
   controller.refresh = () => {};
   return controller;
 }
@@ -234,7 +235,7 @@ test("checks a typed place with the server, then moves on", async () => {
     async (requests) => {
       await controller.confirmPlace();
 
-      assert.equal(requests[0].url, "/flyers/locate.json");
+      assert.equal(requests[0].url, "/printout/locate.json");
       assert.equal(
         requests[0].options.body.get("flyer[near]"),
         "919 Pandora Ave",
@@ -261,7 +262,7 @@ test("sends a chosen location to the preview in the request body", async () => {
   const controller = locationController();
   delete controller.refresh;
   controller.revision = 0;
-  controller.previewUrlValue = "/flyers/preview.json";
+  controller.previewUrlValue = "/printout/preview.json";
   controller.previewErrorTarget = { hidden: true };
   controller.setLoading = () => {};
   controller.selectedCategories = () => ["17"];
@@ -427,7 +428,7 @@ test("clearing every category requests and renders the complete guide", async ()
 
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.revision = 0;
-    controller.previewUrlValue = "/flyers/preview.json";
+    controller.previewUrlValue = "/printout/preview.json";
     controller.searchTarget = { value: "" };
     controller.sortTarget = { value: "default" };
     controller.previewErrorTarget = { hidden: true };
@@ -603,7 +604,7 @@ test("a delayed preview response cannot replace a newer selection", async () => 
 
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.revision = 0;
-    controller.previewUrlValue = "/flyers/preview.json";
+    controller.previewUrlValue = "/printout/preview.json";
     controller.searchTarget = { value: "" };
     controller.sortTarget = { value: "default" };
     controller.previewErrorTarget = { hidden: true };

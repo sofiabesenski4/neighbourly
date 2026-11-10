@@ -57,15 +57,20 @@ class ResourceCard
     {id: document.id, title: title, fields: fields}
   end
 
+  def distance_km
+    point = document.coordinates if @origin&.located?
+    @origin.point.distance_km_to(point) if point
+  end
+
   private
 
   # Like "1.0 km straight-line, about 16 min walk". Calculated from saved coordinates
   # with no network call. The distance is labelled straight-line because that's what it
   # measures, while the time allows for following streets.
   def distance
-    return unless @origin&.located? && document.coordinates
+    km = distance_km
+    return unless km
 
-    km = @origin.point.distance_km_to(document.coordinates)
     length = (km < 0.1) ? "Under 0.1 km" : "#{format("%.1f", km)} km"
     "#{length} straight-line, about #{walking_time(km)} walk"
   end
