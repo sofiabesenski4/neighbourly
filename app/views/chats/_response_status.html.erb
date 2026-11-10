@@ -10,13 +10,13 @@
     <p><%= { "queued" => "Getting ready…", "searching" => "Finding local resources…", "writing" => "Writing a response…", "cancelling" => "Stopping…" }.fetch(response.status) %></p>
     <% unless response.cancelling? %>
       <%= button_to "Stop response", stop_chat_chat_response_path(chat, response), method: :post, params: { attempt_token: response.attempt_token },
-        class: "mt-2 rounded-lg border border-stone-200 px-3 py-1.5 text-stone-700 hover:bg-stone-50 focus-visible:outline-sage-600",
+        class: "mt-2 min-h-11 rounded-lg border border-stone-200 px-3 py-2.5 text-stone-700 hover:bg-stone-50 focus-visible:outline-sage-600",
         data: { turbo_submits_with: "Stopping…" } %>
     <% end %>
   <% elsif failed %>
     <p class="text-red-700"><%= response.error_message.presence || "The assistant couldn't finish this reply. Your question is saved." %></p>
     <%= button_to "Retry reply", retry_chat_chat_response_path(chat, response), method: :post, params: { attempt_token: response.attempt_token },
-      class: "mt-2 rounded-lg border border-stone-200 px-3 py-1.5 text-stone-700 hover:bg-stone-50 focus-visible:outline-sage-600",
+      class: "mt-2 min-h-11 rounded-lg border border-stone-200 px-3 py-2.5 text-stone-700 hover:bg-stone-50 focus-visible:outline-sage-600",
       data: { turbo_submits_with: "Retrying…" } %>
   <% elsif cancelled %>
     <p>Response stopped.</p>
