@@ -218,6 +218,51 @@ RSpec.describe "Live resource guide builder", type: :system do
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
+  it "reveals the same sort choices on desktop hover and in mobile filters" do
+    page.current_window.resize_to(1280, 900)
+    visit_builder
+    expect(page).to have_css("article h4", count: 3)
+
+    search_right = find_field("Search resources").evaluate_script("this.getBoundingClientRect().right")
+    sort = find("summary[aria-label='Sort resources']")
+    expect(sort.evaluate_script("this.getBoundingClientRect().left")).to be >= search_right
+    expect(page).to have_no_button("By name (Z–A)")
+    sort.hover
+    options = ["By category", "By name (A–Z)", "By name (Z–A)", "By distance"]
+    within("[aria-label='Sort order']") do
+      expect(all("button").map(&:text)).to eq(options)
+      expect(page).to have_css("button[aria-pressed='true']", text: "By category")
+      expect(page).to have_button("By distance", disabled: true)
+    end
+    click_button "By name (Z–A)"
+    expect(page).to have_css("article:first-child h4", text: "Gamma noticeboard")
+    expect(page).to have_css("article:nth-child(2) h4", text: "Beta clinic")
+    expect(all("article h4").map(&:text)).to eq(["Gamma noticeboard", "Beta clinic", "Alpha meals"])
+    sort.send_keys(:enter)
+    expect(page).to have_button("By name (A–Z)")
+    sort.send_keys(:escape)
+    expect(page).to have_no_button("By name (A–Z)")
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    find("button[aria-label='Filters (active)']").click
+    within("#flyer-filters") do
+      expect(page).to have_select("Sort order", options: options, selected: "By name (Z–A)")
+      expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
+      select "By name (A–Z)", from: "Sort order"
+      click_button "Apply filters"
+    end
+    expect(page).to have_css("article:first-child h4", text: "Alpha meals")
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+    find("summary[aria-label='Sort resources']").hover
+    expect(page).to have_css("button[aria-pressed='true']", text: "By name (A–Z)")
+    click_button "By category"
+    expect(page).to have_css("h3", text: "Health Care")
+    expect(page).to have_css("h3", text: "Meals")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "searches and applies draft filters from the mobile toolbar" do
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
@@ -240,7 +285,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_unchecked_field("Meals")
       check "Meals"
       check "Health Care"
-      select "Resource name Z–A", from: "Sort order"
+      select "By name (Z–A)", from: "Sort order"
       click_button "Apply filters"
     end
     expect(page).to have_no_css("dialog[open]")
@@ -390,6 +435,38 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_no_field("Meals", type: "checkbox")
       expect(page).to have_no_button("Generate printout")
       expect(page).to have_no_text("Choose what to include")
+    end
+
+    it "enables distance sorting on both layouts and resets it when distances are skipped" do
+      allow(Geocoder).to receive(:locate).and_return(point)
+      Document.find_by!(title: "Beta clinic").update_columns(metadata: {lat: 48.421, lng: -123.36})
+      page.current_window.resize_to(1280, 900)
+      visit_location_screen
+      continue_with_place("919 Pandora Ave")
+      find("summary[aria-label='Sort resources']").hover
+      click_button "By distance"
+      expect(page).to have_css("article:nth-child(2) h4", text: "Alpha meals")
+      expect(all("article h4").map(&:text)).to eq(["Beta clinic", "Alpha meals", "Gamma noticeboard"])
+
+      page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+        width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+      find("button[aria-label='Filters (active)']").click
+      within("#flyer-filters") do
+        expect(page).to have_select("Sort order", selected: "By distance")
+        expect(page).to have_css("option[value='distance']:not([disabled])", visible: :all)
+        find("button[aria-label='Close filters']").click
+      end
+
+      click_button "Change"
+      click_button "Skip distances"
+      expect(page).to have_css("h3", text: "Meals")
+      find("button[aria-label='Filters']").click
+      within("#flyer-filters") do
+        expect(page).to have_select("Sort order", selected: "By category")
+        expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
+      end
+    ensure
+      page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
     end
 
     it "keeps the location controls out of the second screen" do

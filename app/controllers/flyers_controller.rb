@@ -49,12 +49,13 @@ class FlyersController < ApplicationController
       return
     end
 
-    @sections = CategorySearch.call(**@flyer.filters)
+    origin = coordinates_origin
+    @sections = CategorySearch.call(**@flyer.filters, origin: origin)
     respond_to do |format|
       format.json do
         render json: {categories: @sections.map { |section|
           {key: section.category&.id&.to_s, name: section.name,
-           resources: section.resources.map { |resource| ResourceCard.new(resource, origin: coordinates_origin).as_json }}
+           resources: section.resources.map { |resource| ResourceCard.new(resource, origin: origin).as_json }}
         }}
       end
     end
