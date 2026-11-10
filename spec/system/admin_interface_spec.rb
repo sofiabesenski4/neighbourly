@@ -70,6 +70,44 @@ RSpec.describe "Administration interface", type: :system do
     expect(page).to have_css("nav[aria-label='Main navigation'] a[aria-current='page']", text: "Admin console")
   end
 
+  it "keeps navigation within a narrow screen with wider fonts and enlarged text" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 844, deviceScaleFactor: 1, mobile: true)
+    visit root_path
+
+    # Use the bundled font so this regression does not depend on the host OS's fonts.
+    font_url = ActionController::Base.helpers.asset_path("dejavu/DejaVuSans.ttf")
+    loaded = page.evaluate_async_script(<<~JS, font_url)
+      const done = arguments[arguments.length - 1];
+      const font = new FontFace("NavigationRegression", `url("${arguments[0]}")`);
+      font.load().then(loaded => {
+        document.fonts.add(loaded);
+        document.querySelector("nav[aria-label='Main navigation']").style.fontFamily = "NavigationRegression";
+        done(true);
+      }, () => done(false));
+    JS
+    expect(loaded).to be(true)
+
+    within("nav[aria-label='Main navigation']") do
+      links = ["Chat", "Printout", "Admin console"].map { |label| find_link(label, exact: true) }
+      expect(links.map { |link| link.evaluate_script("this.getBoundingClientRect().top") }.uniq.size).to eq(1)
+
+      [nil, "18px"].each do |font_size|
+        links.each do |link|
+          link.execute_script("this.style.fontSize = arguments[0]", font_size) if font_size
+          expect(link.evaluate_script("this.getBoundingClientRect().left >= this.parentElement.getBoundingClientRect().left && this.getBoundingClientRect().right <= this.parentElement.getBoundingClientRect().right")).to be(true)
+          expect(link.evaluate_script("this.getBoundingClientRect().width")).to be >= 44
+          expect(link.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+        end
+        expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be(true)
+      end
+      click_link "Admin console", exact: true
+    end
+
+    expect(page).to have_current_path(admin_path)
+    expect(page).to have_css("h1", text: "Admin console")
+  end
+
   it "contains wide management tables and keeps model details reachable on a phone" do
     User.create!(email: "#{"long-account-name-" * 6}@example.com", password: "password123")
     Report.create!(document: document, user: admin, reason: "out of date", details: "Please check the listed opening hours.")
