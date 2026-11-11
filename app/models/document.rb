@@ -62,6 +62,13 @@ class Document < ApplicationRecord
     [address, metadata["city"].presence, "BC"].compact.join(", ") if address.present?
   end
 
+  # Geocoding adds lat and lng to a stored row. Those are not part of the
+  # row as uploaded, so they do not make it look changed. Coordinates the
+  # row itself supplied are still compared.
+  def self.same_row?(stored, row)
+    stored.except(*(%w[lat lng] - row.keys)) == row
+  end
+
   # A moderator accepted a report, so the resource is kept out of search.
   def removal_accepted?
     reports.where(status: "valid").exists?

@@ -170,4 +170,18 @@ RSpec.describe ContentPipeline::Enricher do
     expect(described_class.new(document).enrich!).to be(false)
     expect(document.reload).to have_attributes(enriched_at: nil, content: "Program Name: Harbour Meals\nAddress: 100 Harbour St")
   end
+
+  it "saves the summary when geocoding added coordinates while the model was answering" do
+    allow(chat).to receive(:ask) do
+      Document.where(id: document.id).update_all(metadata: metadata.merge("lat" => 48.43, "lng" => -123.37))
+      instance_double(RubyLLM::Message, content: reply)
+    end
+
+    described_class.new(document).enrich!
+
+    expect(document.reload).to have_attributes(
+      enriched_at: be_present, metadata: hash_including("lat" => 48.43, "lng" => -123.37)
+    )
+    expect(document.content).to start_with("Free hot lunches on weekdays.")
+  end
 end

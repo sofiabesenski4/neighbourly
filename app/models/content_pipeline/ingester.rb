@@ -88,7 +88,7 @@ module ContentPipeline
     def write_document(document, chunk)
       # An unchanged row keeps the summary and categories enrichment gave it.
       # A changed row is written fresh and enriched again.
-      return if document.enriched_at? && same_row?(document.metadata, chunk[:metadata])
+      return if document.enriched_at? && Document.same_row?(document.metadata, chunk[:metadata])
 
       document.enriched_at = nil
       document.title = chunk[:title]
@@ -96,13 +96,6 @@ module ContentPipeline
       document.metadata = chunk[:metadata]
       document.save_with_category_names!(chunk[:categories] || [])
       document
-    end
-
-    # Geocoding adds lat and lng to a stored row. Those are not part of the
-    # upload, so they do not make an identical row look changed. Coordinates
-    # the file itself supplies are still compared.
-    def same_row?(stored, uploaded)
-      stored.except(*(%w[lat lng] - uploaded.keys)) == uploaded
     end
   end
 end
