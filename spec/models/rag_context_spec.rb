@@ -79,9 +79,12 @@ RSpec.describe RagContext do
     end
 
     context "when no documents exist at all" do
-      it "returns no reference instructions" do
+      it "still limits answers to the reference documents" do
         result = rag_context.augment("Hello")
-        expect(result.instructions).to be_nil
+        instructions = result.instructions.squish
+
+        expect(instructions).to include("provide no general information based on your own knowledge")
+        expect(instructions).to include("No reference documents matched this question.")
         expect(result.documents).to be_empty
       end
     end

@@ -33,11 +33,16 @@ class RagContext
 
   def augment(content)
     documents = Document.search_by_similarity(content, limit: @limit)
-    return Result.new(instructions: nil, documents: []) if documents.empty?
 
-    context_block = documents.map do |doc|
-      "[ref:#{doc.id}] #{doc.title} (Source: #{doc.source.name})\n#{doc.content}"
-    end.join("\n\n")
+    # With no matches the rules still apply, so the model says it has nothing
+    # rather than answering from its own knowledge.
+    context_block = if documents.empty?
+      "No reference documents matched this question."
+    else
+      documents.map do |doc|
+        "[ref:#{doc.id}] #{doc.title} (Source: #{doc.source.name})\n#{doc.content}"
+      end.join("\n\n")
+    end
 
     instructions = "#{SYSTEM_PREFIX}#{context_block}\n--- END REFERENCE DOCUMENTS ---"
     Result.new(instructions: instructions, documents: documents.to_a)
