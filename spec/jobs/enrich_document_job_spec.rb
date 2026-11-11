@@ -12,6 +12,14 @@ RSpec.describe EnrichDocumentJob do
     allow(ContentPipeline::Enricher).to receive(:new).and_return(enricher)
   end
 
+  it "runs apart from chat replies, which keep a worker of their own" do
+    workers = ActiveSupport::ConfigurationFile.parse(Rails.root.join("config/queue.yml"))["production"]["workers"]
+    reserved = workers.select { |worker| Array(worker["queues"]) == [ChatResponseJob.new.queue_name] }
+
+    expect(described_class.new.queue_name).to eq("enrichment")
+    expect(reserved).not_to be_empty
+  end
+
   it "enriches the document" do
     described_class.perform_now(document)
 

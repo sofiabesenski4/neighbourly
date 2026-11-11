@@ -1,6 +1,9 @@
 class EnrichDocumentJob < ApplicationJob
-  # A large CSV queues one job per row. Chat replies run first, so a backlog
-  # of summaries never keeps someone waiting for an answer.
+  # A large CSV queues one job per row. Its own queue lets config/queue.yml
+  # keep a worker free for chat replies, so a backlog of summaries never
+  # keeps someone waiting for an answer. Chat replies also run first on the
+  # workers the two share.
+  queue_as :enrichment
   queue_with_priority 10
 
   # A row can be queued twice when its source is ingested again quickly.
