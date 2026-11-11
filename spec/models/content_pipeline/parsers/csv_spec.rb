@@ -28,6 +28,20 @@ RSpec.describe ContentPipeline::Parsers::Csv do
       )
     end
 
+    it "reads the address from columns it recognises, keeping the row whole in metadata" do
+      chunks = parser.parse(csv)
+
+      expect(chunks.first[:address]).to eq(street_address: "100 Harbour St", city: nil, phone: "250-555-0100", lat: nil, lng: nil)
+      expect(chunks.first[:metadata]).to include("Address" => "100 Harbour St", "Phone" => "250-555-0100")
+      expect(chunks.last[:address]).to include(street_address: "22 North Rd", phone: nil)
+    end
+
+    it "recognises address columns whatever their spelling" do
+      chunk = parser.parse("Name,STREET_ADDRESS,Town,Phone Number,Latitude,Longitude\nHarbour,1 Main St,Sidney,250-555-0100,48.6,-123.4\n").first
+
+      expect(chunk[:address]).to eq(street_address: "1 Main St", city: "Sidney", phone: "250-555-0100", lat: "48.6", lng: "-123.4")
+    end
+
     it "keeps blank cells in metadata as nil" do
       chunk = parser.parse(csv).second
 

@@ -17,11 +17,11 @@
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
     <div class="min-w-0 space-y-2">
       <%= form.label :city, "City", class: "admin-label" %>
-      <%= form.text_field :city, value: @document.metadata&.dig("city") || params.dig(:document, :city), placeholder: "e.g. Victoria", class: "admin-input" %>
+      <%= form.text_field :city, value: @document.location.city || params.dig(:document, :city), placeholder: "e.g. Victoria", class: "admin-input" %>
     </div>
     <div class="min-w-0 space-y-2">
       <%= form.label :address, "Street address", class: "admin-label" %>
-      <%= form.text_field :address, value: @document.metadata&.dig("address") || params.dig(:document, :address), placeholder: "e.g. 100 Harbour St", class: "admin-input" %>
+      <%= form.text_field :address, value: @document.location.street_address || params.dig(:document, :address), placeholder: "e.g. 100 Harbour St", class: "admin-input" %>
     </div>
   </div>
 
@@ -29,7 +29,7 @@
     <div class="min-w-0 space-y-2">
       <%= form.label :phone, "Phone number(s)", class: "admin-label" %>
       <p id="document_phone_hint" class="text-xs leading-5 text-stone-500">Comma-separated if multiple.</p>
-      <%= form.text_field :phone, value: Array(@document.metadata&.dig("phone")).join(", "), placeholder: "e.g. 250-555-0100", class: "admin-input", aria: { describedby: "document_phone_hint" } %>
+      <%= form.text_field :phone, value: @document.location.phone || params.dig(:document, :phone), placeholder: "e.g. 250-555-0100", class: "admin-input", aria: { describedby: "document_phone_hint" } %>
     </div>
     <div class="min-w-0 space-y-2">
       <%= form.label :email, "Email", class: "admin-label" %>

@@ -41,7 +41,7 @@
             <span class="admin-badge bg-sage-50 text-sage-700">FORM</span>
           </div>
           <p class="break-words text-sm text-stone-500">
-            <%= [document.metadata["city"].presence, document.category_names.presence&.join(", ")].compact.join(" · ") %>
+            <%= [document.location.city.presence, document.category_names.presence&.join(", ")].compact.join(" · ") %>
           </p>
           <p class="text-sm text-stone-500">Added <%= time_ago_in_words(document.created_at) %> ago</p>
         </div>

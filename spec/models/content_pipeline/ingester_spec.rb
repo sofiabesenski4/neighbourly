@@ -224,6 +224,15 @@ RSpec.describe ContentPipeline::Ingester do
           )
         end
 
+        it "sets the address again from a changed row, clearing what enrichment filled in" do
+          document.address.update_columns(city: "Victoria", lat: 48.43, lng: -123.37)
+
+          expect { described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St")) }
+            .not_to have_enqueued_job(GeocodeAddressJob)
+
+          expect(document.reload.address).to have_attributes(street_address: "200 Harbour St", city: nil, coordinates: nil)
+        end
+
         it "rewrites the row and clears enrichment when the row changed" do
           described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St"))
 

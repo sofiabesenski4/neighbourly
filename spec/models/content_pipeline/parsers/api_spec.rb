@@ -48,11 +48,11 @@ RSpec.describe ContentPipeline::Parsers::Api do
       expect(chunk[:categories]).to eq(["24 Hour", "Pet Friendly"])
     end
 
-    it "stores structured metadata" do
+    it "stores structured metadata, with the location and phone on the address" do
       chunk = parser.parse(shelter_json).first
 
-      expect(chunk[:metadata][:city]).to eq("vancouver")
-      expect(chunk[:metadata][:phone]).to eq(["604-555-1234"])
+      expect(chunk[:address]).to include(city: "vancouver", phone: "604-555-1234")
+      expect(chunk[:metadata]).not_to include(:city, :address, :phone, :lat, :lng)
       expect(chunk[:metadata][:gender]).to eq(["men"])
       expect(chunk[:categories]).to eq(["24 Hour", "Pet Friendly"])
       expect(chunk[:metadata][:notes]).to eq("No drugs or alcohol")
@@ -115,9 +115,7 @@ RSpec.describe ContentPipeline::Parsers::Api do
 
       expect(chunk[:content]).not_to include("City:")
       expect(chunk[:content]).not_to include("Address:")
-      expect(chunk[:metadata][:lat]).to be_nil
-      expect(chunk[:metadata][:lng]).to be_nil
-      expect(chunk[:metadata][:city]).to be_nil
+      expect(chunk[:address]).to include(street_address: nil, city: nil, lat: nil, lng: nil)
     end
 
     it "handles nested location.location set to false" do
@@ -136,10 +134,7 @@ RSpec.describe ContentPipeline::Parsers::Api do
 
       expect(chunk[:content]).to include("City: Vancouver")
       expect(chunk[:content]).to include("Address: 400 Cedar St")
-      expect(chunk[:metadata][:city]).to eq("vancouver")
-      expect(chunk[:metadata][:address]).to eq("400 Cedar St")
-      expect(chunk[:metadata][:lat]).to be_nil
-      expect(chunk[:metadata][:lng]).to be_nil
+      expect(chunk[:address]).to include(street_address: "400 Cedar St", city: "vancouver", lat: nil, lng: nil)
     end
   end
 end

@@ -17,7 +17,8 @@ module ContentPipeline
             content: build_content(record),
             external_id: record["id"]&.to_s || record["ID"]&.to_s,
             categories: taxonomy_categories(record),
-            metadata: build_metadata(record)
+            metadata: build_metadata(record),
+            address: build_address(record)
           }
         end
       end
@@ -68,18 +69,26 @@ module ContentPipeline
         parts.join("\n")
       end
 
-      def build_metadata(record)
+      # Where the service is and how to reach it. These are saved on the
+      # resource's address rather than in its metadata.
+      def build_address(record)
         location = hash_field(record, "location")
         geo = location ? hash_field(location, "location") : nil
+
+        {
+          street_address: location&.dig("street_address"),
+          city: location&.dig("city", "value"),
+          phone: Array(record["contact"]).filter_map { |c| c.dig("contact", "phone_number") }.compact_blank.join(", "),
+          lat: geo&.dig("lat"),
+          lng: geo&.dig("lng")
+        }
+      end
+
+      def build_metadata(record)
         beds = hash_field(record, "beds")
         age_range = hash_field(record, "age_range")
 
         {
-          city: location&.dig("city", "value"),
-          address: location&.dig("street_address"),
-          lat: geo&.dig("lat"),
-          lng: geo&.dig("lng"),
-          phone: Array(record["contact"]).filter_map { |c| c.dig("contact", "phone_number") }.reject(&:blank?),
           beds: beds&.dig("availability"),
           full: beds&.dig("full"),
           age_range: age_range,

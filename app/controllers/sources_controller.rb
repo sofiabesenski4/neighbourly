@@ -4,7 +4,7 @@ class SourcesController < ApplicationController
   def index
     authorize Source
     @sources = policy_scope(Source).where.not(source_type: "form").order(created_at: :desc)
-    @documents = Document.joins(:source).where(sources: {source_type: "form"}).order(created_at: :desc)
+    @documents = Document.joins(:source).where(sources: {source_type: "form"}).includes(:address, :categories).order(created_at: :desc)
   end
 
   def show

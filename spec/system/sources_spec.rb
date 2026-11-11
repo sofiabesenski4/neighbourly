@@ -21,8 +21,11 @@ RSpec.describe "Sources", type: :system do
     allow(chat).to receive_messages(with_instructions: chat, with_schema: chat)
     allow(chat).to receive(:ask) do |prompt|
       name = JSON.parse(prompt[/^Row: (.*)$/, 1])["Name"]
-      instance_double(RubyLLM::Message, content: {title: name, summary: "#{name} is a local service.", categories: []}.to_json)
+      instance_double(RubyLLM::Message, content: {title: name, summary: "#{name} is a local service.", categories: [],
+                                                  address: "", city: "Victoria", phone: ""}.to_json)
     end
+    # Rows with an address are looked up once ingested.
+    allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.37))
   end
 
   after do
@@ -212,6 +215,10 @@ RSpec.describe "Sources", type: :system do
         expect(document.metadata).to include("Address" => "100 Harbour St")
         expect(document.content).to eq("Harbour Meals is a local service.\n\nName: Harbour Meals\nAddress: 100 Harbour St")
         expect(document.enriched_at).to be_present
+        # The street comes from the file, the city from the summary, and the lookup ran after both.
+        expect(document.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
+        expect(Geocoder).to have_received(:locate).with("100 Harbour St, Victoria, BC")
+        expect(document.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.37))
         expect(page).to have_content("AI summaries")
       end
 

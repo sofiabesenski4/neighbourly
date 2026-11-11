@@ -34,7 +34,7 @@ class CategorySearch
     end
 
     resources = resources
-      .includes(:source, :categories)
+      .includes(:source, :categories, :address)
       .order(Arel.sql("LOWER(documents.title) ASC"), :id)
       .to_a
 

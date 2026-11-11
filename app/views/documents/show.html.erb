@@ -14,18 +14,19 @@
       <dd class="mt-2 whitespace-pre-line break-words text-sm leading-6 text-stone-900"><%= @document.metadata["description"] %></dd>
     </div>
   <% end %>
-  <% if @document.metadata["city"].present? || @document.metadata["address"].present? %>
+  <% location = @document.location %>
+  <% if location.city.present? || location.street_address.present? %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="text-sm font-medium text-stone-500">Location</dt>
       <dd class="mt-2 break-words text-sm leading-6 text-stone-900">
-        <%= @document.metadata["address"] %><% if @document.metadata["address"].present? && @document.metadata["city"].present? %>, <% end %><%= @document.metadata["city"] %>
+        <%= [location.street_address, location.city].compact_blank.join(", ") %>
       </dd>
     </div>
   <% end %>
-  <% if @document.metadata["phone"].present? %>
+  <% if location.phone.present? %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="text-sm font-medium text-stone-500">Phone</dt>
-      <dd class="mt-2 text-sm leading-6 text-stone-900"><%= Array(@document.metadata["phone"]).join(", ") %></dd>
+      <dd class="mt-2 text-sm leading-6 text-stone-900"><%= location.phone %></dd>
     </div>
   <% end %>
   <% if @document.metadata["email"].present? %>

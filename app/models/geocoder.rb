@@ -2,8 +2,8 @@
 # Geocoder web service. This is the only code in the app that talks to that
 # service, so its URL, reply format and match rules all live here.
 #
-# Architecture: GeocodeDocumentJob calls this in the background after a resource
-# is saved, then stores the result in the resource's metadata. Printing reads
+# Architecture: GeocodeAddressJob calls this in the background after a resource's
+# address is saved, then stores the result on that address. Printing reads
 # those stored coordinates, so it doesn't depend on this service being up.
 #
 # Geocoder.locate has three possible outcomes, because callers need to treat
@@ -42,7 +42,7 @@ class Geocoder
   ACCEPTED_PRECISIONS = %w[SITE UNIT CIVIC_NUMBER BLOCK INTERSECTION].freeze
 
   # The service couldn't give an answer, as opposed to having no match. Lets
-  # GeocodeDocumentJob know a retry is worthwhile.
+  # GeocodeAddressJob know a retry is worthwhile.
   class Unavailable < StandardError; end
 
   def self.locate(address)

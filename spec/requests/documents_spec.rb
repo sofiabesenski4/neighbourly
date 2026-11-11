@@ -93,19 +93,20 @@ RSpec.describe "Documents", type: :request do
       end
 
       # Checks the real form path end to end: submitting the form ends with a lookup
-      # queued. document_spec.rb covers the rules for when a lookup is needed.
+      # queued. address_spec.rb covers the rules for when a lookup is needed.
       it "queues a coordinate lookup for the new resource's address" do
         expect { post documents_path, params: valid_params }
-          .to have_enqueued_job(GeocodeDocumentJob)
+          .to have_enqueued_job(GeocodeAddressJob)
       end
 
-      it "creates a document with correct metadata" do
+      it "saves the location and phone on the address and the rest in metadata" do
         post documents_path, params: valid_params
 
+        expect(Document.last.address).to have_attributes(
+          street_address: "100 Harbour St", city: "Victoria", phone: "250-555-0100"
+        )
         meta = Document.last.metadata
-        expect(meta["city"]).to eq("Victoria")
-        expect(meta["address"]).to eq("100 Harbour St")
-        expect(meta["phone"]).to eq(["250-555-0100"])
+        expect(meta).not_to include("city", "address", "phone")
         expect(meta["email"]).to eq("info@example.org")
         expect(meta["website"]).to eq("https://example.org")
         expect(meta["hours"]).to eq("Mon-Sun 7am-11pm")
@@ -192,7 +193,7 @@ RSpec.describe "Documents", type: :request do
         document.reload
         expect(document.title).to eq("Updated Name")
         expect(document.content).to include("City: Nanaimo")
-        expect(document.metadata["city"]).to eq("Nanaimo")
+        expect(document.address.city).to eq("Nanaimo")
       end
 
       it "redirects to the show page" do

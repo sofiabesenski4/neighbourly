@@ -50,7 +50,7 @@ RSpec.describe "Documents", type: :system do
         expect(page).to have_content("Resource 'Harbour Street Society' was created.")
         expect(Document.last.title).to eq("Harbour Street Society")
         expect(Document.last.category_names).to eq(["Meals", "Shelters"])
-        expect(Document.last.metadata["city"]).to eq("Victoria")
+        expect(Document.last.address.city).to eq("Victoria")
         expect(Document.last.metadata["age_range"]).to eq({"min" => 19, "max" => 65})
       end
 
@@ -122,7 +122,7 @@ RSpec.describe "Documents", type: :system do
         expect(page).to have_content("Resource 'New Name' was updated.")
         doc.reload
         expect(doc.title).to eq("New Name")
-        expect(doc.metadata["city"]).to eq("Nanaimo")
+        expect(doc.address.city).to eq("Nanaimo")
       end
 
       it "keeps all categories unchecked when the update is invalid" do

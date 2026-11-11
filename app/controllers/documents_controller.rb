@@ -21,6 +21,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
+    assign_address
     if @document.save_with_category_names(selected_category_names)
       redirect_to sources_path, notice: "Resource '#{@document.title}' was created."
     else
@@ -40,6 +41,7 @@ class DocumentsController < ApplicationController
       content: build_content,
       metadata: build_metadata
     )
+    assign_address
     if @document.save_with_category_names(selected_category_names)
       redirect_to @document, notice: "Resource '#{@document.title}' was updated."
     else
@@ -100,12 +102,17 @@ class DocumentsController < ApplicationController
     @selected_category_names ||= Category.where(id: Array(document_params[:category_ids]).compact_blank).order(:name).pluck(:name)
   end
 
+  # Where the resource is and how to reach it live on its address, not in its
+  # metadata.
+  def assign_address
+    p = document_params
+    phones = p[:phone].to_s.split(",").map(&:strip).compact_blank
+    @document.assign_address(street_address: p[:address], city: p[:city], phone: phones.join(", "))
+  end
+
   def build_metadata
     p = document_params
     meta = {}
-    meta[:city] = p[:city] if p[:city].present?
-    meta[:address] = p[:address] if p[:address].present?
-    meta[:phone] = p[:phone].split(",").map(&:strip).reject(&:blank?) if p[:phone].present?
     meta[:email] = p[:email] if p[:email].present?
     meta[:website] = p[:website] if p[:website].present?
     meta[:hours] = p[:hours] if p[:hours].present?
