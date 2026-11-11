@@ -37,7 +37,10 @@ module ContentPipeline
         if @document.metadata == metadata && @document.enriched_at == enriched_at
           @document.title = result[:title] if result[:title]
           @document.content = content
-          @document.embedding = embedding
+          # Moderation takes the same lock to remove a resource, so a removal
+          # accepted while the model was answering is seen here. The resource
+          # keeps its summary but stays out of search.
+          @document.embedding = @document.removal_accepted? ? nil : embedding
           # Marked changed even if equal to the old vector, so saving does not
           # embed the content a second time.
           @document.embedding_will_change!

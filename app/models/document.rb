@@ -62,6 +62,11 @@ class Document < ApplicationRecord
     [address, metadata["city"].presence, "BC"].compact.join(", ") if address.present?
   end
 
+  # A moderator accepted a report, so the resource is kept out of search.
+  def removal_accepted?
+    reports.where(status: "valid").exists?
+  end
+
   def save_with_category_names(names)
     persist_with_categories(names) { save }
   end
