@@ -34,7 +34,9 @@ module ContentPipeline
       embedding = Embedder.embed(content)
 
       @document.with_lock do
-        if @document.metadata == metadata && @document.enriched_at == enriched_at
+        # Coordinates geocoding added meanwhile do not change the row, so the
+        # summary still fits it.
+        if Document.same_row?(@document.metadata, metadata) && @document.enriched_at == enriched_at
           @document.title = result[:title] if result[:title]
           @document.content = content
           # Moderation takes the same lock to remove a resource, so a removal
