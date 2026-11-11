@@ -46,7 +46,9 @@ class ReportsController < ApplicationController
 
     document = @report.document
 
-    Report.transaction do
+    # Enrichment writes the embedding under this lock too, so it cannot put
+    # the resource back into search after the removal is accepted.
+    document.with_lock do
       document.reports.pending.update_all(status: "valid")
       document.update_column(:embedding, nil)
     end

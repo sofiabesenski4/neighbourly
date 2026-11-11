@@ -135,6 +135,19 @@ RSpec.describe ContentPipeline::Enricher do
     expect(document.reload.content).to eq("Earlier summary.")
   end
 
+  it "keeps the resource out of search when its removal was accepted while the model was answering" do
+    allow(chat).to receive(:ask) do
+      document.reports.create!(reason: "out of date", status: "valid")
+      Document.where(id: document.id).update_all(embedding: nil)
+      instance_double(RubyLLM::Message, content: reply)
+    end
+
+    described_class.new(document).enrich!
+
+    expect(document.reload).to have_attributes(embedding: nil, enriched_at: be_present)
+    expect(document.content).to start_with("Free hot lunches on weekdays.")
+  end
+
   it "raises InvalidResponse and leaves the document alone when the reply is not JSON" do
     reply.replace("I cannot help with that.")
 
