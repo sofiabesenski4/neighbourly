@@ -61,12 +61,20 @@ RSpec.describe RagContext do
       end
 
       it "asks for supported reference markers without guessing source URLs" do
-        result = rag_context.augment("shelters?")
+        instructions = rag_context.augment("shelters?").instructions.squish
 
-        expect(result.instructions).to include("Cite a reference only when it supports the claim")
-        expect(result.instructions).to include("Do not invent markers")
-        expect(result.instructions).to include("Do not write, guess, or reconstruct reference URLs")
-        expect(result.instructions).to include("do not comment on whether a URL is available")
+        expect(instructions).to include("Cite a reference only when it supports the claim")
+        expect(instructions).to include("Do not invent markers")
+        expect(instructions).to include("Do not write, guess, or reconstruct reference URLs")
+        expect(instructions).to include("do not comment on whether a URL is available")
+      end
+
+      it "limits answers to the reference documents without words of support" do
+        instructions = rag_context.augment("shelters?").instructions.squish
+
+        expect(instructions).to include("provide no general information based on your own knowledge")
+        expect(instructions).to include("reaches out to the support team")
+        expect(instructions).to include("DO NOT ADD ANY SORT OF HUMAN OPINION OR WORDS OF SUPPORT")
       end
     end
 
