@@ -84,6 +84,22 @@ RSpec.describe Message, type: :model do
     }.not_to have_broadcasted_to(chat.stream_name)
   end
 
+  it "streams a reply to the account once sign-in saves the guest chat it started in" do
+    guest = GuestChatSession.new(SecureRandom.hex(32))
+    guest_chat = Chat.create!(guest_session_digest: guest.digest)
+    message = guest_chat.messages.create!(role: "assistant", content: "")
+    expect(message.chat).to be_guest
+
+    guest.save_chats(guest_chat.id.to_s, user)
+
+    expect {
+      message.broadcast_append_chunk("After sign-in")
+    }.to have_broadcasted_to("account_#{user.id}_chat_#{guest_chat.id}")
+    expect {
+      message.broadcast_append_chunk("After sign-in")
+    }.not_to have_broadcasted_to("chat_#{guest_chat.id}")
+  end
+
   it "continues streaming public assistant text" do
     message = chat.messages.create!(role: "assistant", content: "")
 
