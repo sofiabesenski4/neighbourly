@@ -190,6 +190,25 @@ RSpec.describe ContentPipeline::Ingester do
           expect { described_class.new(source).ingest(csv) }.not_to(change { document.reload.attributes })
         end
 
+        it "keeps the enrichment when the only difference is coordinates from geocoding" do
+          document.update_columns(metadata: document.metadata.merge("lat" => 48.43, "lng" => -123.37))
+
+          expect { described_class.new(source).ingest(csv) }.not_to have_enqueued_job(EnrichDocumentJob)
+          expect(document.reload).to have_attributes(
+            content: "Free lunches.", enriched_at: be_present, metadata: hash_including("lat" => 48.43, "lng" => -123.37)
+          )
+        end
+
+        context "when the file supplies its own coordinates" do
+          let(:csv) { "id,Name,Address,lat,lng\n1,Harbour Meals,100 Harbour St,48.43,-123.37\n" }
+
+          it "rewrites the row when those coordinates change" do
+            described_class.new(source).ingest(csv.sub("48.43", "48.50"))
+
+            expect(document.reload).to have_attributes(enriched_at: nil, metadata: hash_including("lat" => "48.50"))
+          end
+        end
+
         it "clears enrichment that lands while a changed row is being replaced" do
           document.update!(enriched_at: nil)
           allow(source.documents).to receive(:find_or_initialize_by).and_wrap_original do |original, **attributes|
