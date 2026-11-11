@@ -25,8 +25,12 @@ class Chat < ApplicationRecord
   end
 
   # A guest subscription issued before sign-in cannot receive account messages.
+  # Ownership is read from the database, because a reply that started while
+  # the chat was a guest's holds an old copy. Its later chunks then follow the
+  # chat to the account once sign-in saves it.
   def stream_name
-    guest? ? "chat_#{id}" : "account_#{user_id}_chat_#{id}"
+    owner_id, digest = self.class.where(id: id).pick(:user_id, :guest_session_digest) || [user_id, guest_session_digest]
+    digest.present? ? "chat_#{id}" : "account_#{owner_id}_chat_#{id}"
   end
 
   def response_in_progress?
