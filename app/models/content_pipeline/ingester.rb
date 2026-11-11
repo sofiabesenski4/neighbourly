@@ -91,6 +91,9 @@ module ContentPipeline
       return if document.enriched_at? && Document.same_row?(document.metadata, chunk[:metadata])
 
       document.enriched_at = nil
+      # The address is set again from what this row gives, which clears any
+      # parts enrichment filled in for the old row.
+      document.assign_address(**chunk[:address]) if chunk[:address]
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]

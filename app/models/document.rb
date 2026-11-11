@@ -4,6 +4,8 @@ class Document < ApplicationRecord
   has_many :messages, through: :document_messages
   has_many :reports, dependent: :destroy
   has_and_belongs_to_many :categories, -> { order(:name) }
+  # Saved with the resource, so an import or form edit writes both together.
+  has_one :address, dependent: :destroy, autosave: true
 
   has_neighbors :embedding
 
@@ -11,14 +13,6 @@ class Document < ApplicationRecord
 
   # Skipped when the caller already embedded the new content.
   before_save :generate_embedding, if: -> { content_changed? && !embedding_changed? }
-
-  # Together these keep a resource's coordinates in step with its address. They
-  # live on the model so that every way of saving a resource gets the same
-  # behaviour: the form, source imports and the console.
-  before_save :keep_coordinates_for_same_address, if: :metadata_changed?
-  # after_commit, not after_save, so the job can't run before the data it needs
-  # is visible to the worker, or be queued for a save that gets rolled back.
-  after_commit :queue_geocoding, on: [:create, :update], if: :needs_geocoding?
 
   scope :with_embeddings, -> { where.not(embedding: nil) }
 
@@ -35,36 +29,39 @@ class Document < ApplicationRecord
     self.categories = Category.where(name: normalized_names)
   end
 
-  # Where the resource is, as a GeoPoint, or nil when that isn't known. A resource
-  # has no coordinates if it has no street address, its lookup hasn't finished or
-  # the geocoder found no trustworthy match. Callers must handle nil.
-  #
-  # Values are stored in metadata by GeocodeDocumentJob, or supplied directly by
-  # an import. Imported files can contain anything, so a value that isn't a number
-  # counts as unknown rather than raising an error while printing.
+  # Sets the address from what a source or the resource form gives. Blank
+  # values clear a field. Coordinates are only replaced when given, so a lookup
+  # already made for the same address is kept. Nothing is created for a
+  # resource that has no address details at all.
+  def assign_address(street_address: nil, city: nil, phone: nil, lat: nil, lng: nil)
+    details = {street_address: street_address.presence, city: city.presence, phone: phone.presence}
+    return if address.nil? && details.values.none? && lat.blank? && lng.blank?
+
+    (address || build_address).assign_attributes(details.merge({lat: lat, lng: lng}.compact_blank))
+  end
+
+  # The resource's address, or for a resource saved before addresses had their
+  # own table, one read from its metadata. The second kind is never saved.
+  def location
+    address || legacy_address
+  end
+
+  # Where the resource is, as a GeoPoint, or nil when that isn't known. Callers
+  # must handle nil.
   def coordinates
-    lat = Float(metadata["lat"], exception: false)
-    lng = Float(metadata["lng"], exception: false)
-    GeoPoint.new(lat: lat, lng: lng) if lat && lng
+    location.coordinates
   end
 
-  # The text to send to the geocoder, like "919 Pandora Ave, Victoria, BC", or nil
-  # when this resource can't be looked up.
-  def geocoding_query
-    self.class.geocoding_query_for(metadata)
+  # Enrichment finds the row's address, so geocoding waits for it rather than
+  # looking up whatever the row's columns happen to give.
+  def awaiting_enrichment?
+    enriched_at.nil? && source.enrich_documents?
   end
 
-  # Takes the metadata as an argument so keep_coordinates_for_same_address can
-  # compare the address before and after an edit. A resource with only a city gets
-  # no query, because that could only match the middle of town.
-  def self.geocoding_query_for(metadata)
-    address = metadata["address"].to_s.strip
-    [address, metadata["city"].presence, "BC"].compact.join(", ") if address.present?
-  end
-
-  # Geocoding adds lat and lng to a stored row. Those are not part of the
-  # row as uploaded, so they do not make it look changed. Coordinates the
-  # row itself supplied are still compared.
+  # Resources geocoded before addresses had their own table have lat and lng
+  # in their metadata. Those are not part of the row as uploaded, so they do
+  # not make it look changed. Coordinates the row itself supplied are still
+  # compared.
   def self.same_row?(stored, row)
     stored.except(*(%w[lat lng] - row.keys)) == row
   end
@@ -91,28 +88,15 @@ class Document < ApplicationRecord
 
   private
 
-  # The resource form and source imports build metadata from scratch on every
-  # save, which would erase stored coordinates each time someone fixed a typo in a
-  # phone number. If the address is unchanged, copy the old coordinates forward so
-  # we don't repeat the lookup. If it changed, they're left behind on purpose:
-  # they describe the old address, and needs_geocoding? will queue a new lookup.
-  def keep_coordinates_for_same_address
-    # New coordinates in this save, such as from an import, take priority.
-    return if metadata["lat"].present? || metadata["lng"].present?
-    return unless metadata_was&.key?("lat")
-    return unless self.class.geocoding_query_for(metadata_was) == geocoding_query
-
-    self.metadata = metadata.merge(metadata_was.slice("lat", "lng"))
-  end
-
-  # Only a save that changed metadata can need a lookup. Saves that touch nothing
-  # location-related, like changing categories, are skipped by this first check.
-  def needs_geocoding?
-    saved_change_to_metadata? && geocoding_query.present? && coordinates.nil?
-  end
-
-  def queue_geocoding
-    GeocodeDocumentJob.perform_later(self)
+  def legacy_address
+    data = metadata || {}
+    Address.new(
+      street_address: data["address"].presence,
+      city: data["city"].presence,
+      phone: Array(data["phone"]).compact_blank.join(", ").presence,
+      lat: data["lat"],
+      lng: data["lng"]
+    ).tap(&:readonly!)
   end
 
   def persist_with_categories(names)

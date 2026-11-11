@@ -31,15 +31,18 @@ class ResourceCard
   end
 
   def fields
-    address = value("address", "Address")
-    city = text(content_fields["City"]) || value("city")
+    location = document.location
+    address = text(location.street_address) || text(content_fields["Address"])
+    city = text(content_fields["City"]) || text(location.city)
+    # Several numbers are saved as one comma-separated value. Each gets a line.
+    phone = text(location.phone&.split(/,\s*/), separator: "\n") || text(content_fields["Phone"])
     rows = [
       ["Services", value("description", "Description") || text(document.category_names)],
       ["Address", address && [address, city].compact.join(", ")],
       ["City", (city unless address)],
       ["Distance", distance],
       ["Hours", value("hours", "Hours")],
-      ["Phone", value("phone", "Phone", separator: "\n")],
+      ["Phone", phone],
       ["Email", value("email", "Email")],
       ["Website", value("website", "Website")],
       ["Ages served", ages],

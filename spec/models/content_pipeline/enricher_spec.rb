@@ -67,6 +67,56 @@ RSpec.describe ContentPipeline::Enricher do
     end
   end
 
+  describe "filling in the address" do
+    before do
+      reply.replace({title: "Harbour Meals", summary: "Lunches.", categories: [],
+                     address: " 100 Harbour St ", city: "Victoria", phone: "250-555-0100"}.to_json)
+    end
+
+    def give_address(**details)
+      document.assign_address(**details)
+      document.save!
+    end
+
+    it "saves what the model found and queues the lookup" do
+      expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob)
+
+      expect(document.reload.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria", phone: "250-555-0100")
+    end
+
+    it "keeps what the row's columns gave and fills in only the gaps" do
+      give_address(street_address: "1 Column St")
+
+      described_class.new(document).enrich!
+
+      expect(document.reload.address).to have_attributes(street_address: "1 Column St", city: "Victoria", phone: "250-555-0100")
+    end
+
+    it "queues the lookup for an address that waited for enrichment, even when the model adds nothing" do
+      source.update!(enrich_documents: true)
+      expect { give_address(street_address: "100 Harbour St", city: "Victoria") }.not_to have_enqueued_job(GeocodeAddressJob)
+      reply.replace({title: "Harbour Meals", summary: "Lunches.", categories: [], address: "", city: "", phone: ""}.to_json)
+
+      expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob).once
+    end
+
+    it "saves no address when neither the row nor the model gives one" do
+      reply.replace({title: "Harbour Meals", summary: "Lunches.", categories: [], address: "", city: "", phone: ""}.to_json)
+
+      expect { described_class.new(document).enrich! }.not_to have_enqueued_job(GeocodeAddressJob)
+
+      expect(document.reload.address).to be_nil
+    end
+
+    it "does not look the address up again when the coordinates are already known" do
+      give_address(street_address: "100 Harbour St", city: "Victoria", lat: 48.43, lng: -123.37)
+
+      expect { described_class.new(document).enrich! }.not_to have_enqueued_job(GeocodeAddressJob)
+
+      expect(document.reload.coordinates).to eq(GeoPoint.new(lat: 48.43, lng: -123.37))
+    end
+  end
+
   it "keeps the existing title when the model gives none" do
     reply.replace({title: " ", summary: "Lunches.", categories: []}.to_json)
 

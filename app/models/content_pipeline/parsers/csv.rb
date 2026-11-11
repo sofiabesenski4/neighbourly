@@ -13,6 +13,17 @@ module ContentPipeline
       TITLE_HEADER = /(?:\A|[^a-z])(?:name|title)(?:[^a-z]|\z)/i
       MAX_TITLE_LENGTH = 120
 
+      # Column names that hold a row's address, compared after lowercasing
+      # and turning anything but letters into single spaces, so "Street
+      # Address", "street_address" and "STREET-ADDRESS" all match.
+      ADDRESS_HEADERS = {
+        street_address: ["address", "street address", "street"],
+        city: ["city", "town", "municipality"],
+        phone: ["phone", "phone number", "telephone"],
+        lat: ["lat", "latitude"],
+        lng: ["lng", "lon", "long", "longitude"]
+      }.freeze
+
       # One "Header: value" line per filled-in cell. Enrichment keeps these
       # lines under the summary so exact details stay searchable.
       def self.render_fields(fields)
@@ -32,7 +43,8 @@ module ContentPipeline
             content: self.class.render_fields(fields),
             external_id: external_id_for(fields),
             categories: [],
-            metadata: fields
+            metadata: fields,
+            address: address_for(fields)
           }
         end
 
@@ -90,6 +102,15 @@ module ContentPipeline
       def title_for(fields)
         named = fields.find { |header, value| header.match?(TITLE_HEADER) && value.present? }&.last
         (named || fields.values.compact.first).truncate(MAX_TITLE_LENGTH)
+      end
+
+      # The first filled-in column for each part of the address. Enrichment
+      # fills in parts the columns don't give.
+      def address_for(fields)
+        by_name = fields.each_with_object({}) do |(header, value), found|
+          found[header.downcase.gsub(/[^a-z]+/, " ").strip] ||= value if value.present?
+        end
+        ADDRESS_HEADERS.transform_values { |names| by_name.values_at(*names).compact.first }
       end
 
       def external_id_for(fields)
