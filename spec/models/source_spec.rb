@@ -32,7 +32,8 @@ RSpec.describe Source, type: :model do
 
     it "allows two sources to share a url" do
       Source.create!(name: "First", url: "https://example.com/data", source_type: "api")
-      expect(build_source(name: "Second", url: "https://example.com/data")).to be_valid
+      expect { build_source(name: "Second", url: "https://example.com/data").save! }
+        .to change(Source.where(url: "https://example.com/data"), :count).by(1)
     end
 
     it "requires a source_type" do
