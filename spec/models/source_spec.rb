@@ -30,11 +30,9 @@ RSpec.describe Source, type: :model do
       expect(source).to be_valid
     end
 
-    it "requires a unique url" do
+    it "allows two sources to share a url" do
       Source.create!(name: "First", url: "https://example.com/data", source_type: "api")
-      duplicate = build_source(name: "Second", url: "https://example.com/data")
-      expect(duplicate).not_to be_valid
-      expect(duplicate.errors[:url]).to include("has already been taken")
+      expect(build_source(name: "Second", url: "https://example.com/data")).to be_valid
     end
 
     it "requires a source_type" do

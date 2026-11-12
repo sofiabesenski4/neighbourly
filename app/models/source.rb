@@ -7,13 +7,11 @@ class Source < ApplicationRecord
   broadcasts_refreshes
   after_commit -> { broadcast_refresh_later_to "sources" }, on: [:update, :destroy]
 
-  # A blank URL is stored as NULL. The unique index on url allows any number
-  # of NULLs but only one empty string, so sources without a URL would clash.
+  # A blank URL is stored as NULL, so a source either has a URL or has none.
   normalizes :url, with: ->(url) { url.strip.presence }
 
   validates :name, presence: true
   validates :url, presence: true, unless: -> { form? || api? || csv? }
-  validates :url, uniqueness: true, if: -> { url.present? }
   validates :source_type, presence: true, inclusion: {in: %w[api html form csv]}
 
   # Uploads are ingested by IngestSourceJob. Form entries are never ingested
