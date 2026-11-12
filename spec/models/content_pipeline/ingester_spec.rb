@@ -52,7 +52,7 @@ RSpec.describe ContentPipeline::Ingester do
     end
 
     context "with an HTML source" do
-      let(:source) { Source.create!(name: "Test HTML", url: "https://example.com/page", source_type: "html", css_selector: ".content") }
+      let(:source) { Source.create!(name: "Test HTML", url: "https://example.com/page", source_type: "html") }
 
       let(:html_response) do
         <<~HTML

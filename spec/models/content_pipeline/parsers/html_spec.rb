@@ -54,18 +54,6 @@ RSpec.describe ContentPipeline::Parsers::Html do
       expect(chunks.first[:metadata][:chunk_index]).to eq(0)
     end
 
-    context "with a css_selector configured" do
-      let(:source) { Source.new(name: "Harbour Street", url: "https://example.com/meals", source_type: "html", css_selector: "main.content") }
-
-      it "extracts only content matching the selector" do
-        chunks = parser.parse(simple_html)
-        combined = chunks.map { |c| c[:content] }.join(" ")
-
-        expect(combined).to include("Free Meals")
-        expect(combined).to include("100 Harbour St")
-      end
-    end
-
     context "with long content" do
       let(:long_html) do
         paragraphs = 10.times.map { |i| "<p>#{"Sentence number #{i}. " * 20}</p>" }.join

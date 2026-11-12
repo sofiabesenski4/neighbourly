@@ -76,7 +76,7 @@ class SourcesController < ApplicationController
   end
 
   def source_params
-    params.require(:source).permit(:name, :url, :source_type, :css_selector, :enrich_documents, :file)
+    params.require(:source).permit(:name, :url, :source_type, :enrich_documents, :file)
   end
 
   def valid_file_type?(file, source_type)

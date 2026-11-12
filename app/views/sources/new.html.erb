@@ -28,12 +28,6 @@
           {}, class: "admin-input", aria: { invalid: @source.errors[:source_type].any? } %>
     </div>
 
-    <div class="space-y-2">
-      <%= form.label :css_selector, "CSS selector (HTML only)", class: "admin-label" %>
-      <p id="source_selector_hint" class="text-xs leading-5 text-stone-500">Optional. Targets specific content on the page, such as <code>main.content</code>.</p>
-      <%= form.text_field :css_selector, placeholder: "e.g. .main-content, article", class: "admin-input", aria: { describedby: "source_selector_hint" } %>
-    </div>
-
     <div class="rounded-xl border border-stone-200 bg-stone-50 p-4">
       <div class="flex items-center gap-3">
         <%= form.check_box :enrich_documents, class: "admin-checkbox", aria: { describedby: "source_enrich_hint" } %>
