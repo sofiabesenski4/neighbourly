@@ -1,8 +1,7 @@
 module ContentPipeline
   module Parsers
-    # Parses HTML pages using Nokogiri. Extracts text content from a
-    # configurable CSS selector (or the full <body> by default), then
-    # splits it into overlapping chunks suitable for embedding.
+    # Parses HTML pages using Nokogiri. Extracts text content from the
+    # <body>, then splits it into overlapping chunks suitable for embedding.
     class Html < Base
       MAX_CHUNK_LENGTH = 1500 # characters (~375 tokens)
       OVERLAP_LENGTH = 200  # characters of overlap between chunks
@@ -13,14 +12,7 @@ module ContentPipeline
         # Remove non-content elements
         doc.css("script, style, nav, footer, header, noscript, iframe").remove
 
-        # Extract text from targeted selector or full body
-        container = if @source.css_selector.present?
-          doc.css(@source.css_selector)
-        else
-          doc.css("body")
-        end
-
-        text = extract_text(container)
+        text = extract_text(doc.css("body"))
         return [] if text.blank?
 
         page_title = doc.at_css("title")&.text&.strip || @source.name
