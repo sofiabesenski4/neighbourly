@@ -17,7 +17,7 @@
 
     <div class="space-y-2">
       <%= form.label :url, "Origin URL", class: "admin-label" %>
-      <p id="source_url_hint" class="text-xs leading-5 text-stone-500">A reference URL, required for HTML sources. Also used to identify duplicate uploads.</p>
+      <p id="source_url_hint" class="text-xs leading-5 text-stone-500">A reference URL, required for HTML sources.</p>
       <%= form.text_field :url, placeholder: "https://example.com/data", class: "admin-input", aria: { describedby: "source_url_hint", invalid: @source.errors[:url].any? } %>
     </div>
 
