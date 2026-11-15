@@ -165,6 +165,14 @@
             <button type="button" class="mt-2 min-h-11 cursor-pointer font-medium underline" data-action="flyer-builder#refresh">Try again</button>
           </div>
 
+          <details class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800" hidden
+                   data-flyer-builder-target="removedResources">
+            <summary class="min-h-11 cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold focus-visible:outline-red-700"
+                     data-flyer-builder-target="removedSummary">Removed resources</summary>
+            <ul id="removed-printout-resources" class="divide-y divide-red-200 border-t border-red-200 px-4"
+                data-flyer-builder-target="removedList"></ul>
+          </details>
+
           <div data-flyer-builder-target="cards" aria-busy="false">
             <div class="rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600">
               <p class="font-medium text-stone-900">Loading your guide…</p>

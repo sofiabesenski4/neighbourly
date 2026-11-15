@@ -52,6 +52,22 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page.evaluate_script("window.printoutExclusions")).to eq([resource.id.to_s])
   end
 
+  it "shows each removed resource once in a collapsible list that survives filter changes" do
+    Document.find_by!(title: "Alpha meals").categories << health
+    visit_builder
+
+    expect(page).to have_no_text("Removed resources")
+    first(:button, "Remove Alpha meals").click
+    expect(page).to have_no_text("Alpha meals")
+    find("summary", text: "Removed resources (1)").click
+    expect(page).to have_css("#removed-printout-resources li", text: "Alpha meals", count: 1)
+    check "Health Care"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_css("#removed-printout-resources li", text: "Alpha meals", count: 1)
+    find("summary", text: "Removed resources (1)").click
+    expect(page).to have_no_text("Alpha meals")
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)
