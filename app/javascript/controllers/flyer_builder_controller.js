@@ -507,6 +507,16 @@ export default class extends Controller {
     this.builderHeadingTarget.focus();
   }
 
+  restoreResource(id) {
+    this.excludedResources.delete(id);
+    this.updateResourceSelection();
+    const focusTarget =
+      this.excludedResources.size > 0
+        ? this.removedSummaryTarget
+        : this.builderHeadingTarget;
+    focusTarget.focus();
+  }
+
   updateResourceSelection() {
     if (this.generating) {
       this.revision += 1;
@@ -523,10 +533,20 @@ export default class extends Controller {
     this.removedResourcesTarget.hidden = count === 0;
     if (count === 0) this.removedResourcesTarget.open = false;
     this.removedSummaryTarget.textContent = `Removed resources (${count})`;
-    const rows = [...this.excludedResources.values()].map((title) => {
+    const rows = [...this.excludedResources].map(([id, title]) => {
       const row = document.createElement("li");
-      row.className = "py-3 text-sm [overflow-wrap:anywhere]";
-      row.textContent = title;
+      row.className = "flex items-center justify-between gap-3 py-1 text-sm";
+      const name = document.createElement("span");
+      name.className = "min-w-0 [overflow-wrap:anywhere]";
+      name.textContent = title;
+      const restore = document.createElement("button");
+      restore.type = "button";
+      restore.className =
+        "min-h-11 shrink-0 cursor-pointer rounded-lg px-3 font-semibold hover:bg-red-100 focus-visible:outline-red-700";
+      restore.textContent = "Restore";
+      restore.setAttribute("aria-label", `Restore ${title}`);
+      restore.addEventListener("click", () => this.restoreResource(id));
+      row.append(name, restore);
       return row;
     });
     this.removedListTarget.replaceChildren(...rows);
