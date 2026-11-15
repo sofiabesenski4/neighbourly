@@ -27,6 +27,66 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
+  it "removes all copies of a resource, counts it once, and sends its ID when printing" do
+    resource = Document.find_by!(title: "Alpha meals")
+    resource.categories << health
+    visit_builder
+    expect(page).to have_css("article h4", text: "Alpha meals", count: 2)
+
+    first(:button, "Remove Alpha meals").click
+
+    expect(page).to have_no_css("article h4", text: "Alpha meals")
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    page.execute_script(<<~JS)
+      window.open = () => null;
+      const fetchPrintout = window.fetch;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.printoutExclusions = options.body.getAll("flyer[excluded_resource_ids][]");
+        }
+        return fetchPrintout(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(page.evaluate_script("window.printoutExclusions")).to eq([resource.id.to_s])
+  end
+
+  it "shows each removed resource once in a collapsible list that survives filter changes" do
+    Document.find_by!(title: "Alpha meals").categories << health
+    visit_builder
+
+    expect(page).to have_no_text("Removed resources")
+    first(:button, "Remove Alpha meals").click
+    expect(page).to have_no_text("Alpha meals")
+    find("summary", text: "Removed resources (1)").click
+    expect(page).to have_css("#removed-printout-resources li", text: "Alpha meals", count: 1)
+    check "Health Care"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_css("#removed-printout-resources li", text: "Alpha meals", count: 1)
+    find("summary", text: "Removed resources (1)").click
+    expect(page).to have_no_text("Alpha meals")
+  end
+
+  it "lets an admin restore a resource and re-enable printing after all matches were removed" do
+    admin = User.create!(email: "printout-admin@example.com", password: "password123", admin: true)
+    login_as(admin, scope: :user)
+    visit_builder
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    click_button "Remove Alpha meals"
+
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
+    expect(page).to have_button("Generate printout", disabled: true)
+    find("summary", text: "Removed resources (1)").click
+    find('#removed-printout-resources button[aria-label="Restore Alpha meals"]', text: "Restore").click
+
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_button("Generate printout", disabled: false)
+    expect(page).to have_no_text("Removed resources")
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)

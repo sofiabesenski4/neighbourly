@@ -76,6 +76,38 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "omits an excluded resource from every category and the map pins" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      removed = source.documents.create!(title: "Excluded service", content: "Meals",
+        categories: [food, shelter])
+      removed.create_address!(lat: 48.42, lng: -123.36)
+      kept = source.documents.create!(title: "Included service", content: "Meals",
+        categories: [food, shelter])
+      kept.create_address!(lat: 48.43, lng: -123.36)
+      expect(FlyerMapPage).to receive(:new).and_wrap_original do |build_map, pdf, items:, **options|
+        expect(items.map(&:title)).to eq([kept.title])
+        expect(items.first.point).to eq(kept.coordinates)
+        build_map.call(pdf, items: items, **options)
+      end
+
+      post flyers_path, params: {flyer: {categories: [food.id.to_s, shelter.id.to_s], excluded_resource_ids: [removed.id.to_s]}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text.scan(kept.title).length).to eq(2)
+      expect(text).not_to include(removed.title)
+    end
+
+    it "rejects exclusions that are not a list of positive IDs" do
+      ["17", ["invalid"]].each do |value|
+        post flyers_path, params: {flyer: {excluded_resource_ids: value}}, headers: {"Accept" => "application/pdf"}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body.fetch("errors").join).to include("Excluded resource ids")
+      end
+    end
+
     it "hands the selected categories to the generator" do
       expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil).and_return(nil)
 

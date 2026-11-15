@@ -11,8 +11,8 @@ class CategorySearch
     end
   end
 
-  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, origin: nil, scope: Document.all)
-    selection = Flyer.new(categories: categories, query: query, sort: sort)
+  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, excluded_resource_ids: [], origin: nil, scope: Document.all)
+    selection = Flyer.new(categories: categories, query: query, sort: sort, excluded_resource_ids: excluded_resource_ids)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
     unfiltered = selection.categories.empty?
@@ -24,6 +24,7 @@ class CategorySearch
     # resources and accepted removals hidden until a publication workflow
     # replaces this prototype visibility rule (issue #65).
     resources = scope
+      .where.not(id: selection.excluded_resource_ids)
       .where.not(id: Report.where(status: "valid").select(:document_id))
       .where("metadata ->> 'closed' IS DISTINCT FROM 'true'")
       .select(:id, :source_id, :title, :content, :metadata)
