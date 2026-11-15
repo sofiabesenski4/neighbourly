@@ -22,6 +22,9 @@ export default class extends Controller {
     "clearSearchOrder",
     "cards",
     "count",
+    "removedResources",
+    "removedSummary",
+    "removedList",
     "status",
     "generate",
     "generateLabel",
@@ -55,6 +58,7 @@ export default class extends Controller {
     this.generating = false;
     this.excludedResources = new Map();
     this.previewReady = false;
+    this.renderRemovedResources();
     this.locationRequest = 0;
     // Browsers can restore a page's old field values, but not which screen it was on.
     // Starting clean on the first screen means a location is never used invisibly.
@@ -511,6 +515,21 @@ export default class extends Controller {
     }
     this.discardPrintout();
     if (this.previewReady) this.renderCards();
+    this.renderRemovedResources();
+  }
+
+  renderRemovedResources() {
+    const count = this.excludedResources.size;
+    this.removedResourcesTarget.hidden = count === 0;
+    if (count === 0) this.removedResourcesTarget.open = false;
+    this.removedSummaryTarget.textContent = `Removed resources (${count})`;
+    const rows = [...this.excludedResources.values()].map((title) => {
+      const row = document.createElement("li");
+      row.className = "py-3 text-sm [overflow-wrap:anywhere]";
+      row.textContent = title;
+      return row;
+    });
+    this.removedListTarget.replaceChildren(...rows);
   }
 
   renderCards() {
