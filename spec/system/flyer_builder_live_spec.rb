@@ -27,6 +27,31 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
+  it "removes all copies of a resource, counts it once, and sends its ID when printing" do
+    resource = Document.find_by!(title: "Alpha meals")
+    resource.categories << health
+    visit_builder
+    expect(page).to have_css("article h4", text: "Alpha meals", count: 2)
+
+    first(:button, "Remove Alpha meals").click
+
+    expect(page).to have_no_css("article h4", text: "Alpha meals")
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    page.execute_script(<<~JS)
+      window.open = () => null;
+      const fetchPrintout = window.fetch;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.printoutExclusions = options.body.getAll("flyer[excluded_resource_ids][]");
+        }
+        return fetchPrintout(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(page.evaluate_script("window.printoutExclusions")).to eq([resource.id.to_s])
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)

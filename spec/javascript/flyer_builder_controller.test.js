@@ -472,6 +472,8 @@ test("rendered resource cards use Tailwind utility classes", () => {
         append(...children) {
           this.children.push(...children);
         },
+        setAttribute() {},
+        addEventListener() {},
       }),
     };
 
@@ -510,6 +512,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
         );
       },
       setAttribute() {},
+      addEventListener() {},
     });
 
     globalThis.document = {
@@ -530,6 +533,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
     controller.generating = false;
+    controller.excludedResources = new Map();
 
     controller.render([
       { name: "Empty category", resources: [] },
@@ -552,7 +556,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     assert.match(grid.className, /lg:grid-cols-2/);
     assert.equal(grid.children.length, 4);
     assert.deepEqual(
-      grid.children.map((card) => card.children[0].textContent),
+      grid.children.map((card) => card.children[0].children[0].textContent),
       ["Alpha", "Bravo", "Charlie", "Delta"],
     );
     controller.render([

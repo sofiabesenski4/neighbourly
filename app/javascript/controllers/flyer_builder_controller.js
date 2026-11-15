@@ -53,6 +53,8 @@ export default class extends Controller {
     this.revision = (this.revision || 0) + 1;
     this.hasResults = false;
     this.generating = false;
+    this.excludedResources = new Map();
+    this.previewReady = false;
     this.locationRequest = 0;
     // Browsers can restore a page's old field values, but not which screen it was on.
     // Starting clean on the first screen means a location is never used invisibly.
@@ -483,17 +485,42 @@ export default class extends Controller {
   }
 
   setLoading() {
+    this.previewReady = false;
     this.statusTarget.textContent = "Updating…";
     this.cardsTarget.setAttribute("aria-busy", "true");
     this.generateTarget.disabled = true;
   }
 
   render(categories) {
+    this.previewCategories = categories;
+    this.previewReady = true;
+    this.renderCards();
+  }
+
+  removeResource(resource) {
+    this.excludedResources.set(String(resource.id), resource.title);
+    this.updateResourceSelection();
+    this.builderHeadingTarget.focus();
+  }
+
+  updateResourceSelection() {
+    if (this.generating) {
+      this.revision += 1;
+      this.generating = false;
+      this.generateLabelTarget.textContent = "Generate printout";
+    }
+    this.discardPrintout();
+    if (this.previewReady) this.renderCards();
+  }
+
+  renderCards() {
     const fragment = document.createDocumentFragment();
     const ids = new Set();
-    let total = 0;
-    categories.forEach((category) => {
-      if (category.resources.length === 0) return;
+    this.previewCategories.forEach((category) => {
+      const resources = category.resources.filter(
+        (resource) => !this.excludedResources.has(String(resource.id)),
+      );
+      if (resources.length === 0) return;
       const section = document.createElement("section");
       section.className = "mt-4 first:mt-0 sm:mt-7";
       const heading = document.createElement("h3");
@@ -503,26 +530,27 @@ export default class extends Controller {
       const count = document.createElement("span");
       count.className =
         "ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm";
-      count.textContent = `${category.resources.length} ${category.resources.length === 1 ? "card" : "cards"}`;
+      count.textContent = `${resources.length} ${resources.length === 1 ? "card" : "cards"}`;
       heading.append(count);
       section.append(heading);
       const grid = document.createElement("div");
       grid.className =
         "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
-      category.resources.forEach((resource) => {
+      resources.forEach((resource) => {
         ids.add(resource.id);
-        total += 1;
         grid.append(this.card(resource));
       });
       section.append(grid);
       fragment.append(section);
     });
-    if (total === 0) {
+    if (ids.size === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className =
         "rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600";
-      if (this.searchTarget.value.trim()) {
+      if (this.previewCategories.some(({ resources }) => resources.length)) {
+        empty.textContent = "All matching resources were removed.";
+      } else if (this.searchTarget.value.trim()) {
         empty.textContent = "No resources match your search.";
       } else if (this.selectedCategories().length) {
         empty.textContent = "No resources match the selected categories.";
@@ -533,7 +561,7 @@ export default class extends Controller {
     }
     this.cardsTarget.replaceChildren(fragment);
     this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
-    this.hasResults = total > 0;
+    this.hasResults = ids.size > 0;
     this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
     this.generateTarget.disabled = !this.hasResults || this.generating;
@@ -543,10 +571,24 @@ export default class extends Controller {
     const article = document.createElement("article");
     article.className =
       "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
+    const header = document.createElement("header");
+    header.className =
+      "flex items-start gap-2 px-3 py-1 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4";
     const title = document.createElement("h4");
     title.className =
-      "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
+      "min-w-0 flex-1 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
     title.textContent = resource.title;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.setAttribute("aria-label", `Remove ${resource.title}`);
+    remove.title = `Remove ${resource.title} from this printout`;
+    remove.className =
+      "grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-stone-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-red-700";
+    remove.innerHTML = `<svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6" />
+    </svg>`;
+    remove.addEventListener("click", () => this.removeResource(resource));
+    header.append(title, remove);
     const details = document.createElement("dl");
     details.className =
       "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";
@@ -562,7 +604,7 @@ export default class extends Controller {
       row.append(label, value);
       details.append(row);
     });
-    article.append(title, details);
+    article.append(header, details);
     return article;
   }
 
@@ -586,6 +628,10 @@ export default class extends Controller {
         tab.document.title = "Preparing printout";
         tab.document.body.textContent = "Preparing your printout…";
       }
+      const body = new FormData(this.formTarget);
+      for (const id of this.excludedResources.keys()) {
+        body.append("flyer[excluded_resource_ids][]", id);
+      }
       const response = await fetch(this.formTarget.action, {
         method: "POST",
         headers: {
@@ -594,7 +640,7 @@ export default class extends Controller {
             document.querySelector('meta[name="csrf-token"]')?.content || "",
         },
         credentials: "same-origin",
-        body: new FormData(this.formTarget),
+        body,
         signal,
       });
       if (
