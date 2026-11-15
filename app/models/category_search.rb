@@ -11,8 +11,8 @@ class CategorySearch
     end
   end
 
-  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, origin: nil)
-    selection = Flyer.new(categories: categories, query: query, sort: sort)
+  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, excluded_resource_ids: [], origin: nil)
+    selection = Flyer.new(categories: categories, query: query, sort: sort, excluded_resource_ids: excluded_resource_ids)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
     unfiltered = selection.categories.empty?
@@ -23,7 +23,7 @@ class CategorySearch
     # Printouts list services. Closed services and accepted removals stay
     # hidden until a publication workflow replaces this prototype visibility
     # rule (issue #65).
-    resources = Service.visible
+    resources = Service.visible.where.not(id: selection.excluded_resource_ids)
     resources = resources.in_categories(selection.categories) unless unfiltered
     resources = resources.includes(:source, :categories, :address).alphabetical.to_a
 
