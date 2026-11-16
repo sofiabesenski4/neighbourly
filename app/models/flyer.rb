@@ -15,12 +15,22 @@ class Flyer
   MIN_TEXT_SIZE = 8
   MAX_TEXT_SIZE = 25
   TEXT_SIZE_STEP = 0.5
+  DETAIL_FIELDS = {
+    "service" => ["Services"].freeze,
+    "address" => %w[Address City].freeze,
+    "distance" => ["Distance"].freeze,
+    "phone" => ["Phone"].freeze,
+    "eligibility" => ["Ages served", "Eligibility"].freeze,
+    "notes" => ["Notes"].freeze,
+    "intake" => ["Intake"].freeze
+  }.freeze
 
   attribute :categories, default: -> { [] }
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
   attribute :include_map, default: DEFAULT_INCLUDE_MAP
   attribute :text_size
+  attribute :details
 
   # Optional place to measure distances from, as typed. FlyerOrigin looks it up when
   # the printout is generated, not here, because validating also runs for the live
@@ -40,6 +50,7 @@ class Flyer
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
   validates :include_map, inclusion: {in: %w[yes no], message: "must be yes or no"}
   validate :text_size_is_supported
+  validate :details_are_supported
 
   # Use the same persisted categories as the resource form. String IDs match
   # submitted checkbox values without coercing malformed input into an ID.
@@ -94,7 +105,20 @@ class Flyer
     end
   end
 
+  def selected_details
+    return DETAIL_FIELDS.keys if details.nil? || errors[:details].any?
+
+    details.reject(&:empty?).uniq
+  end
+
   private
+
+  def details_are_supported
+    return if details.nil?
+    return if details.is_a?(Array) && details.all? { |key| key == "" || DETAIL_FIELDS.key?(key) }
+
+    errors.add(:details, "must be a list of supported resource details")
+  end
 
   def text_size_is_supported
     return if text_size.nil?

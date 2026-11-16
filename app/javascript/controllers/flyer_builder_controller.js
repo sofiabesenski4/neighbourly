@@ -12,6 +12,8 @@ export default class extends Controller {
     "desktopSearch",
     "desktopSort",
     "desktopSortOption",
+    "advancedFilters",
+    "resourceDetail",
     "searchField",
     "search",
     "sort",
@@ -75,6 +77,7 @@ export default class extends Controller {
     this.updateFilterControls();
     this.updateMapColourSettings();
     this.syncTextSizeSlider();
+    this.updateResourceDetails();
     this.refresh();
   }
 
@@ -85,7 +88,8 @@ export default class extends Controller {
 
   closePrintSettingsOutside(event) {
     const settings = this.printSettingsTarget;
-    if (settings.open && !settings.contains(event.target)) settings.open = false;
+    if (settings.open && !settings.contains(event.target))
+      settings.open = false;
   }
 
   mapSettingChanged() {
@@ -391,6 +395,14 @@ export default class extends Controller {
     const destination = desktop ? this.desktopSearchTarget : this.toolbarTarget;
     if (this.searchFieldTarget.parentElement !== destination)
       destination.prepend(this.searchFieldTarget);
+    const nextControl = desktop
+      ? this.desktopSortTarget
+      : this.filterButtonTarget;
+    const advanced = this.advancedFiltersTarget;
+    if (advanced.nextElementSibling !== nextControl) {
+      advanced.open = false;
+      nextControl.before(advanced);
+    }
     this.desktopSearchTarget.hidden = !desktop;
     if (!desktop) this.desktopSortTarget.open = false;
     if (desktop && this.filterDialogTarget.open) this.closeFilters();
@@ -403,7 +415,38 @@ export default class extends Controller {
   }
 
   hoverDesktopSort(event) {
-    if (event.pointerType === "mouse") this.desktopSortTarget.open = true;
+    if (event.pointerType !== "mouse") return;
+
+    this.advancedFiltersTarget.open = false;
+    this.desktopSortTarget.open = true;
+  }
+
+  closeAdvancedFilters() {
+    const advanced = this.advancedFiltersTarget;
+    if (!advanced.open) return;
+
+    advanced.open = false;
+    advanced.querySelector("summary").focus();
+  }
+
+  closeAdvancedFiltersOutside(event) {
+    const advanced = this.advancedFiltersTarget;
+    if (advanced.open && !advanced.contains(event.target))
+      advanced.open = false;
+  }
+
+  updateResourceDetails(event) {
+    this.hiddenDetailLabels = new Set(
+      this.resourceDetailTargets
+        .filter((input) => !input.checked)
+        .flatMap((input) => input.dataset.fieldLabels.split(",")),
+    );
+    for (const row of this.cardsTarget.querySelectorAll(
+      "[data-detail-label]",
+    )) {
+      row.hidden = this.hiddenDetailLabels.has(row.dataset.detailLabel);
+    }
+    if (event) this.discardPrintout();
   }
 
   leaveDesktopSort(event) {
@@ -589,6 +632,8 @@ export default class extends Controller {
     resource.fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "[overflow-wrap:anywhere]";
+      row.setAttribute("data-detail-label", field.label);
+      row.hidden = this.hiddenDetailLabels?.has(field.label) ?? false;
       const label = document.createElement("dt");
       label.className = "inline font-semibold";
       label.textContent = `${field.label}: `;

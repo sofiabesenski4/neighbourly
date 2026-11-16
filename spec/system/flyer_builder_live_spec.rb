@@ -60,15 +60,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_checked_field("Yes")
     end
     expect(find_field("Text size").value).to eq("15.5")
-    within_fieldset("Resource details") do
-      %w[Service Address Phone Notes Intake].each do |label|
-        expect(page).to have_checked_field(label)
-      end
-      expect(all('input[type="checkbox"]').length).to eq(5)
-      uncheck "Notes"
-      expect(page).to have_unchecked_field("Notes")
-      expect(page).to have_checked_field("Address")
-    end
+    expect(page).to have_no_field("Notes")
 
     settings.click
     expect(page).to have_no_field("Text size")
@@ -76,6 +68,64 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_field("Text size")
     find("#flyer-preview-heading").click
     expect(page).to have_no_field("Text size")
+  end
+
+  it "shows resource detail filters between Categories and Sort and applies them to the preview" do
+    Document.find_by!(title: "Alpha meals").update!(
+      metadata: {age_range_text: "18+", gender: "Women"})
+    visit_builder
+    expect(page).to have_css("article dt", text: "Services:")
+    expect(page).to have_css("article dt", text: "Ages served:")
+    expect(page).to have_css("article dt", text: "Eligibility:")
+    advanced = find('summary[title="Advanced filtering"]')
+    expect(advanced).to have_css("svg[aria-hidden='true']")
+    expect(advanced.find(:xpath, "../preceding-sibling::*[1]")).to have_text("Categories")
+    expect(advanced.find(:xpath, "../following-sibling::*[1]")).to have_css('summary[aria-label="Sort resources"]')
+    advanced.click
+
+    within_fieldset("Resource details") do
+      ["Service", "Address", "Distance and walking time", "Phone", "Ages served and eligibility", "Notes", "Intake"].each do |label|
+        expect(page).to have_checked_field(label)
+      end
+      uncheck "Service"
+      uncheck "Ages served and eligibility"
+      expect(page).to have_checked_field("Address")
+    end
+    expect(page).to have_no_css("article dt", text: "Services:")
+    expect(page).to have_no_css("article dt", text: "Ages served:")
+    expect(page).to have_no_css("article dt", text: "Eligibility:")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_field("Service")
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_no_css("article dt", text: "Services:")
+
+    advanced.click
+    within_fieldset("Resource details") do
+      check "Service"
+      check "Ages served and eligibility"
+    end
+    expect(page).to have_css("article dt", text: "Services:")
+    expect(page).to have_css("article dt", text: "Ages served:")
+    expect(page).to have_css("article dt", text: "Eligibility:")
+  end
+
+  it "keeps the same resource detail choices available in the mobile toolbar" do
+    visit_builder
+    find('summary[title="Advanced filtering"]').click
+    within_fieldset("Resource details") { uncheck "Service" }
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    within('[data-flyer-builder-target="toolbar"]') do
+      find('summary[title="Advanced filtering"]').click
+      within_fieldset("Resource details") { expect(page).to have_unchecked_field("Service") }
+    end
+    expect(page).to have_no_css("article dt", text: "Services:")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
   it "keeps the map and text size choices through a preview update and sends them when generating" do
@@ -594,6 +644,11 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
       expect(page).to have_text("1 resource included")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
+      find('summary[title="Advanced filtering"]').click
+      within_fieldset("Resource details") { uncheck "Distance and walking time" }
+      expect(page).to have_no_css("article", text: "Distance:")
+      within_fieldset("Resource details") { check "Distance and walking time" }
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       click_button "Generate printout"
 

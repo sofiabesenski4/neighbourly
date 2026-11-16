@@ -210,6 +210,6 @@ class FlyersController < ApplicationController
 
       value = settings[key]
       options[key] = value.is_a?(String) ? value : ""
-    end
+    end.tap { |options| options[:details] = settings[:details] if settings.key?(:details) }
   end
 end

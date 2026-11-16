@@ -76,6 +76,15 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "rejects malformed detail selections" do
+      [["unknown"], "notes", [{"notes" => true}]].each do |details|
+        post flyers_path, params: {print_settings: {details: details}}, headers: {"Accept" => "application/pdf"}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body.fetch("errors").join(" ")).to include("Details must be a list of supported resource details")
+      end
+    end
+
     it "prints larger card text at the selected pixel size" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
       source = Source.create!(name: "Local", source_type: "api")
