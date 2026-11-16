@@ -74,6 +74,29 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_field("Text size")
   end
 
+  it "keeps the map choice through a preview update and sends it when generating" do
+    visit_builder
+    find('summary[aria-label="Print settings"]').click
+    within_fieldset("Include map") { choose "No" }
+    find('summary[aria-label="Print settings"]').click
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+
+    page.execute_script(<<~JS)
+      window.open = () => null;
+      const request = window.fetch;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.submittedMapChoice = options.body.get("print_settings[include_map]");
+        }
+        return request(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(page.evaluate_script("window.submittedMapChoice")).to eq("no")
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)

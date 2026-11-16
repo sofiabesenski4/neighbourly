@@ -23,10 +23,11 @@ class FlyerPdf
   end
   Measure = Data.define(:height, :header_height, :row_heights)
 
-  def initialize(sections:, origin: nil, printed_at: Time.current)
+  def initialize(sections:, origin: nil, printed_at: Time.current, include_map: true)
     @sections = sections
     @origin = origin
     @printed_at = printed_at
+    @include_map = include_map
     @pdf = Prawn::Document.new(page_size: "LETTER", margin: MARGIN, compress: true)
     fonts = Rails.root.join("app/assets/fonts/dejavu")
     @pdf.font_families.update("ResourceSans" => {
@@ -45,7 +46,7 @@ class FlyerPdf
     @sections.each do |section|
       render_section(section) if section.resources.any?
     end
-    render_map if entries.any?
+    render_map if @include_map && entries.any?
     @pdf.number_pages("Printed #{@printed_at.strftime("%Y-%m-%d %H:%M %Z")}  |  Page <page>",
       at: [0, -16], width: @width, size: 9.5)
     @pdf.render

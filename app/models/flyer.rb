@@ -10,10 +10,12 @@ class Flyer
   DISTANCE_SORT = "distance"
   SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
   QUERY_LIMIT = 160
+  DEFAULT_INCLUDE_MAP = "yes"
 
   attribute :categories, default: -> { [] }
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
+  attribute :include_map, default: DEFAULT_INCLUDE_MAP
 
   # Optional place to measure distances from, as typed. FlyerOrigin looks it up when
   # the printout is generated, not here, because validating also runs for the live
@@ -31,6 +33,7 @@ class Flyer
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
+  validates :include_map, inclusion: {in: %w[yes no], message: "must be yes or no"}
 
   # Use the same persisted categories as the resource form. String IDs match
   # submitted checkbox values without coercing malformed input into an ID.
@@ -76,6 +79,10 @@ class Flyer
       filters[:query] = query if query.present?
       filters[:sort] = sort if sort != DEFAULT_SORT
     end
+  end
+
+  def pdf_options
+    include_map == "no" ? {include_map: false} : {}
   end
 
   private

@@ -54,7 +54,7 @@ RSpec.describe "Flyers", type: :request do
 
       expect(response).to have_http_status(:ok)
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
     end
 
     it "renders an error for unknown categories while preserving recognized selections" do
@@ -63,19 +63,42 @@ RSpec.describe "Flyers", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       document = Nokogiri::HTML(response.body)
       expect(document.at_css('[role="alert"]').text).to include("Categories include unknown options: unknown")
-      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
     end
 
     it "starts with no categories checked and explains the unfiltered view" do
       get new_flyer_path
 
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[type="checkbox"][checked]')).to be_empty
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]')).to be_empty
       expect(response.body).to include("No selection shows all available resources.")
     end
   end
 
   describe "POST /printout" do
+    it "includes the map by default and can generate the same cards without it" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      source.documents.create!(title: "Community meal", content: "Meals", categories: [food])
+
+      post flyers_path
+      expect(response).to have_http_status(:ok)
+      default_pages = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text)
+      expect(default_pages.last).to include("OpenStreetMap")
+
+      post flyers_path, params: {print_settings: {include_map: "no"}}
+      expect(response).to have_http_status(:ok)
+      custom_pages = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text)
+      expect(custom_pages).to contain_exactly(a_string_including("Community meal"))
+    end
+
+    it "rejects an invalid map setting for PDF requests" do
+      post flyers_path, params: {print_settings: {include_map: ["no"]}}, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body.fetch("errors")).to include("Include map must be yes or no")
+    end
+
     it "hands the selected categories to the generator" do
       expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil).and_return(nil)
 
@@ -561,7 +584,7 @@ RSpec.describe "Flyers", type: :request do
       follow_redirect!
 
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([food.id.to_s])
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([food.id.to_s])
     end
 
     it "redirects an unfiltered HTML preview to the complete builder" do

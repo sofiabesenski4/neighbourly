@@ -79,6 +79,11 @@ export default class extends Controller {
     this.mapColourSettingsTarget.disabled = selected?.value === "no";
   }
 
+  mapSettingChanged() {
+    this.updateMapColourSettings();
+    this.discardPrintout();
+  }
+
   disconnect() {
     this.beforeCache();
   }
