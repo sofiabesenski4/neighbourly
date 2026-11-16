@@ -76,6 +76,38 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "omits service, address, and distance rows independently while preserving the map" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      meal = source.documents.create!(title: "Community meal", content: "Meals", categories: [food])
+      meal.create_address!(street_address: "919 Pandora Ave", city: "Victoria", phone: "250-555-0101",
+        lat: 48.43, lng: -123.36)
+      clinic = source.documents.create!(title: "Community clinic", content: "Clinic", categories: [health])
+      clinic.create_address!(city: "Victoria")
+      visible_rows = {
+        "service" => ["Services:"],
+        "address" => ["Address:", "City:"],
+        "distance" => ["Distance:"]
+      }
+      expect(FlyerMapPage).to receive(:new).exactly(4).times.and_wrap_original do |build_map, pdf, items:, **options|
+        expect(items.find { |item| item.title == meal.title }.point).to eq(meal.coordinates)
+        build_map.call(pdf, items: items, **options)
+      end
+
+      [nil, *visible_rows.keys].each do |hidden|
+        settings = hidden ? {print_settings: {details: Flyer::DETAIL_FIELDS.keys - [hidden]}} : {}
+        post flyers_path, params: settings.merge(flyer: {lat: "48.42", lng: "-123.36"})
+
+        expect(response).to have_http_status(:ok)
+        pages = PDF::Reader.new(StringIO.new(response.body)).pages
+        cards = pages[0...-1].map(&:text).join("\n")
+        expect(cards).to include("Community meal", "Community clinic", "Phone:")
+        expect(cards).to include(*visible_rows.except(hidden).values.flatten)
+        visible_rows.fetch(hidden, []).each { |label| expect(cards).not_to include(label) }
+        expect(pages.last.text).to include("You are here")
+      end
+    end
+
     it "rejects malformed detail selections" do
       [["unknown"], "notes", [{"notes" => true}]].each do |details|
         post flyers_path, params: {print_settings: {details: details}}, headers: {"Accept" => "application/pdf"}

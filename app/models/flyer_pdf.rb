@@ -23,11 +23,12 @@ class FlyerPdf
   end
   Measure = Data.define(:height, :header_height, :row_heights)
 
-  def initialize(sections:, origin: nil, printed_at: Time.current, include_map: true, text_size_px: nil)
+  def initialize(sections:, origin: nil, printed_at: Time.current, include_map: true, text_size_px: nil, hidden_detail_labels: [])
     @sections = sections
     @origin = origin
     @printed_at = printed_at
     @include_map = include_map
+    @hidden_detail_labels = hidden_detail_labels
     text_scale = text_size_px ? text_size_px * 0.75 / BODY_SIZE : 1.0
     @body_size = (BODY_SIZE * text_scale).round(2)
     @title_size = (TITLE_SIZE * text_scale).round(2)
@@ -96,7 +97,8 @@ class FlyerPdf
   def build_entry(document, number)
     card = ResourceCard.new(document, origin: @origin)
     title = clean(card.title)
-    rows = card.fields.map { |field|
+    fields = card.fields.reject { |field| @hidden_detail_labels.include?(field[:label]) }
+    rows = fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
        size: ["Last updated", "Information source"].include?(field[:label]) ? @secondary_size : @body_size}
     }

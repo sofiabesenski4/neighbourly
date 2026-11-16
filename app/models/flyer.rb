@@ -24,6 +24,7 @@ class Flyer
     "notes" => ["Notes"].freeze,
     "intake" => ["Intake"].freeze
   }.freeze
+  PDF_DETAIL_KEYS = %w[service address distance].freeze
 
   attribute :categories, default: -> { [] }
   attribute :query, :string, default: ""
@@ -102,6 +103,8 @@ class Flyer
     {}.tap do |options|
       options[:include_map] = false if include_map == "no"
       options[:text_size_px] = text_size.to_f if text_size
+      hidden_labels = DETAIL_FIELDS.values_at(*(PDF_DETAIL_KEYS - selected_details)).flatten
+      options[:hidden_detail_labels] = hidden_labels if hidden_labels.any?
     end
   end
 
