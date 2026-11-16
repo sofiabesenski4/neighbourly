@@ -25,6 +25,8 @@ export default class extends Controller {
     "status",
     "generate",
     "generateLabel",
+    "includeMap",
+    "mapColourSettings",
     "previewError",
     "previewErrorMessage",
     "printError",
@@ -68,7 +70,13 @@ export default class extends Controller {
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
     this.updateFilterControls();
+    this.updateMapColourSettings();
     this.refresh();
+  }
+
+  updateMapColourSettings() {
+    const selected = this.includeMapTargets.find((input) => input.checked);
+    this.mapColourSettingsTarget.disabled = selected?.value === "no";
   }
 
   disconnect() {

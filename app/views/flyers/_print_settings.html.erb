@@ -1,0 +1,61 @@
+<details class="relative shrink-0">
+  <summary aria-label="Print settings" title="Print settings"
+           class="grid size-11 cursor-pointer list-none place-items-center rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-sage-50 focus-visible:outline-sage-600 [&::-webkit-details-marker]:hidden">
+    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
+      <path d="M10.4 2.75h3.2l.55 2.36c.44.14.87.32 1.28.53l2.06-1.28 2.26 2.26-1.28 2.06c.21.41.39.84.53 1.28l2.35.55v3.2l-2.35.55c-.14.45-.32.87-.53 1.28l1.28 2.06-2.26 2.26-2.06-1.28c-.41.21-.84.39-1.28.53l-.55 2.35h-3.2l-.55-2.35a7.5 7.5 0 0 1-1.28-.53l-2.06 1.28-2.26-2.26 1.28-2.06c-.21-.41-.39-.83-.53-1.28l-2.36-.55v-3.2l2.36-.55c.14-.44.32-.87.53-1.28L4.25 6.62l2.26-2.26 2.06 1.28c.41-.21.84-.39 1.28-.53l.55-2.36Z" />
+    </svg>
+  </summary>
+
+  <div class="absolute right-0 bottom-full z-20 mb-2 max-h-[min(28rem,60dvh)] w-[min(26rem,calc(100vw_-_2rem))] overflow-y-auto overscroll-contain rounded-lg border border-stone-200 bg-white p-4 shadow-lg sm:top-full sm:bottom-auto sm:mt-2 sm:mb-0">
+    <p class="mb-1 font-semibold text-stone-900">Print settings</p>
+    <p class="mb-4 text-sm text-stone-600">These settings do not affect the PDF yet.</p>
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+      <% [
+        ["Include map", "include_map", "yes"],
+        ["Colour resource cards", "colour_resources", "no"],
+        ["Colour map", "colour_map", "no"]
+      ].each do |label, key, default| %>
+        <fieldset class="min-w-0 disabled:opacity-60"
+                  <% if key == "colour_map" %>data-flyer-builder-target="mapColourSettings"<% end %>>
+          <legend class="text-sm font-medium text-stone-900"><%= label %></legend>
+          <div class="flex flex-wrap gap-x-4">
+            <% %w[yes no].each do |value| %>
+              <label class="inline-flex min-h-11 items-center gap-2 text-sm text-stone-800">
+                <%= radio_button_tag "print_settings[#{key}]", value, value == default,
+                      class: "size-4 accent-sage-600 focus-visible:outline-sage-600",
+                      data: key == "include_map" ? { flyer_builder_target: "includeMap", action: "change->flyer-builder#updateMapColourSettings" } : {} %>
+                <span><%= value.capitalize %></span>
+              </label>
+            <% end %>
+          </div>
+        </fieldset>
+      <% end %>
+
+      <div>
+        <%= label_tag "print-settings-text-size", "Text size", class: "text-sm font-medium text-stone-900" %>
+        <div class="flex min-h-11 items-center gap-3 text-sm text-stone-600">
+          <span aria-hidden="true">Smaller</span>
+          <%= range_field_tag "print_settings[text_size]", 100, id: "print-settings-text-size",
+                min: 85, max: 130, step: 5,
+                class: "min-w-0 flex-1 accent-sage-600 focus-visible:outline-sage-600" %>
+          <span aria-hidden="true">Larger</span>
+        </div>
+      </div>
+
+      <fieldset class="min-w-0 sm:col-span-2">
+        <legend class="text-sm font-medium text-stone-900">Resource details</legend>
+        <div class="flex flex-wrap gap-x-5">
+          <% %w[Service Address Phone Notes Intake].each do |label| %>
+            <% key = label.downcase %>
+            <label class="inline-flex min-h-11 items-center gap-2 text-sm text-stone-800">
+              <%= check_box_tag "print_settings[details][]", key, true, id: "print-settings-detail-#{key}",
+                    class: "size-4 accent-sage-600 focus-visible:outline-sage-600" %>
+              <span><%= label %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+    </div>
+  </div>
+</details>

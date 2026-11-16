@@ -27,6 +27,53 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
+  it "shows the default print settings and lets people change the available controls" do
+    visit_builder
+    expect(page).to have_no_field("Text size")
+
+    settings = find('summary[aria-label="Print settings"]')
+    expect(settings).to have_css("svg[aria-hidden='true']")
+    expect(settings.text).to be_empty
+    expect(settings.evaluate_script(<<~JS)).to be(true)
+      this.getBoundingClientRect().left >=
+        this.closest("details").previousElementSibling.getBoundingClientRect().right
+    JS
+    settings.click
+
+    within_fieldset("Include map") do
+      expect(page).to have_checked_field("Yes")
+      choose "No"
+      expect(page).to have_checked_field("No")
+    end
+    within_fieldset("Colour map") do
+      expect(page).to have_checked_field("No", disabled: true)
+    end
+    within_fieldset("Include map") { choose "Yes" }
+    within_fieldset("Colour map") do
+      expect(page).to have_checked_field("No")
+      choose "Yes"
+      expect(page).to have_checked_field("Yes")
+    end
+    within_fieldset("Colour resource cards") do
+      expect(page).to have_checked_field("No")
+      choose "Yes"
+      expect(page).to have_checked_field("Yes")
+    end
+    expect(find_field("Text size").value).to eq("100")
+    within_fieldset("Resource details") do
+      %w[Service Address Phone Notes Intake].each do |label|
+        expect(page).to have_checked_field(label)
+      end
+      expect(all('input[type="checkbox"]').length).to eq(5)
+      uncheck "Notes"
+      expect(page).to have_unchecked_field("Notes")
+      expect(page).to have_checked_field("Address")
+    end
+
+    settings.click
+    expect(page).to have_no_field("Text size")
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)
