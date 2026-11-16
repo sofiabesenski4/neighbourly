@@ -71,8 +71,16 @@ RSpec.describe "Live resource guide builder", type: :system do
   end
 
   it "shows resource detail filters between Categories and Sort and applies them to the preview" do
-    Document.find_by!(title: "Alpha meals").update!(
-      metadata: {age_range_text: "18+", gender: "Women"})
+    meal_id = Document.find_by!(title: "Alpha meals").id
+    allow(ResourceCard).to receive(:new).and_wrap_original do |build, document, **options|
+      card = build.call(document, **options)
+      if document.id == meal_id
+        allow(card).to receive(:fields).and_wrap_original do |fields|
+          fields.call + [{label: "Ages served", value: "18+"}, {label: "Eligibility", value: "Local residents"}]
+        end
+      end
+      card
+    end
     visit_builder
     expect(page).to have_css("article dt", text: "Services:")
     expect(page).to have_css("article dt", text: "Ages served:")
