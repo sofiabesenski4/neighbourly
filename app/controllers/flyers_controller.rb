@@ -205,7 +205,11 @@ class FlyersController < ApplicationController
     settings = params[:print_settings]
     return {include_map: nil} unless settings.is_a?(ActionController::Parameters)
 
-    value = settings.fetch(:include_map, Flyer::DEFAULT_INCLUDE_MAP)
-    {include_map: (value if value.is_a?(String))}
+    %i[include_map text_size].each_with_object({}) do |key, options|
+      next unless settings.key?(key)
+
+      value = settings[key]
+      options[key] = value.is_a?(String) ? value : ""
+    end
   end
 end

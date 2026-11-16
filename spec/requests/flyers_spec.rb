@@ -76,6 +76,28 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "prints larger card text at the selected pixel size" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      source.documents.create!(title: "Community meal", content: "Meals",
+        categories: [food], metadata: {notes: "Ask at the front desk"})
+
+      post flyers_path, params: {print_settings: {include_map: "no", text_size: "25"}}
+
+      expect(response).to have_http_status(:ok)
+      content = PDF::Reader.new(StringIO.new(response.body)).pages.first.raw_content
+      expect(content).to match(/18\.75\s+Tf/)
+    end
+
+    it "rejects text sizes outside the slider choices" do
+      ["7.5", "25.5", "14.25"].each do |size|
+        post flyers_path, params: {print_settings: {text_size: size}}, headers: {"Accept" => "application/pdf"}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body.fetch("errors")).to include("Text size must be between 8 and 25 pixels in 0.5 pixel increments")
+      end
+    end
+
     it "includes the map by default and can generate the same cards without it" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
       source = Source.create!(name: "Local", source_type: "api")

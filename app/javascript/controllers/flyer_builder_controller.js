@@ -26,7 +26,10 @@ export default class extends Controller {
     "generate",
     "generateLabel",
     "includeMap",
+    "printSettings",
     "mapColourSettings",
+    "textSizeInput",
+    "textSizeSlider",
     "previewError",
     "previewErrorMessage",
     "printError",
@@ -71,6 +74,7 @@ export default class extends Controller {
     this.layoutChanged();
     this.updateFilterControls();
     this.updateMapColourSettings();
+    this.syncTextSizeSlider();
     this.refresh();
   }
 
@@ -79,9 +83,28 @@ export default class extends Controller {
     this.mapColourSettingsTarget.disabled = selected?.value === "no";
   }
 
+  closePrintSettingsOutside(event) {
+    const settings = this.printSettingsTarget;
+    if (settings.open && !settings.contains(event.target)) settings.open = false;
+  }
+
   mapSettingChanged() {
     this.updateMapColourSettings();
     this.discardPrintout();
+  }
+
+  syncTextSizeSlider() {
+    const input = this.textSizeInputTarget;
+    if (!input.validity.valid) return;
+
+    const slider = this.textSizeSliderTarget;
+    slider.value = input.value;
+    slider.setAttribute("aria-valuetext", `${slider.value} pixels`);
+  }
+
+  syncTextSizeInput() {
+    this.textSizeInputTarget.value = this.textSizeSliderTarget.value;
+    this.syncTextSizeSlider();
   }
 
   disconnect() {

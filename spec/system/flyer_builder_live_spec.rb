@@ -59,7 +59,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       choose "Yes"
       expect(page).to have_checked_field("Yes")
     end
-    expect(find_field("Text size").value).to eq("100")
+    expect(find_field("Text size").value).to eq("15.5")
     within_fieldset("Resource details") do
       %w[Service Address Phone Notes Intake].each do |label|
         expect(page).to have_checked_field(label)
@@ -72,12 +72,26 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     settings.click
     expect(page).to have_no_field("Text size")
+    settings.click
+    expect(page).to have_field("Text size")
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_field("Text size")
   end
 
-  it "keeps the map choice through a preview update and sends it when generating" do
+  it "keeps the map and text size choices through a preview update and sends them when generating" do
     visit_builder
     find('summary[aria-label="Print settings"]').click
     within_fieldset("Include map") { choose "No" }
+    slider = find('input[aria-label="Text size slider"]')
+    slider.send_keys(:home)
+    expect(page).to have_field("Text size", with: "8")
+    slider.send_keys(:right)
+    expect(page).to have_field("Text size", with: "8.5")
+    slider.send_keys(:end)
+    expect(page).to have_field("Text size", with: "25")
+    fill_in "Text size", with: "21.5"
+    expect(slider.value).to eq("21.5")
+    expect(slider["aria-valuetext"]).to eq("21.5 pixels")
     find('summary[aria-label="Print settings"]').click
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
@@ -87,14 +101,17 @@ RSpec.describe "Live resource guide builder", type: :system do
       const request = window.fetch;
       window.fetch = (url, options) => {
         if (options.headers.Accept === "application/pdf") {
-          window.submittedMapChoice = options.body.get("print_settings[include_map]");
+          window.submittedSettings = {
+            map: options.body.get("print_settings[include_map]"),
+            size: options.body.get("print_settings[text_size]"),
+          };
         }
         return request(url, options);
       };
     JS
     click_button "Generate printout"
     expect(page).to have_link("Open printout")
-    expect(page.evaluate_script("window.submittedMapChoice")).to eq("no")
+    expect(page.evaluate_script("window.submittedSettings")).to eq({"map" => "no", "size" => "21.5"})
   end
 
   it "opens the generated PDF in a new tab with one click" do

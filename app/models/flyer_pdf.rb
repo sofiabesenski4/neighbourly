@@ -1,6 +1,6 @@
 require "prawn"
 
-# A measured, row-based layout. Cards stay at the agreed text sizes;
+# A measured, row-based layout. Cards are measured at the selected text size;
 # narrow and full-width measurements are cached for the duration of a render.
 # A card that exceeds a full page continues across pages without losing text.
 # Each resource gets one number for the guide, shown on its card and its pin on the final
@@ -23,18 +23,22 @@ class FlyerPdf
   end
   Measure = Data.define(:height, :header_height, :row_heights)
 
-  def initialize(sections:, origin: nil, printed_at: Time.current, include_map: true)
+  def initialize(sections:, origin: nil, printed_at: Time.current, include_map: true, text_size_px: nil)
     @sections = sections
     @origin = origin
     @printed_at = printed_at
     @include_map = include_map
+    text_scale = text_size_px ? text_size_px * 0.75 / BODY_SIZE : 1.0
+    @body_size = (BODY_SIZE * text_scale).round(2)
+    @title_size = (TITLE_SIZE * text_scale).round(2)
+    @secondary_size = (SECONDARY_SIZE * text_scale).round(2)
     @pdf = Prawn::Document.new(page_size: "LETTER", margin: MARGIN, compress: true)
     fonts = Rails.root.join("app/assets/fonts/dejavu")
     @pdf.font_families.update("ResourceSans" => {
       normal: fonts.join("DejaVuSans.ttf").to_s,
       bold: fonts.join("DejaVuSans-Bold.ttf").to_s
     })
-    @pdf.font("ResourceSans", size: BODY_SIZE)
+    @pdf.font("ResourceSans", size: @body_size)
     @width = @pdf.bounds.width
     @column_width = (@width - GUTTER) / 2
     @measurements = {}
@@ -94,12 +98,12 @@ class FlyerPdf
     title = clean(card.title)
     rows = card.fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
-       size: ["Last updated", "Information source"].include?(field[:label]) ? SECONDARY_SIZE : BODY_SIZE}
+       size: ["Last updated", "Information source"].include?(field[:label]) ? @secondary_size : @body_size}
     }
     # Keep an unusually long name in the body, where it can continue across
     # pages, rather than repeating an oversized header on every page.
-    if @pdf.height_of(title, width: @column_width - 2 * PADDING, size: TITLE_SIZE, style: :bold) > 80
-      rows.unshift({label: "Resource name", value: title, size: BODY_SIZE})
+    if @pdf.height_of(title, width: @column_width - 2 * PADDING, size: @title_size, style: :bold) > 80
+      rows.unshift({label: "Resource name", value: title, size: @body_size})
       title = title.each_grapheme_cluster.take(80).join + "…"
     end
     Entry.new(key: key_for(document), number: number, title: title, rows: rows)
@@ -113,7 +117,7 @@ class FlyerPdf
   def measurement(entry, width)
     @measurements[[entry.key, width]] ||= begin
       inner = width - 2 * PADDING
-      header = @pdf.height_of(entry.heading, width: inner, size: TITLE_SIZE, style: :bold, leading: 2) + 16
+      header = @pdf.height_of(entry.heading, width: inner, size: @title_size, style: :bold, leading: 2) + 16
       heights = entry.rows.map { |row| @pdf.height_of_formatted(fragments(row), width: inner, leading: 2) }
       Measure.new(height: header + 2 * PADDING + heights.sum + [heights.size - 1, 0].max * 5,
         header_height: header, row_heights: heights)
@@ -217,7 +221,7 @@ class FlyerPdf
     @pdf.stroke_line([x, top - header_height], [x + width, top - header_height])
     @pdf.fill_color("000000")
     @pdf.text_box(title, at: [x + PADDING, top - 8], width: width - 2 * PADDING,
-      height: header_height, size: TITLE_SIZE, style: :bold, leading: 2)
+      height: header_height, size: @title_size, style: :bold, leading: 2)
   end
 
   def draw_card(entry, x, top, width)
@@ -238,7 +242,7 @@ class FlyerPdf
     part = 0
     while remaining.any?
       title = entry.heading + (part.positive? ? " continued" : "")
-      header = @pdf.height_of(title, width: @width - 2 * PADDING, size: TITLE_SIZE, style: :bold, leading: 2) + 16
+      header = @pdf.height_of(title, width: @width - 2 * PADDING, size: @title_size, style: :bold, leading: 2) + 16
       available = @cursor - BOTTOM - header - 2 * PADDING
       options = {at: [PADDING, @cursor - header - PADDING], width: @width - 2 * PADDING,
                  height: available, leading: 2, document: @pdf}
