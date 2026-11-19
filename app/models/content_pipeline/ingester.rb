@@ -86,12 +86,17 @@ module ContentPipeline
       document.with_lock { write_document(document, chunk) }
     end
 
-    # Returns the document when it was written, or nil when an unchanged
-    # enriched row was kept as it was.
+    # Returns the document when enrichment may still be due for it, or nil
+    # when an unchanged enriched row was kept as it was.
     def write_document(document, chunk)
-      # An unchanged row keeps the summary and categories enrichment gave it.
-      # A changed row is written fresh and enriched again.
-      return if document.enriched_at? && Document.same_row?(document.metadata, chunk[:metadata])
+      # An unchanged row is left as it is, so it keeps the summary and
+      # categories enrichment gave it, and admins' edits to its service. It
+      # only gets a service when it has none, as when an admin deleted it. Web
+      # page chunks are always written: their metadata doesn't hold their text.
+      if chunk[:service] && document.persisted? && Document.same_row?(document.metadata, chunk[:metadata])
+        write_service(document, chunk) if document.service.nil?
+        return document.enriched_at? ? nil : document
+      end
 
       document.enriched_at = nil
       # The address is set again from what this row gives, which clears any

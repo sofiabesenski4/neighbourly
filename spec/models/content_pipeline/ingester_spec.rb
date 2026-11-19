@@ -116,6 +116,14 @@ RSpec.describe ContentPipeline::Ingester do
         expect(Document.last.content).to include("Meals served daily")
       end
 
+      it "writes a page's new text even when its title is unchanged" do
+        ingester.ingest("<html><head><title>Page</title></head><body><p>Meals served daily.</p></body></html>")
+
+        ingester.ingest("<html><head><title>Page</title></head><body><p>Meals served on weekdays.</p></body></html>")
+
+        expect(Document.sole.content).to include("Meals served on weekdays.")
+      end
+
       it "saves no services, because a page's chunks are search text" do
         html = "<html><head><title>Uploaded Page</title></head><body><p>Meals served daily.</p></body></html>"
 
@@ -294,6 +302,26 @@ RSpec.describe ContentPipeline::Ingester do
           described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
 
           expect(service.reload).to have_attributes(phone: "250-555-0199", coordinates: GeoPoint.new(lat: 48.43, lng: -123.37))
+        end
+
+        it "keeps admin edits to a service when its row comes in unchanged" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+          service.update!(hours: "Daily 11am-1pm")
+
+          described_class.new(source).ingest(csv)
+
+          expect(service.reload.hours).to eq("Daily 11am-1pm")
+        end
+
+        it "gives an unchanged row a service again when an admin deleted it" do
+          ingester.ingest(csv)
+          document = source.documents.find_by!(external_id: "1")
+          document.update!(enriched_at: Time.current)
+          document.service.destroy!
+
+          expect { described_class.new(source).ingest(csv) }.to change(Service, :count).by(1)
+          expect(document.reload.service.name).to eq("Harbour Meals")
         end
 
         it "saves no document when its service can't be saved" do
