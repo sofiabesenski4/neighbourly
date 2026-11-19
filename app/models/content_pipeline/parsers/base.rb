@@ -28,7 +28,9 @@ module ContentPipeline
       def web_address(value)
         text = value.to_s.strip
         return if text.empty?
-        return text if text.match?(%r{\Ahttps?://\S+\z}i)
+        # The same check services and organizations validate with, so a value
+        # kept here never stops the service from saving.
+        return text if text.match?(ApplicationRecord::WEB_ADDRESS)
 
         "https://#{text}" if text.match?(/\A[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?\z/i)
       end

@@ -188,6 +188,13 @@ RSpec.describe ContentPipeline::Parsers::Csv do
         expect(chunk[:service][:additional_details]).to eq("Ages" => "All ages")
       end
 
+      it "keeps a website with no host in additional details" do
+        chunk = parser.parse("Name,Website\nHarbour Meals,https://?\n").first
+
+        expect(chunk[:service]).not_to have_key(:website)
+        expect(chunk[:service][:additional_details]).to eq("Website" => "https://?")
+      end
+
       it "keeps a website that isn't a web address in additional details" do
         chunk = parser.parse("Name,Website\nHarbour Meals,ask at the desk\n").first
 
