@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -44,7 +44,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
   end
 
   create_table "addresses", force: :cascade do |t|
-    t.bigint "document_id", null: false
     t.string "street_address"
     t.string "city"
     t.string "phone"
@@ -52,7 +51,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
     t.float "lng"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["document_id"], name: "index_addresses_on_document_id", unique: true
+    t.string "addressable_type", null: false
+    t.bigint "addressable_id", null: false
+    t.string "province"
+    t.string "postal_code"
+    t.string "country"
+    t.index ["addressable_type", "addressable_id"], name: "index_addresses_on_addressable", unique: true
   end
 
   create_table "categories", force: :cascade do |t|
@@ -67,6 +71,13 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
     t.bigint "document_id", null: false
     t.index ["category_id", "document_id"], name: "index_categories_documents_on_category_id_and_document_id", unique: true
     t.index ["document_id", "category_id"], name: "index_categories_documents_on_document_id_and_category_id", unique: true
+  end
+
+  create_table "categories_services", id: false, force: :cascade do |t|
+    t.bigint "category_id", null: false
+    t.bigint "service_id", null: false
+    t.index ["category_id", "service_id"], name: "index_categories_services_on_category_id_and_service_id", unique: true
+    t.index ["service_id", "category_id"], name: "index_categories_services_on_service_id_and_category_id", unique: true
   end
 
   create_table "chat_responses", force: :cascade do |t|
@@ -85,9 +96,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
     t.uuid "attempt_token", default: -> { "gen_random_uuid()" }, null: false
     t.index ["assistant_message_id"], name: "index_chat_responses_on_assistant_message_id"
     t.index ["chat_id", "created_at"], name: "index_chat_responses_on_chat_id_and_created_at"
-    t.index ["chat_id"], name: "index_chat_responses_one_active_per_chat", unique: true, where: "((status)::text = ANY ((ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'cancelling'::character varying])::text[]))"
+    t.index ["chat_id"], name: "index_chat_responses_one_active_per_chat", unique: true, where: "((status)::text = ANY (ARRAY[('queued'::character varying)::text, ('searching'::character varying)::text, ('writing'::character varying)::text, ('cancelling'::character varying)::text]))"
     t.index ["user_message_id"], name: "index_chat_responses_on_user_message_id", unique: true
-    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying, 'searching'::character varying, 'writing'::character varying, 'cancelling'::character varying, 'completed'::character varying, 'failed'::character varying, 'cancelled'::character varying]::text[])", name: "chat_responses_status_check"
+    t.check_constraint "status::text = ANY (ARRAY['queued'::character varying::text, 'searching'::character varying::text, 'writing'::character varying::text, 'cancelling'::character varying::text, 'completed'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])", name: "chat_responses_status_check"
   end
 
   create_table "chats", force: :cascade do |t|
@@ -142,6 +153,20 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
     t.text "thinking_text"
     t.datetime "updated_at", null: false
     t.index ["chat_id"], name: "index_messages_on_chat_id"
+  end
+
+  create_table "organizations", force: :cascade do |t|
+    t.string "name", null: false
+    t.string "normalized_name", null: false
+    t.text "description"
+    t.string "website"
+    t.string "email"
+    t.string "phone"
+    t.bigint "source_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["normalized_name"], name: "index_organizations_on_normalized_name", unique: true
+    t.index ["source_id"], name: "index_organizations_on_source_id"
   end
 
   create_table "reports", force: :cascade do |t|
@@ -243,6 +268,25 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
     t.index ["status"], name: "index_ruby_llm_usages_on_status"
     t.check_constraint "operation::text = ANY (ARRAY['chat'::character varying::text, 'embedding'::character varying::text, 'moderation'::character varying::text, 'image'::character varying::text, 'speech'::character varying::text, 'transcription'::character varying::text, 'ocr'::character varying::text, 'rerank'::character varying::text])"
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])"
+  end
+
+  create_table "services", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.string "hours"
+    t.string "phone"
+    t.string "email"
+    t.string "website"
+    t.boolean "closed", default: false, null: false
+    t.bigint "organization_id"
+    t.bigint "source_id", null: false
+    t.bigint "document_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.jsonb "additional_details", default: {}, null: false
+    t.index ["document_id"], name: "index_services_on_document_id", unique: true
+    t.index ["organization_id"], name: "index_services_on_organization_id"
+    t.index ["source_id"], name: "index_services_on_source_id"
   end
 
   create_table "solid_queue_batch_executions", force: :cascade do |t|
@@ -423,9 +467,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "addresses", "documents", on_delete: :cascade
   add_foreign_key "categories_documents", "categories", on_delete: :cascade
   add_foreign_key "categories_documents", "documents", on_delete: :cascade
+  add_foreign_key "categories_services", "categories", on_delete: :cascade
+  add_foreign_key "categories_services", "services", on_delete: :cascade
   add_foreign_key "chat_responses", "chats", on_delete: :cascade
   add_foreign_key "chat_responses", "messages", column: "assistant_message_id", on_delete: :nullify
   add_foreign_key "chat_responses", "messages", column: "user_message_id", on_delete: :cascade
@@ -435,8 +480,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_12_005113) do
   add_foreign_key "document_messages", "messages"
   add_foreign_key "documents", "sources", on_delete: :cascade
   add_foreign_key "messages", "chats"
+  add_foreign_key "organizations", "sources", on_delete: :nullify
   add_foreign_key "reports", "documents"
   add_foreign_key "reports", "users"
+  add_foreign_key "services", "documents", on_delete: :nullify
+  add_foreign_key "services", "organizations", on_delete: :nullify
+  add_foreign_key "services", "sources", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade

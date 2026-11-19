@@ -23,7 +23,7 @@ RSpec.describe "resources rake tasks" do
   # would look: a street address with no coordinates and no lookup queued.
   def existing_address(**details)
     document = source.documents.create!(content: "Resource")
-    Address.insert!({document_id: document.id, **details})
+    Address.insert!({addressable_type: "Document", addressable_id: document.id, **details})
     document.reload.address
   end
 
@@ -35,6 +35,14 @@ RSpec.describe "resources rake tasks" do
     address = existing_address(street_address: "919 Pandora Ave", city: "Victoria")
 
     expect { run_task }.to have_enqueued_job(GeocodeAddressJob).with(address).once
+      .and output(/Queued 1 coordinate lookups/).to_stdout
+  end
+
+  it "covers service and organization addresses too" do
+    service = source.services.create!(name: "Lunch")
+    Address.insert!({addressable_type: "Service", addressable_id: service.id, street_address: "919 Pandora Ave"})
+
+    expect { run_task }.to have_enqueued_job(GeocodeAddressJob).with(service.reload.address).once
       .and output(/Queued 1 coordinate lookups/).to_stdout
   end
 

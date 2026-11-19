@@ -18,8 +18,8 @@ namespace :resources do
     without_street = 0
     awaiting_enrichment = 0
 
-    Address.where(lat: nil).or(Address.where(lng: nil)).includes(document: :source).find_each do |address|
-      if address.document.awaiting_enrichment?
+    Address.where(lat: nil).or(Address.where(lng: nil)).includes(:addressable).find_each do |address|
+      if address.awaiting_enrichment?
         # Enrichment may still fill in these addresses, and queues their lookups.
         awaiting_enrichment += 1
       elsif address.geocoding_query

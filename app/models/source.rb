@@ -1,5 +1,7 @@
 class Source < ApplicationRecord
   has_many :documents, dependent: :destroy
+  has_many :services, dependent: :destroy
+  has_many :organizations, dependent: :nullify
 
   # Open source pages refresh when a source changes, so admins see ingestion
   # start, finish or fail without reloading. The sources list listens on one

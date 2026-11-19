@@ -1,12 +1,25 @@
-# Where a resource is and how to reach it: its street address, city, phone
-# number and coordinates. Each resource has at most one. Sources, the resource
-# form and enrichment fill it in, and the printout, map and resource page read
-# it.
+# Where something is: its street address, city, province, postal code, country
+# and coordinates. A resource (Document), a service or an organization has at
+# most one, and only addresses hold coordinates. Sources, the admin forms and
+# enrichment fill it in, and the printout, map and admin pages read it.
+#
+# A resource's address also keeps its phone number. Services and organizations
+# keep theirs on the record itself.
 #
 # Resources saved before this table existed keep these details in their
 # metadata. Document#location reads either.
 class Address < ApplicationRecord
-  belongs_to :document
+  # The BC Address Geocoder only knows BC, so it would match an address
+  # elsewhere to the wrong place. These are the values that mean BC and Canada.
+  BC_NAMES = ["bc", "b.c.", "british columbia"].freeze
+  CANADA_NAMES = ["ca", "can", "canada"].freeze
+
+  belongs_to :addressable, polymorphic: true
+
+  # Data from the United States says "state".
+  alias_attribute :state, :province
+
+  normalizes :street_address, :city, :province, :postal_code, :country, :phone, with: ->(value) { value.strip.presence }
 
   # Coordinates describe one address. A save that moves the address without
   # giving new coordinates drops the old ones, and the lookup below finds new
@@ -33,31 +46,52 @@ class Address < ApplicationRecord
     GeoPoint.new(lat: lat, lng: lng) if lat && lng
   end
 
+  # The address as one line, like "919 Pandora Ave, Victoria, BC, V8W 1A1".
+  def one_line
+    [street_address, city, province, postal_code, country].compact_blank.join(", ")
+  end
+
   # The text to send to the geocoder, like "919 Pandora Ave, Victoria, BC", or
   # nil when this can't be looked up. A city alone gets no query, because that
   # could only match the middle of town.
   def geocoding_query
     street = street_address.to_s.strip
-    [street, city.presence, "BC"].compact.join(", ") if street.present?
+    [street, city.presence, "BC"].compact.join(", ") if street.present? && in_bc?
+  end
+
+  # A missing province or country is taken to be BC, Canada, where every
+  # resource so far is.
+  def in_bc?
+    (province.nil? || BC_NAMES.include?(province.downcase)) &&
+      (country.nil? || CANADA_NAMES.include?(country.downcase))
   end
 
   # Queues a lookup when one could find coordinates. A row waiting for
   # enrichment is skipped, because enrichment may still fill in its address.
   # Enrichment calls this itself once it has saved.
   def locate_later
-    return if geocoding_query.nil? || coordinates || document.awaiting_enrichment?
+    return if geocoding_query.nil? || coordinates || awaiting_enrichment?
 
     GeocodeAddressJob.perform_later(self)
+  end
+
+  # True while enrichment may still fill in the row this address came from.
+  def awaiting_enrichment?
+    case addressable
+    when Document then addressable.awaiting_enrichment?
+    when Service then addressable.document&.awaiting_enrichment? || false
+    else false
+    end
   end
 
   private
 
   def moved?
-    street_address_changed? || city_changed?
+    %w[street_address city province country].any? { |name| attribute_changed?(name) }
   end
 
   def saved_move?
-    saved_change_to_street_address? || saved_change_to_city?
+    %w[street_address city province country].any? { |name| saved_change_to_attribute?(name) }
   end
 
   def forget_coordinates

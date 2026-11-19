@@ -1,4 +1,5 @@
-# Looks up where one resource's address is and saves the answer on the address.
+# Looks up where one address is and saves the answer on the address. The
+# address can belong to a resource, a service or an organization.
 #
 # Architecture: Address queues this job after a save moves it to a street address
 # with no coordinates. Enrichment queues it too, once it has filled in a CSV row's
