@@ -204,6 +204,13 @@ RSpec.describe ContentPipeline::Parsers::Csv do
         expect(chunk[:service][:additional_details]).to eq("Website" => "ask at the desk")
       end
 
+      it "takes the street address from Address Line 1, keeping Address Line 2 as a detail" do
+        chunk = parser.parse("Name,Address Line 2,Address Line 1\nHarbour Meals,Unit 4,100 Harbour St\n").first
+
+        expect(chunk[:address][:street_address]).to eq("100 Harbour St")
+        expect(chunk[:service][:additional_details]).to eq("Address Line 2" => "Unit 4")
+      end
+
       it "names no organization when the row has no organization column" do
         expect(parser.parse("Name,Phone\nHarbour Meals,111\n").first[:organization]).to be_nil
       end

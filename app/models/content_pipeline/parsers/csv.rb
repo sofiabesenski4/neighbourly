@@ -51,9 +51,10 @@ module ContentPipeline
       end
 
       # "Street Address", "street_address" and "STREET-ADDRESS" all become
-      # "street address".
+      # "street address". Digits stay, so "Address Line 1" and "Address Line 2"
+      # remain different columns.
       def self.header_key(header)
-        header.downcase.gsub(/[^a-z]+/, " ").strip
+        header.downcase.gsub(/[^a-z0-9]+/, " ").strip
       end
 
       def parse(raw_content)
