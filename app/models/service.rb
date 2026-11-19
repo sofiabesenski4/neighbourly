@@ -1,6 +1,9 @@
 # One thing people can go to for help, like a meal program or a shelter, and
 # how to reach it. It is offered by an organization when the data says which.
 #
+# Details with no column of their own, such as eligibility, languages or
+# intake steps, are kept in `details`, so nothing a source gives is lost.
+#
 # A service keeps a record of where its details came from: the source, and the
 # imported row (Document) when there is one. A service added by an admin
 # belongs to the form entries source and has no row.
@@ -26,9 +29,11 @@ class Service < ApplicationRecord
   normalizes :name, with: ->(name) { name.squish }
   normalizes :description, :hours, :phone, :email, :website, :address_line,
     :city, :province, :postal_code, :country, with: ->(value) { value.strip.presence }
+  normalizes :details, with: ->(details) { details || {} }, apply_to_nil: true
 
   validates :name, presence: true
   validates :document_id, uniqueness: true, allow_nil: true
+  validate :details_is_an_object
   validates :website, format: {with: %r{\Ahttps?://}i, message: "must start with http:// or https://"}, allow_nil: true
 
   scope :alphabetical, -> { order(Arel.sql("LOWER(services.name)"), :id) }
@@ -53,6 +58,10 @@ class Service < ApplicationRecord
   end
 
   private
+
+  def details_is_an_object
+    errors.add(:details, "must be a set of named values") unless details.is_a?(Hash)
+  end
 
   def awaiting_enrichment?
     document.present? && document.awaiting_enrichment?

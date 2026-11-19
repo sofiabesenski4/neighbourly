@@ -29,6 +29,24 @@ RSpec.describe Service, type: :model do
     expect(service(phone: "  ", city: " Victoria ").attributes.values_at("phone", "city")).to eq([nil, "Victoria"])
   end
 
+  it "keeps details that have no column of their own" do
+    created = service(details: {languages: ["English", "Punjabi"], intake: {referral: false, steps: ["Call ahead"]}})
+
+    expect(created.reload.details).to eq(
+      "languages" => ["English", "Punjabi"],
+      "intake" => {"referral" => false, "steps" => ["Call ahead"]}
+    )
+  end
+
+  it "has no details until some are given" do
+    expect(service.details).to eq({})
+    expect(service(details: nil).details).to eq({})
+  end
+
+  it "only keeps details as named values" do
+    expect(source.services.build(name: "Community lunch", details: ["languages"])).not_to be_valid
+  end
+
   it "is offered by an organization when one is known" do
     organization = Organization.create!(name: "Our Place Society")
 
