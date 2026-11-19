@@ -40,7 +40,8 @@
     </div>
   <% end %>
   <% @service.additional_details.each do |key, value| %>
-    <% next if value.blank? %>
+    <%# false is a real answer, like "referral required: no", so only empty values are skipped. %>
+    <% next unless value == false || value.present? %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="break-words text-sm font-medium text-stone-500"><%= key.to_s.humanize %></dt>
       <dd class="mt-2 whitespace-pre-line break-words text-sm leading-6 text-stone-900"><%= service_detail_text(value) %></dd>

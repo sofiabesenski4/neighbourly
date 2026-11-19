@@ -76,12 +76,13 @@ RSpec.describe "Services", type: :request do
     end
 
     it "lists details that have no field of their own" do
-      service.update!(additional_details: {"languages" => ["English", "Punjabi"], "intake_steps" => {"referral" => false}, "bring" => ""})
+      service.update!(additional_details: {"languages" => ["English", "Punjabi"], "intake_steps" => {"referral" => false},
+                                           "bring" => "", "referral_required" => false})
 
       get service_path(service)
 
       page = Nokogiri::HTML(response.body)
-      expect(page.css("dt").map(&:text)).to include("Languages", "Intake steps")
+      expect(page.css("dt").map(&:text)).to include("Languages", "Intake steps", "Referral required")
       expect(page.css("dt").map(&:text)).not_to include("Bring")
       expect(page.text).to include("English, Punjabi", %("referral": false))
     end
