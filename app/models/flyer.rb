@@ -24,7 +24,7 @@ class Flyer
     "notes" => ["Notes"].freeze,
     "intake" => ["Intake"].freeze
   }.freeze
-  PDF_DETAIL_KEYS = %w[service address distance].freeze
+  PDF_DETAIL_KEYS = %w[service address distance phone].freeze
 
   attribute :categories, default: -> { [] }
   attribute :query, :string, default: ""

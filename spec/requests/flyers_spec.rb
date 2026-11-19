@@ -76,6 +76,21 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "omits phone numbers while retaining other ways to contact the resource" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "api")
+      meal = source.documents.create!(title: "Community meal", content: "Meals",
+        categories: [food], metadata: {email: "help@example.com", website: "https://example.com/meals"})
+      meal.create_address!(street_address: "919 Pandora Ave", phone: "250-555-0101")
+
+      post flyers_path, params: {print_settings: {include_map: "no", details: Flyer::DETAIL_FIELDS.keys - ["phone"]}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      expect(text).to include("Community meal", "919 Pandora Ave", "help@example.com", "https://example.com/meals")
+      expect(text).not_to include("Phone:", "250-555-0101")
+    end
+
     it "omits service, address, and distance rows independently while preserving the map" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
       source = Source.create!(name: "Local", source_type: "api")
