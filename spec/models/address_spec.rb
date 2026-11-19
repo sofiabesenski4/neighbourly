@@ -4,7 +4,7 @@ require "rails_helper"
 # happens to stored coordinates across edits. Jobs are only queued here, never
 # run, so no lookup happens. What the job does is in geocode_address_job_spec.rb.
 RSpec.describe Address, type: :model do
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
 
   before { allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0)) }
 

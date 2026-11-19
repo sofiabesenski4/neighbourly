@@ -15,6 +15,9 @@ class Source < ApplicationRecord
   validates :name, presence: true
   validates :url, presence: true, unless: -> { form? || api? || csv? }
   validates :source_type, presence: true, inclusion: {in: %w[api html form csv]}
+  # BC 211 JSON ("api") sources are no longer added or refreshed. Ones added
+  # before stay valid, so they can still be listed, reported on and deleted.
+  validates :source_type, inclusion: {in: %w[html form csv], message: "can't be API anymore"}, on: :create
 
   # Uploads are ingested by IngestSourceJob. Form entries are never ingested
   # and have no status.
@@ -22,13 +25,12 @@ class Source < ApplicationRecord
     {pending: "pending", ingesting: "ingesting", succeeded: "succeeded", failed: "failed"},
     prefix: :ingestion, validate: {allow_nil: true}
 
-  scope :api_sources, -> { where(source_type: "api") }
   scope :html_sources, -> { where(source_type: "html") }
   scope :form_sources, -> { where(source_type: "form") }
   scope :csv_sources, -> { where(source_type: "csv") }
   # Sources the pipeline can re-fetch: a parsed type with an origin URL.
-  # Form entries and URL-less uploads have nothing to fetch.
-  scope :fetchable, -> { where(source_type: %w[api html csv]).where.not(url: [nil, ""]) }
+  # Form entries, URL-less uploads and old API sources have nothing to fetch.
+  scope :fetchable, -> { where(source_type: %w[html csv]).where.not(url: [nil, ""]) }
 
   def api?
     source_type == "api"

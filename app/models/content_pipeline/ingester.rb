@@ -67,8 +67,6 @@ module ContentPipeline
 
     def parser_for(source)
       case source.source_type
-      when "api"
-        Parsers::Api.new(source)
       when "html"
         Parsers::Html.new(source)
       when "csv"

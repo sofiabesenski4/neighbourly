@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe Document, type: :model do
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
 
   describe "validations" do
     it "is valid with content and a source" do

@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe ReportPolicy do
   let(:admin) { User.create!(email: "admin@example.com", password: "password123", admin: true) }
   let(:regular_user) { User.create!(email: "user@example.com", password: "password123", admin: false) }
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
   let(:document) {
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
     source.documents.create!(content: "test", title: "Test", external_id: "1")

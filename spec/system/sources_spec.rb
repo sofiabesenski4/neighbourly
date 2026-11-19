@@ -66,14 +66,25 @@ RSpec.describe "Sources", type: :system do
     end
 
     it "lists existing sources on the index page" do
-      source = Source.create!(name: "BC 211 Shelters", url: "https://example.com/shelters", source_type: "api")
+      source = Source.create!(name: "Shelter page", url: "https://example.com/shelters", source_type: "html")
       source.documents.create!(content: "test", external_id: "1")
+
+      visit sources_path
+
+      expect(page).to have_content("Shelter page")
+      expect(page).to have_content("HTML")
+      expect(page).to have_content("1 document")
+    end
+
+    # BC 211 JSON can no longer be added, but sources added before stay listed.
+    it "still lists an API source added before that input was removed" do
+      legacy = Source.new(name: "BC 211 Shelters", url: "https://example.com/shelters", source_type: "api")
+      legacy.save!(validate: false)
 
       visit sources_path
 
       expect(page).to have_content("BC 211 Shelters")
       expect(page).to have_content("API")
-      expect(page).to have_content("1 document")
     end
 
     it "subscribes the sources list to one refresh stream" do
@@ -109,19 +120,19 @@ RSpec.describe "Sources", type: :system do
 
     describe "viewing a source" do
       it "shows the source details and its documents" do
-        source = Source.create!(name: "BC 211 Shelters", url: "https://example.com/shelters", source_type: "api")
+        source = Source.create!(name: "Shelter page", url: "https://example.com/shelters", source_type: "html")
         source.documents.create!(content: "My Shelter\nCity: Victoria", title: "My Shelter", external_id: "1", metadata: {city: "Victoria"})
 
         visit source_path(source)
 
-        expect(page).to have_content("BC 211 Shelters")
-        expect(page).to have_content("API")
+        expect(page).to have_content("Shelter page")
+        expect(page).to have_content("HTML")
         expect(page).to have_content("My Shelter")
         expect(page).to have_content("Victoria")
       end
 
       it "links to source show from the index" do
-        source = Source.create!(name: "Test Source", url: "https://example.com/test", source_type: "api")
+        source = Source.create!(name: "Test Source", url: "https://example.com/test", source_type: "html")
 
         visit sources_path
         click_link "Test Source"
@@ -130,7 +141,7 @@ RSpec.describe "Sources", type: :system do
       end
 
       it "allows deleting an individual document from a source" do
-        source = Source.create!(name: "Test Source", url: "https://example.com/test", source_type: "api")
+        source = Source.create!(name: "Test Source", url: "https://example.com/test", source_type: "html")
         source.documents.create!(content: "Doc A", title: "Doc A", external_id: "a")
         doc_b = source.documents.create!(content: "Doc B", title: "Doc B", external_id: "b")
 
@@ -146,32 +157,11 @@ RSpec.describe "Sources", type: :system do
       end
 
       it "shows an empty state when a source has no documents" do
-        source = Source.create!(name: "Empty Source", url: "https://example.com/empty", source_type: "api")
+        source = Source.create!(name: "Empty Source", url: "https://example.com/empty", source_type: "html")
 
         visit source_path(source)
 
         expect(page).to have_content("No documents in this source.")
-      end
-    end
-
-    describe "uploading a JSON source" do
-      it "creates a source and ingests documents from a JSON file" do
-        visit new_source_path
-
-        fill_in "Source name", with: "Test Shelters"
-        fill_in "Origin URL", with: "https://example.com/shelters.json"
-        select "JSON (structured API data)", from: "Data type"
-
-        json_content = [{"id" => 1, "post_title" => "My Shelter", "location" => {"city" => {"label" => "Victoria"}}}].to_json
-        file = create_temp_file("shelters.json", json_content)
-        attach_file "Upload file", file.path
-
-        perform_enqueued_jobs { click_button "Upload and ingest" }
-
-        expect(page).to have_content("Source 'Test Shelters' created. Its documents are being ingested in the background.")
-        expect(page).to have_content("1 document")
-        expect(Source.last.name).to eq("Test Shelters")
-        expect(Document.last.title).to eq("My Shelter")
       end
     end
 
@@ -317,7 +307,7 @@ RSpec.describe "Sources", type: :system do
 
         fill_in "Source name", with: "No File"
         fill_in "Origin URL", with: "https://example.com/nofile"
-        select "JSON (structured API data)", from: "Data type"
+        select "HTML (web page)", from: "Data type"
         click_button "Upload and ingest"
 
         expect(page).to have_content("File must be provided")
@@ -328,13 +318,13 @@ RSpec.describe "Sources", type: :system do
 
         fill_in "Source name", with: "Wrong Type"
         fill_in "Origin URL", with: "https://example.com/wrong"
-        select "JSON (structured API data)", from: "Data type"
+        select "HTML (web page)", from: "Data type"
 
-        file = create_temp_file("page.html", "<html><body>test</body></html>")
+        file = create_temp_file("data.csv", "Name\nHarbour Meals\n")
         attach_file "Upload file", file.path
         click_button "Upload and ingest"
 
-        expect(page).to have_content("File must be a .json file for API sources")
+        expect(page).to have_content("File must be an .html file for HTML sources")
       end
 
       it "rejects a non-CSV file for a CSV source" do
@@ -343,7 +333,7 @@ RSpec.describe "Sources", type: :system do
         fill_in "Source name", with: "Wrong Type"
         select "CSV (spreadsheet rows)", from: "Data type"
 
-        file = create_temp_file("data.json", [{"id" => 1}].to_json)
+        file = create_temp_file("page.html", "<html><body>test</body></html>")
         attach_file "Upload file", file.path
         click_button "Upload and ingest"
 
@@ -354,9 +344,9 @@ RSpec.describe "Sources", type: :system do
         visit new_source_path
 
         fill_in "Origin URL", with: "https://example.com/noname"
-        select "JSON (structured API data)", from: "Data type"
+        select "HTML (web page)", from: "Data type"
 
-        file = create_temp_file("data.json", [{"id" => 1, "post_title" => "Test"}].to_json)
+        file = create_temp_file("page.html", "<html><body>test</body></html>")
         attach_file "Upload file", file.path
         click_button "Upload and ingest"
 
@@ -366,7 +356,7 @@ RSpec.describe "Sources", type: :system do
 
     describe "deleting a source" do
       it "deletes the source and all its documents" do
-        source = Source.create!(name: "To Delete", url: "https://example.com/delete", source_type: "api")
+        source = Source.create!(name: "To Delete", url: "https://example.com/delete", source_type: "html")
         source.documents.create!(content: "doc", external_id: "1")
 
         visit sources_path

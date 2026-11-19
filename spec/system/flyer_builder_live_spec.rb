@@ -13,7 +13,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     end
 
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
-    source = Source.create!(name: "Local", source_type: "api")
+    source = Source.create!(name: "Local", source_type: "csv")
     source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food])
     source.documents.create!(title: "Beta clinic", content: "Clinic", categories: [health])
     source.documents.create!(title: "Gamma noticeboard", content: "Noticeboard", metadata: {})

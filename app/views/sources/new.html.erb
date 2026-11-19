@@ -24,7 +24,7 @@
     <div class="space-y-2">
       <%= form.label :source_type, "Data type", class: "admin-label" %>
       <%= form.select :source_type,
-          options_for_select([["JSON (structured API data)", "api"], ["HTML (web page)", "html"], ["CSV (spreadsheet rows)", "csv"]], @source.source_type),
+          options_for_select([["HTML (web page)", "html"], ["CSV (spreadsheet rows)", "csv"]], @source.source_type),
           {}, class: "admin-input", aria: { invalid: @source.errors[:source_type].any? } %>
     </div>
 
@@ -38,8 +38,8 @@
 
     <div class="space-y-2">
       <%= form.label :file, "Upload file", class: "admin-label" %>
-      <p id="source_file_hint" class="text-xs leading-5 text-stone-500">Choose a .json, .html, or .csv file to ingest.</p>
-      <%= form.file_field :file, accept: ".json,.html,.htm,.csv", class: "admin-file-input", aria: { describedby: "source_file_hint", invalid: @source.errors[:file].any? } %>
+      <p id="source_file_hint" class="text-xs leading-5 text-stone-500">Choose an .html or .csv file to ingest.</p>
+      <%= form.file_field :file, accept: ".html,.htm,.csv", class: "admin-file-input", aria: { describedby: "source_file_hint", invalid: @source.errors[:file].any? } %>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 border-t border-stone-100 pt-6">

@@ -98,7 +98,7 @@ RSpec.describe "Flyers", type: :request do
 
     it "prints the same matching resources in the same order as the preview" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
+      source = Source.create!(name: "Local", source_type: "csv")
       source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food, shelter])
       source.documents.create!(title: "Zebra meals", content: "Meals", categories: [shelter])
       source.documents.create!(title: "Other clinic", content: "Clinic", categories: [health])
@@ -119,7 +119,7 @@ RSpec.describe "Flyers", type: :request do
 
     it "sorts the preview and PDF nearest first, placing unknown distances last" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
+      source = Source.create!(name: "Local", source_type: "csv")
       source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food], metadata: {lat: 48.44, lng: -123.36})
       source.documents.create!(title: "Zebra meals", content: "Meals", categories: [food, shelter], metadata: {lat: 48.421, lng: -123.36})
       source.documents.create!(title: "Aardvark meals", content: "Meals", categories: [shelter])
@@ -158,7 +158,7 @@ RSpec.describe "Flyers", type: :request do
     it "prints uncategorized resources when no categories have been configured" do
       Category.delete_all
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
+      source = Source.create!(name: "Local", source_type: "csv")
       source.documents.create!(title: "Community noticeboard", content: "Noticeboard")
 
       post flyers_path
@@ -271,7 +271,7 @@ RSpec.describe "Flyers", type: :request do
 
       before do
         allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-        Source.create!(name: "Local", source_type: "api").documents.create!(
+        Source.create!(name: "Local", source_type: "csv").documents.create!(
           title: "Community meal", content: "Community meal", categories: [food],
           metadata: {address: "1 Test St", lat: 48.43, lng: -123.36}
         )
@@ -489,7 +489,7 @@ RSpec.describe "Flyers", type: :request do
   describe "GET /printout/preview" do
     before do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
+      source = Source.create!(name: "Local", source_type: "csv")
       source.documents.create!(title: "Community meal", content: "Community meal", categories: [food], metadata: {notes: "Call ahead"})
       source.documents.create!(title: "Unrelated clinic", content: "Clinic", categories: [health])
     end

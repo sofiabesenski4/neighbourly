@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe SourcePolicy do
   let(:admin) { User.create!(email: "admin@example.com", password: "password123", admin: true) }
   let(:regular_user) { User.create!(email: "user@example.com", password: "password123", admin: false) }
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
 
   describe "admin user" do
     subject { described_class.new(admin, source) }

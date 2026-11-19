@@ -4,7 +4,7 @@ RSpec.describe RagContext do
   let(:fake_vector) { Array.new(1536, 0.0).tap { |v| v[0] = 1.0 } }
   let(:rag_context) { described_class.new(limit: 3) }
 
-  let(:source) { Source.create!(name: "BC 211 Shelters", url: "https://example.com/api", source_type: "api") }
+  let(:source) { Source.create!(name: "BC 211 Shelters", url: "https://example.com/api", source_type: "csv") }
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)

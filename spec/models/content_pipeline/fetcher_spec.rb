@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ContentPipeline::Fetcher do
-  let(:source) { Source.new(name: "Test", url: "https://example.com/data.json", source_type: "api") }
+  let(:source) { Source.new(name: "Test", url: "https://example.com/data.json", source_type: "csv") }
   let(:fetcher) { described_class.new(source) }
 
   # Resolution is stubbed rather than left to real DNS so the suite neither

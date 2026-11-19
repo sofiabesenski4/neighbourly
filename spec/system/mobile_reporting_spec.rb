@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe "Reporting resources on mobile", type: :system do
   let(:user) { User.create!(email: "mobile-report@example.com", password: "password123") }
-  let(:source) { Source.create!(name: "Victoria Community Directory", source_type: "api", url: "https://example.com/resources") }
+  let(:source) { Source.create!(name: "Victoria Community Directory", source_type: "csv", url: "https://example.com/resources") }
   let(:document) { source.documents.create!(title: "HarbourCommunityKitchen" * 5, content: "Community meals and support.") }
   let(:chat) { user.chats.create!(title: "Local meals") }
 

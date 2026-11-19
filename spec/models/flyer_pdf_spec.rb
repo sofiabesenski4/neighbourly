@@ -3,7 +3,7 @@ require "pdf/reader"
 
 RSpec.describe FlyerPdf do
   def resource(title: "Meal program", **metadata)
-    Document.new(title: title, content: title, metadata: metadata, source: Source.new(name: "Guide", source_type: "api"))
+    Document.new(title: title, content: title, metadata: metadata, source: Source.new(name: "Guide", source_type: "csv"))
   end
 
   def reader_for(resources)
@@ -80,9 +80,9 @@ RSpec.describe FlyerPdf do
 
     it "gives a resource in two categories the same number on both cards" do
       shared = Document.new(id: 7, title: "Shared", content: "Shared", metadata: {},
-        source: Source.new(name: "Guide", source_type: "api"))
+        source: Source.new(name: "Guide", source_type: "csv"))
       copy = Document.new(id: 7, title: "Shared", content: "Shared", metadata: {},
-        source: Source.new(name: "Guide", source_type: "api"))
+        source: Source.new(name: "Guide", source_type: "csv"))
       text = text_of([section("Food", [shared, resource(title: "Other")]), section("Health", [copy])])
 
       expect(text.scan("1. Shared").size).to be >= 2

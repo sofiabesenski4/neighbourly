@@ -51,7 +51,7 @@ RSpec.describe DocumentPolicy do
     end
 
     let!(:form_document) { source.documents.create!(content: "form doc", title: "Form Resource") }
-    let!(:api_source) { Source.create!(name: "API", url: "https://example.com", source_type: "api") }
+    let!(:api_source) { Source.create!(name: "API", url: "https://example.com", source_type: "csv") }
     let!(:api_document) { api_source.documents.create!(content: "api doc", external_id: "1") }
 
     it "returns only form-source documents for admin" do
