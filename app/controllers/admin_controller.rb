@@ -6,6 +6,8 @@ class AdminController < ApplicationController
     authorize :admin, :index?
 
     @user_count = policy_scope(User).count
+    @organization_count = policy_scope(Organization).count
+    @service_count = policy_scope(Service).count
     source_scope = policy_scope(Source)
     @source_count = source_scope.where.not(source_type: "form").count
     @resource_count = Document.where(source_id: source_scope.select(:id)).count

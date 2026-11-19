@@ -29,20 +29,22 @@ RSpec.describe "Admin console", type: :request do
     expect(Nokogiri::HTML(response.body).at_css("[aria-label='Administration sections']")).to be_nil
   end
 
-  it "shows current account, source, pending-report, and model counts to an administrator" do
+  it "shows current account, organization, service, source, pending-report, and model counts to an administrator" do
     user
     source = Source.create!(name: "Community directory", source_type: "csv")
     document = source.documents.create!(title: "Community kitchen", content: "Meals every day.")
     Source.form_entry_source.documents.create!(title: "Community hub", content: "Drop-in support.")
     Report.create!(document: document, user: user, reason: "out of date")
     Report.create!(document: document, user: user, reason: "other", status: "dismissed")
+    organization = Organization.create!(name: "Our Place Society")
+    source.services.create!(name: "Community kitchen", organization: organization)
     sign_in admin
 
     get admin_path
 
     expect(response).to have_http_status(:ok)
     sections = Nokogiri::HTML(response.body).at_css("[aria-label='Administration sections']")
-    {users_path => "2", sources_path => "1", reports_path => "1", models_path => "1"}.each do |path, count|
+    {users_path => "2", organizations_path => "1", services_path => "1", sources_path => "1", reports_path => "1", models_path => "1"}.each do |path, count|
       expect(sections.at_css("a[href='#{path}'] dd").text.squish).to eq(count)
     end
     expect(sections.at_css("a[href='#{sources_path}']").text.squish).to include("2 resources")

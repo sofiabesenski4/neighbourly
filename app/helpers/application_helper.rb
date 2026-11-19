@@ -1,5 +1,5 @@
 module ApplicationHelper
   def administration_page?
-    current_user&.admin? && %w[admin users sources documents reports models].include?(controller_name)
+    current_user&.admin? && %w[admin users organizations services sources documents reports models].include?(controller_name)
   end
 end

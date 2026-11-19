@@ -6,6 +6,8 @@ class Document < ApplicationRecord
   has_and_belongs_to_many :categories, -> { order(:name) }
   # Saved with the resource, so an import or form edit writes both together.
   has_one :address, dependent: :destroy, autosave: true
+  # The service read from this row. It outlives the row, unlinked.
+  has_one :service, dependent: :nullify
 
   has_neighbors :embedding
 

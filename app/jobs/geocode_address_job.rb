@@ -1,4 +1,5 @@
 # Looks up where one resource's address is and saves the answer on the address.
+# It takes an Address or a Service. Both include Locatable.
 #
 # Architecture: Address queues this job after a save moves it to a street address
 # with no coordinates. Enrichment queues it too, once it has filled in a CSV row's
