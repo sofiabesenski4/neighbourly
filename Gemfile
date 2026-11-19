@@ -80,7 +80,7 @@ gem "devise", "~> 5.0"
 
 gem "pundit", "~> 2.5"
 
-gem "rspec-rails", "~> 8.0"
+gem "rspec-rails", "~> 8.1"
 
 gem "tailwindcss-rails", "~> 4.4"
 
