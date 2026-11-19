@@ -11,6 +11,8 @@
     <%= form.text_area :description, rows: 4, class: "admin-input" %>
   </div>
 
+  <%= render "addresses/fields", form: form, record: @organization %>
+
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
     <div class="min-w-0 space-y-2">
       <%= form.label :phone, "Phone", class: "admin-label" %>

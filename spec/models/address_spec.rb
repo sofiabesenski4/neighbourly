@@ -61,6 +61,32 @@ RSpec.describe Address, type: :model do
     expect { document.destroy! }.to change(Address, :count).by(-1)
   end
 
+  it "reads and writes the province as the state" do
+    address = Address.new(state: "WA")
+
+    expect(address.province).to eq("WA")
+    expect(address.state).to eq("WA")
+  end
+
+  it "takes an address with no province or country to be in BC" do
+    expect(Address.new(street_address: "919 Pandora Ave", city: "Victoria").geocoding_query)
+      .to eq("919 Pandora Ave, Victoria, BC")
+    expect(Address.new(street_address: "919 Pandora Ave", province: "British Columbia", country: "Canada").geocoding_query)
+      .to eq("919 Pandora Ave, BC")
+  end
+
+  # The geocoder only knows BC, so it would place these at the wrong address.
+  it "doesn't look up an address outside BC" do
+    expect(Address.new(street_address: "400 Broad St", city: "Seattle", state: "WA").geocoding_query).to be_nil
+    expect(Address.new(street_address: "1 Main St", city: "Victoria", country: "Australia").geocoding_query).to be_nil
+  end
+
+  it "reads as one line" do
+    address = Address.new(street_address: "919 Pandora Ave", city: "Victoria", province: "BC", postal_code: "V8W 1A1")
+
+    expect(address.one_line).to eq("919 Pandora Ave, Victoria, BC, V8W 1A1")
+  end
+
   context "when the source enriches its rows" do
     let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true) }
 

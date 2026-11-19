@@ -24,7 +24,7 @@ RSpec.describe "Services", type: :request do
 
     it "lists services with the organization that offers each" do
       service
-      Source.form_entry_source.services.create!(name: "Bike repair", city: "Victoria")
+      Source.form_entry_source.services.create!(name: "Bike repair", address_attributes: {city: "Victoria"})
 
       get services_path
 
@@ -44,8 +44,8 @@ RSpec.describe "Services", type: :request do
 
     it "creates a service as an admin entry, with its organization and categories" do
       post services_path, params: {service: {
-        name: "Community lunch", organization_id: organization.id, address_line: "919 Pandora Ave",
-        city: "Victoria", province: "BC", country: "Canada", category_ids: [meals.id]
+        name: "Community lunch", organization_id: organization.id, category_ids: [meals.id],
+        address_attributes: {street_address: "919 Pandora Ave", city: "Victoria", province: "BC", country: "Canada"}
       }}
 
       created = Service.last
@@ -53,7 +53,7 @@ RSpec.describe "Services", type: :request do
       expect(created.organization).to eq(organization)
       expect(created.source).to eq(Source.form_entry_source)
       expect(created.category_names).to eq(["Meals"])
-      expect(created.state).to eq("BC")
+      expect(created.address).to have_attributes(street_address: "919 Pandora Ave", state: "BC", addressable: created)
     end
 
     it "shows the form again when the name is missing" do

@@ -11,7 +11,7 @@ class OrganizationsController < ApplicationController
 
   def show
     authorize @organization
-    @services = @organization.services.alphabetical.includes(:categories)
+    @services = @organization.services.alphabetical.includes(:categories, :address)
   end
 
   def new
@@ -55,6 +55,6 @@ class OrganizationsController < ApplicationController
   end
 
   def organization_params
-    params.require(:organization).permit(:name, :description, :website, :email, :phone)
+    params.require(:organization).permit(:name, :description, :website, :email, :phone, address_attributes: [:id, :street_address, :city, :province, :postal_code, :country])
   end
 end

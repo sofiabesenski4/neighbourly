@@ -18,15 +18,8 @@ RSpec.describe Service, type: :model do
     expect(service.errors.attribute_names).to include(:name, :source)
   end
 
-  it "reads and writes the province as the state" do
-    service = Service.new(state: "WA")
-
-    expect(service.province).to eq("WA")
-    expect(service.state).to eq("WA")
-  end
-
   it "stores blank details as empty" do
-    expect(service(phone: "  ", city: " Victoria ").attributes.values_at("phone", "city")).to eq([nil, "Victoria"])
+    expect(service(phone: "  ", email: " info@example.org ").attributes.values_at("phone", "email")).to eq([nil, "info@example.org"])
   end
 
   it "keeps details that have no column of their own" do
@@ -70,53 +63,44 @@ RSpec.describe Service, type: :model do
     expect { source.destroy! }.to change(Service, :count).by(-1)
   end
 
-  describe "finding coordinates" do
-    it "queues a lookup for a street address in BC" do
-      expect { service(address_line: "919 Pandora Ave", city: "Victoria", province: "British Columbia") }
+  describe "its address" do
+    it "keeps where it is, coordinates included, on its address rather than on itself" do
+      created = service(address_attributes: {street_address: "919 Pandora Ave", city: "Victoria", lat: 48.42, lng: -123.35})
+
+      expect(created.reload.address).to have_attributes(street_address: "919 Pandora Ave", city: "Victoria", addressable: created)
+      expect(created.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.35))
+      expect(Service.column_names).not_to include("lat", "lng", "city")
+    end
+
+    it "queues a lookup for its address" do
+      expect { service(address_attributes: {street_address: "919 Pandora Ave", city: "Victoria"}) }
         .to have_enqueued_job(GeocodeAddressJob)
     end
 
-    it "takes a service with no province or country to be in BC" do
-      expect(Service.new(address_line: "919 Pandora Ave", city: "Victoria").geocoding_query)
-        .to eq("919 Pandora Ave, Victoria, BC")
+    it "adds no address for blank location fields" do
+      expect(service(address_attributes: {street_address: "", city: ""}).address).to be_nil
     end
 
-    # The geocoder only knows BC, so it would place these at the wrong address.
-    it "doesn't look up an address outside BC" do
-      expect { service(address_line: "400 Broad St", city: "Seattle", state: "WA") }
-        .not_to have_enqueued_job(GeocodeAddressJob)
-      expect { service(address_line: "1 Main St", city: "Victoria", country: "Australia") }
-        .not_to have_enqueued_job(GeocodeAddressJob)
+    it "is cleared, not ignored, when its fields are blanked" do
+      created = service(address_attributes: {street_address: "919 Pandora Ave"})
+
+      created.update!(address_attributes: {id: created.address.id, street_address: ""})
+
+      expect(created.reload.address.street_address).to be_nil
     end
 
-    it "uses coordinates it was given instead of looking them up" do
-      created = nil
-
-      expect { created = service(address_line: "919 Pandora Ave", lat: 48.42, lng: -123.35) }
-        .not_to have_enqueued_job(GeocodeAddressJob)
-      expect(created.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.35))
-    end
-
-    it "keeps coordinates when other details change" do
-      created = service(address_line: "919 Pandora Ave", city: "Victoria", lat: 48.42, lng: -123.35)
-
-      expect { created.update!(phone: "250-555-0199") }.not_to have_enqueued_job(GeocodeAddressJob)
-      expect(created.reload.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.35))
-    end
-
-    it "drops coordinates and looks up again when the address changes" do
-      created = service(address_line: "919 Pandora Ave", city: "Victoria", lat: 48.42, lng: -123.35)
-
-      expect { created.update!(address_line: "535 Ellice St") }.to have_enqueued_job(GeocodeAddressJob)
-      expect(created.reload.coordinates).to be_nil
-    end
-
-    it "waits while its row is waiting for enrichment" do
+    it "waits for enrichment while its row is waiting" do
       source.update!(enrich_documents: true)
       document = source.documents.create!(title: "Row 1", content: "Name: Community lunch")
 
-      expect { service(document: document, address_line: "919 Pandora Ave") }
+      expect { service(document: document, address_attributes: {street_address: "919 Pandora Ave"}) }
         .not_to have_enqueued_job(GeocodeAddressJob)
+    end
+
+    it "is removed with the service" do
+      created = service(address_attributes: {street_address: "919 Pandora Ave"})
+
+      expect { created.destroy! }.to change(Address, :count).by(-1)
     end
   end
 end

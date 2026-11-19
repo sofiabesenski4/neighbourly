@@ -8,7 +8,7 @@
 
 <%= render "admin/page_header", title: @service.name, description: "Review the information held for this service." %>
 
-<% location = [@service.address_line, @service.city, @service.province, @service.postal_code, @service.country].compact_blank.join(", ") %>
+<% location = @service.address&.one_line %>
 <dl class="admin-panel max-w-4xl divide-y divide-stone-100">
   <div class="px-5 py-4 sm:px-6">
     <dt class="text-sm font-medium text-stone-500">Offered by</dt>

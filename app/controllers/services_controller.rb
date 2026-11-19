@@ -5,7 +5,7 @@ class ServicesController < ApplicationController
 
   def index
     authorize Service
-    @services = policy_scope(Service).alphabetical.includes(:organization, :categories)
+    @services = policy_scope(Service).alphabetical.includes(:organization, :categories, :address)
   end
 
   def show
@@ -58,7 +58,7 @@ class ServicesController < ApplicationController
   def service_params
     params.require(:service).permit(
       :name, :organization_id, :description, :hours, :phone, :email, :website,
-      :address_line, :city, :province, :postal_code, :country, :closed, category_ids: []
+      :closed, category_ids: [], address_attributes: [:id, :street_address, :city, :province, :postal_code, :country]
     )
   end
 end

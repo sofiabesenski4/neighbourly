@@ -5,6 +5,10 @@ class Organization < ApplicationRecord
   belongs_to :source, optional: true
   # Removing an organization keeps its services, unlinked.
   has_many :services, dependent: :nullify
+  has_one :address, as: :addressable, dependent: :destroy, autosave: true
+  # Blank location fields add no address, but can clear one already there.
+  accepts_nested_attributes_for :address,
+    reject_if: ->(fields) { fields["id"].blank? && fields.except("id").values.all?(&:blank?) }
 
   normalizes :name, with: ->(name) { name.squish }
   normalizes :description, :website, :email, :phone, with: ->(value) { value.strip.presence }

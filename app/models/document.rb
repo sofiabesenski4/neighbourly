@@ -5,7 +5,7 @@ class Document < ApplicationRecord
   has_many :reports, dependent: :destroy
   has_and_belongs_to_many :categories, -> { order(:name) }
   # Saved with the resource, so an import or form edit writes both together.
-  has_one :address, dependent: :destroy, autosave: true
+  has_one :address, as: :addressable, dependent: :destroy, autosave: true
   # The service read from this row. It outlives the row, unlinked.
   has_one :service, dependent: :nullify
 

@@ -9,7 +9,7 @@
 <%= render "admin/page_header", title: @organization.name, description: "Review this organization and the services it offers." %>
 
 <dl class="admin-panel max-w-4xl divide-y divide-stone-100">
-  <% [["About", @organization.description], ["Phone", @organization.phone], ["Email", @organization.email]].each do |label, value| %>
+  <% [["About", @organization.description], ["Location", @organization.address&.one_line], ["Phone", @organization.phone], ["Email", @organization.email]].each do |label, value| %>
     <% next if value.blank? %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="text-sm font-medium text-stone-500"><%= label %></dt>

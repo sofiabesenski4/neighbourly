@@ -59,6 +59,14 @@ RSpec.describe "Organizations", type: :request do
       expect(response.body).to include("Name is already used by another organization")
     end
 
+    it "saves the organization's address and shows it" do
+      patch organization_path(organization), params: {organization: {address_attributes: {street_address: "919 Pandora Ave", city: "Victoria"}}}
+
+      expect(organization.reload.address.street_address).to eq("919 Pandora Ave")
+      get organization_path(organization)
+      expect(response.body).to include("919 Pandora Ave, Victoria")
+    end
+
     it "updates an organization" do
       patch organization_path(organization), params: {organization: {email: "hello@example.org"}}
 

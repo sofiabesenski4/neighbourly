@@ -18,31 +18,7 @@
     <%= form.text_area :description, rows: 4, class: "admin-input" %>
   </div>
 
-  <fieldset class="min-w-0 space-y-4">
-    <legend class="admin-label">Location</legend>
-    <div class="space-y-2">
-      <%= form.label :address_line, "Street address", class: "admin-label" %>
-      <%= form.text_field :address_line, placeholder: "e.g. 100 Harbour St", class: "admin-input" %>
-    </div>
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-4">
-      <div class="min-w-0 space-y-2">
-        <%= form.label :city, "City", class: "admin-label" %>
-        <%= form.text_field :city, placeholder: "e.g. Victoria", class: "admin-input" %>
-      </div>
-      <div class="min-w-0 space-y-2">
-        <%= form.label :province, "Province or state", class: "admin-label" %>
-        <%= form.text_field :province, placeholder: "e.g. BC", class: "admin-input" %>
-      </div>
-      <div class="min-w-0 space-y-2">
-        <%= form.label :postal_code, "Postal code", class: "admin-label" %>
-        <%= form.text_field :postal_code, placeholder: "e.g. V8W 1A1", class: "admin-input" %>
-      </div>
-      <div class="min-w-0 space-y-2">
-        <%= form.label :country, "Country", class: "admin-label" %>
-        <%= form.text_field :country, placeholder: "e.g. Canada", class: "admin-input" %>
-      </div>
-    </div>
-  </fieldset>
+  <%= render "addresses/fields", form: form, record: @service %>
 
   <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
     <div class="min-w-0 space-y-2">
