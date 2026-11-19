@@ -94,7 +94,7 @@ class FlyersController < ApplicationController
   end
 
   def create
-    @flyer = Flyer.new(flyer_params)
+    @flyer = Flyer.new(flyer_params.to_h.merge(print_settings))
 
     unless @flyer.valid?
       render_invalid_flyer
@@ -108,7 +108,7 @@ class FlyersController < ApplicationController
       return
     end
 
-    pdf = FlyerGenerator.call(**@flyer.filters, origin: origin)
+    pdf = FlyerGenerator.call(**@flyer.filters, **@flyer.pdf_options, origin: origin)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
@@ -197,5 +197,19 @@ class FlyersController < ApplicationController
   def flyer_params
     flyer = params.fetch(:flyer, {})
     flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: []) : {}
+  end
+
+  def print_settings
+    return {} unless params.key?(:print_settings)
+
+    settings = params[:print_settings]
+    return {include_map: nil} unless settings.is_a?(ActionController::Parameters)
+
+    %i[include_map text_size].each_with_object({}) do |key, options|
+      next unless settings.key?(key)
+
+      value = settings[key]
+      options[key] = value.is_a?(String) ? value : ""
+    end.tap { |options| options[:details] = settings[:details] if settings.key?(:details) }
   end
 end

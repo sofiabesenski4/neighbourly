@@ -469,6 +469,7 @@ test("rendered resource cards use Tailwind utility classes", () => {
       createElement: (tagName) => ({
         tagName,
         children: [],
+        setAttribute() {},
         append(...children) {
           this.children.push(...children);
         },

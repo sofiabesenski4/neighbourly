@@ -27,6 +27,151 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
+  it "shows the default print settings and lets people change the available controls" do
+    visit_builder
+    expect(page).to have_no_field("Text size")
+
+    settings = find('summary[aria-label="Print settings"]')
+    expect(settings).to have_css("svg[aria-hidden='true']")
+    expect(settings.text).to be_empty
+    expect(settings.evaluate_script(<<~JS)).to be(true)
+      this.getBoundingClientRect().left >=
+        this.closest("details").previousElementSibling.getBoundingClientRect().right
+    JS
+    settings.click
+
+    within_fieldset("Include map") do
+      expect(page).to have_checked_field("Yes")
+      choose "No"
+      expect(page).to have_checked_field("No")
+    end
+    within_fieldset("Colour map") do
+      expect(page).to have_checked_field("No", disabled: true)
+    end
+    within_fieldset("Include map") { choose "Yes" }
+    within_fieldset("Colour map") do
+      expect(page).to have_checked_field("No")
+      choose "Yes"
+      expect(page).to have_checked_field("Yes")
+    end
+    within_fieldset("Colour resource cards") do
+      expect(page).to have_checked_field("No")
+      choose "Yes"
+      expect(page).to have_checked_field("Yes")
+    end
+    expect(find_field("Text size").value).to eq("15.5")
+    expect(page).to have_no_field("Notes")
+
+    settings.click
+    expect(page).to have_no_field("Text size")
+    settings.click
+    expect(page).to have_field("Text size")
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_field("Text size")
+  end
+
+  it "shows resource detail filters between Categories and Sort and applies them to the preview" do
+    meal_id = Document.find_by!(title: "Alpha meals").id
+    allow(ResourceCard).to receive(:new).and_wrap_original do |build, document, **options|
+      card = build.call(document, **options)
+      if document.id == meal_id
+        allow(card).to receive(:fields).and_wrap_original do |fields|
+          fields.call + [{label: "Ages served", value: "18+"}, {label: "Eligibility", value: "Local residents"}]
+        end
+      end
+      card
+    end
+    visit_builder
+    expect(page).to have_css("article dt", text: "Services:")
+    expect(page).to have_css("article dt", text: "Ages served:")
+    expect(page).to have_css("article dt", text: "Eligibility:")
+    advanced = find('summary[title="Advanced filtering"]')
+    expect(advanced).to have_css("svg[aria-hidden='true']")
+    expect(advanced.find(:xpath, "../preceding-sibling::*[1]")).to have_text("Categories")
+    expect(advanced.find(:xpath, "../following-sibling::*[1]")).to have_css('summary[aria-label="Sort resources"]')
+    advanced.click
+
+    within_fieldset("Resource details") do
+      ["Service", "Address", "Distance and walking time", "Phone", "Ages served and eligibility", "Notes", "Intake"].each do |label|
+        expect(page).to have_checked_field(label)
+      end
+      uncheck "Service"
+      uncheck "Ages served and eligibility"
+      expect(page).to have_checked_field("Address")
+    end
+    expect(page).to have_no_css("article dt", text: "Services:")
+    expect(page).to have_no_css("article dt", text: "Ages served:")
+    expect(page).to have_no_css("article dt", text: "Eligibility:")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_field("Service")
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_no_css("article dt", text: "Services:")
+
+    advanced.click
+    within_fieldset("Resource details") do
+      check "Service"
+      check "Ages served and eligibility"
+    end
+    expect(page).to have_css("article dt", text: "Services:")
+    expect(page).to have_css("article dt", text: "Ages served:")
+    expect(page).to have_css("article dt", text: "Eligibility:")
+  end
+
+  it "keeps the same resource detail choices available in the mobile toolbar" do
+    visit_builder
+    find('summary[title="Advanced filtering"]').click
+    within_fieldset("Resource details") { uncheck "Service" }
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    within('[data-flyer-builder-target="toolbar"]') do
+      find('summary[title="Advanced filtering"]').click
+      within_fieldset("Resource details") { expect(page).to have_unchecked_field("Service") }
+    end
+    expect(page).to have_no_css("article dt", text: "Services:")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
+  it "keeps the map and text size choices through a preview update and sends them when generating" do
+    visit_builder
+    find('summary[aria-label="Print settings"]').click
+    within_fieldset("Include map") { choose "No" }
+    slider = find('input[aria-label="Text size slider"]')
+    slider.send_keys(:home)
+    expect(page).to have_field("Text size", with: "8")
+    slider.send_keys(:right)
+    expect(page).to have_field("Text size", with: "8.5")
+    slider.send_keys(:end)
+    expect(page).to have_field("Text size", with: "25")
+    fill_in "Text size", with: "21.5"
+    expect(slider.value).to eq("21.5")
+    expect(slider["aria-valuetext"]).to eq("21.5 pixels")
+    find('summary[aria-label="Print settings"]').click
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+
+    page.execute_script(<<~JS)
+      window.open = () => null;
+      const request = window.fetch;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.submittedSettings = {
+            map: options.body.get("print_settings[include_map]"),
+            size: options.body.get("print_settings[text_size]"),
+          };
+        }
+        return request(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(page.evaluate_script("window.submittedSettings")).to eq({"map" => "no", "size" => "21.5"})
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)
@@ -507,6 +652,11 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
       expect(page).to have_text("1 resource included")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
+      find('summary[title="Advanced filtering"]').click
+      within_fieldset("Resource details") { uncheck "Distance and walking time" }
+      expect(page).to have_no_css("article", text: "Distance:")
+      within_fieldset("Resource details") { check "Distance and walking time" }
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       click_button "Generate printout"
 

@@ -87,11 +87,12 @@
         <div class="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-3">
           <div class="w-full min-w-0" role="search" aria-label="Find resources for your guide" hidden data-flyer-builder-target="desktopSearch"></div>
           <p class="min-w-0 flex-1 text-lg font-semibold text-stone-900">Categories</p>
+          <%= render "resource_details" %>
           <details class="relative hidden shrink-0 sm:block" data-flyer-builder-target="desktopSort"
                    data-action="pointerenter->flyer-builder#hoverDesktopSort pointerleave->flyer-builder#leaveDesktopSort keydown.esc->flyer-builder#closeDesktopSort">
             <summary aria-label="Sort resources"
-                     class="grid size-11 cursor-pointer list-none place-items-center rounded-lg border border-stone-200 text-stone-700 hover:bg-sage-50 focus-visible:outline-sage-600 [&::-webkit-details-marker]:hidden">
-              <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                     class="grid size-7.5 cursor-pointer list-none place-items-center rounded-md border border-stone-200 text-stone-700 hover:bg-sage-50 focus-visible:outline-sage-600 [&::-webkit-details-marker]:hidden">
+              <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M8 4v16m-4-4 4 4 4-4m4 4V4m-4 4 4-4 4 4" />
               </svg>
             </summary>
@@ -149,14 +150,17 @@
               <a class="inline-flex min-h-11 items-center font-medium text-sage-800 underline sm:mt-2" data-flyer-builder-target="pdfLink" target="_blank" rel="noopener">Open printout</a>
             </div>
           </div>
-          <%= form.button type: :submit,
-                class: "inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 disabled:cursor-not-allowed disabled:opacity-50 sm:col-start-2 sm:row-start-1 sm:w-auto",
-                data: { flyer_builder_target: "generate" } do %>
-            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 8.25V3.75h10.5v4.5m-10.5 9H4.5A2.25 2.25 0 0 1 2.25 15V10.5A2.25 2.25 0 0 1 4.5 8.25h15a2.25 2.25 0 0 1 2.25 2.25V15a2.25 2.25 0 0 1-2.25 2.25h-2.25m-10.5-3h10.5v6H6.75v-6Zm10.5-3h.008v.008h-.008v-.008Z" />
-            </svg>
-            <span data-flyer-builder-target="generateLabel">Generate printout</span>
-          <% end %>
+          <div class="flex items-center gap-2 sm:z-20 sm:col-start-2 sm:row-start-1">
+            <%= form.button type: :submit,
+                  class: "inline-flex min-h-11 min-w-0 flex-1 cursor-pointer items-center justify-center gap-2 rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 disabled:cursor-not-allowed disabled:opacity-50",
+                  data: { flyer_builder_target: "generate" } do %>
+              <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 8.25V3.75h10.5v4.5m-10.5 9H4.5A2.25 2.25 0 0 1 2.25 15V10.5A2.25 2.25 0 0 1 4.5 8.25h15a2.25 2.25 0 0 1 2.25 2.25V15a2.25 2.25 0 0 1-2.25 2.25h-2.25m-10.5-3h10.5v6H6.75v-6Zm10.5-3h.008v.008h-.008v-.008Z" />
+              </svg>
+              <span data-flyer-builder-target="generateLabel">Generate printout</span>
+            <% end %>
+            <%= render "print_settings" %>
+          </div>
         </div>
 
         <div class="sm:col-span-2 sm:row-start-2 sm:mt-6">
