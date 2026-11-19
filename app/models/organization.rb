@@ -2,6 +2,8 @@
 # Admins see which services each one runs. Imports will link services to the
 # organization a row names, matching it by name.
 class Organization < ApplicationRecord
+  include HasWebsite
+
   belongs_to :source, optional: true
   # Removing an organization keeps its services, unlinked.
   has_many :services, dependent: :nullify
@@ -17,7 +19,6 @@ class Organization < ApplicationRecord
 
   validates :name, presence: true
   validate :name_not_taken
-  validates :website, format: {with: WEB_ADDRESS, message: "must be a web address starting with http:// or https://"}, allow_nil: true
 
   scope :alphabetical, -> { order(:normalized_name) }
 

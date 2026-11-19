@@ -13,6 +13,7 @@ RSpec.describe ApplicationHelper, type: :helper do
     it "shows anything else as plain text, so it can't run" do
       expect(helper.web_link("javascript:alert(1)")).to eq("javascript:alert(1)")
       expect(helper.web_link("https://example.org\njavascript:alert(1)")).not_to include("<a")
+      expect(helper.web_link("https://:443")).to eq("https://:443")
     end
   end
 end

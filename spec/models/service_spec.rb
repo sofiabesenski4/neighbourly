@@ -18,6 +18,11 @@ RSpec.describe Service, type: :model do
     expect(service.errors.attribute_names).to include(:name, :source)
   end
 
+  it "only accepts a website that names a host" do
+    expect(source.services.build(name: "Lunch", website: "https://:443")).not_to be_valid
+    expect(source.services.build(name: "Lunch", website: "https://example.org")).to be_valid
+  end
+
   it "stores blank details as empty" do
     expect(service(phone: "  ", email: " info@example.org ").attributes.values_at("phone", "email")).to eq([nil, "info@example.org"])
   end
