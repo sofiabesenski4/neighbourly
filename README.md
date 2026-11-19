@@ -26,8 +26,8 @@ You need Ruby installed. We recommend using `rbenv` to manage your Ruby versions
 ```
 brew install rbenv
 brew install ruby-build
-rbenv install 4.0.4 # Or the version in .ruby-version
-rbenv local 4.0.4
+rbenv install 4.0.9 # Or the version in .ruby-version
+rbenv local 4.0.9
 ```
 
 ## Environment Variables
