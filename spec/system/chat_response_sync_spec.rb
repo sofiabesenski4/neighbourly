@@ -19,12 +19,9 @@ RSpec.describe "Chat response reconciliation", type: :system do
     page.execute_script("window.dispatchEvent(new Event('focus'))")
   end
 
-  it "shows the first reply when its initial message broadcast was missed" do
-    visit new_chat_path
-    fill_in "Prompt", with: "Find meals in Victoria"
-    click_button "Start new chat"
-
-    expect(page).to have_text("Getting ready")
+  # Cable connecting and the page loading each ask the server for missed replies, and a refresh
+  # that starts while another is running is dropped. Wait until both have finished.
+  def wait_for_initial_sync
     expect(page).to have_css("turbo-cable-stream-source[connected]", visible: :all)
     page.document.synchronize do
       synced = page.evaluate_script(<<~JS)
@@ -36,6 +33,15 @@ RSpec.describe "Chat response reconciliation", type: :system do
       JS
       raise Capybara::ElementNotFound unless synced
     end
+  end
+
+  it "shows the first reply when its initial message broadcast was missed" do
+    visit new_chat_path
+    fill_in "Prompt", with: "Find meals in Victoria"
+    click_button "Start new chat"
+
+    expect(page).to have_text("Getting ready")
+    wait_for_initial_sync
 
     record = user.chats.last.latest_response
     allow(ActionCable.server).to receive(:broadcast).and_wrap_original do |broadcast, stream, html, **options|
@@ -179,9 +185,16 @@ RSpec.describe "Chat response reconciliation", type: :system do
       record
     end
     visit chat_path(chat)
-    missing_ids = records.drop(1).flat_map { |record| [record.user_message_id, record.assistant_message_id] }
-    page.execute_script("arguments[0].forEach(id => document.getElementById(`message_${id}`).remove())", missing_ids)
     expect(page).to have_css("[data-response-id='#{records.last.id}']", visible: :all)
+    wait_for_initial_sync
+    missing_ids = records.drop(1).flat_map { |record| [record.user_message_id, record.assistant_message_id] }
+    # The page knows the latest status but has not synced replies over HTTP yet, so its
+    # boundary is still the start of the chat.
+    page.execute_script(<<~JS, missing_ids)
+      arguments[0].forEach(id => document.getElementById(`message_${id}`).remove());
+      const workspace = document.querySelector('[data-controller~="response-sync"]');
+      window.Stimulus.getControllerForElementAndIdentifier(workspace, 'response-sync').boundary = '0';
+    JS
 
     resume_page
 

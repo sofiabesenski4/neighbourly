@@ -27,6 +27,20 @@ RSpec.describe "Live resource guide builder", type: :system do
     click_button "Skip distances"
   end
 
+  # Crossing the desktop breakpoint moves the search field between the mobile toolbar and the
+  # sidebar, which shifts the controls next to it. The move happens on the window's resize event,
+  # a frame after the new layout applies, so wait for it before clicking or hovering.
+  def emulate_mobile
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    within("[data-flyer-builder-target='toolbar']") { expect(page).to have_field("Search resources") }
+  end
+
+  def clear_mobile_emulation
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+    within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)
@@ -245,8 +259,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     sort.send_keys(:escape)
     expect(page).to have_no_button("Name (A–Z)")
 
-    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
-      width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+    emulate_mobile
     find("button[aria-label='Filters (active)']").click
     within("#flyer-filters") do
       expect(page).to have_select("Sort by", options: options, selected: "Name (Z–A)")
@@ -255,7 +268,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       click_button "Apply filters"
     end
     expect(page).to have_css("article:first-child h4", text: "Alpha meals")
-    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+    clear_mobile_emulation
     find("summary[aria-label='Sort resources']").hover
     expect(page).to have_css("button[aria-pressed='true']", text: "Name (A–Z)")
     click_button "Category"
