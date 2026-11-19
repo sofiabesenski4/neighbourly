@@ -233,14 +233,13 @@ RSpec.describe "Documents", type: :request do
         expect(response).to redirect_to(document_path(document))
       end
 
-      it "gives a resource added before services existed its service, and keeps it in step" do
-        patch document_path(document), params: valid_params
-        service = document.reload.service
-        expect(service.name).to eq("Harbour Street Society")
+      it "keeps the resource's service in step" do
+        post documents_path, params: valid_params
+        created = Document.last
 
-        patch document_path(document), params: valid_params.deep_merge(document: {title: "Harbour Hub"})
+        patch document_path(created), params: valid_params.deep_merge(document: {title: "Harbour Hub"})
 
-        expect(service.reload.name).to eq("Harbour Hub")
+        expect(created.reload.service.name).to eq("Harbour Hub")
         expect(Service.count).to eq(1)
       end
 

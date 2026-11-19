@@ -110,8 +110,6 @@ RSpec.describe "sources rake tasks" do
       Source.create!(name: "Fetched", url: "https://example.com/a", source_type: "csv")
       Source.create!(name: "Uploaded CSV", source_type: "csv")
       Source.form_entry_source
-      # BC 211 JSON sources added before that input was removed aren't refreshed.
-      Source.new(name: "BC 211", url: "https://example.com/api", source_type: "api").save!(validate: false)
 
       expect { Rake::Task["sources:ingest_all"].invoke }
         .to output("Ingested 1 documents from 'Fetched'\n").to_stdout

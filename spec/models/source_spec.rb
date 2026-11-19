@@ -46,18 +46,7 @@ RSpec.describe Source, type: :model do
       expect(build_source(source_type: "form", url: nil)).to be_valid
       expect(build_source(source_type: "csv")).to be_valid
       expect(build_source(source_type: "rss")).not_to be_valid
-    end
-
-    # BC 211 JSON input was removed. Sources added before still save, so they
-    # can be renamed, reported on and deleted.
-    it "no longer allows new api sources, but keeps old ones valid" do
-      new_api = build_source(source_type: "api")
-      expect(new_api).not_to be_valid
-      expect(new_api.errors[:source_type]).to include("can't be API anymore")
-
-      legacy = build_source(source_type: "api")
-      legacy.save!(validate: false)
-      expect(legacy.update(name: "Renamed")).to be(true)
+      expect(build_source(source_type: "api")).not_to be_valid
     end
 
     it "does not require a url for form sources" do
@@ -90,7 +79,6 @@ RSpec.describe Source, type: :model do
 
   describe "scopes" do
     before do
-      Source.new(name: "API Source", url: "https://example.com/api", source_type: "api").save!(validate: false)
       Source.create!(name: "HTML Source", url: "https://example.com/page", source_type: "html")
       Source.create!(name: "CSV Source", source_type: "csv")
     end
@@ -111,21 +99,19 @@ RSpec.describe Source, type: :model do
     end
   end
 
-  describe "#api?, #html?, and #form?" do
+  describe "#html?, #form?, and #csv?" do
     it "returns true for matching type" do
-      api_source = build_source(source_type: "api")
       html_source = build_source(source_type: "html")
       form_source = build_source(source_type: "form", url: nil)
+      csv_source = build_source(source_type: "csv", url: nil)
 
-      expect(api_source.api?).to be true
-      expect(api_source.html?).to be false
-      expect(api_source.form?).to be false
       expect(html_source.html?).to be true
-      expect(html_source.api?).to be false
+      expect(html_source.form?).to be false
+      expect(html_source.csv?).to be false
       expect(form_source.form?).to be true
-      expect(form_source.api?).to be false
-      expect(build_source(source_type: "csv", url: nil).csv?).to be true
-      expect(api_source.csv?).to be false
+      expect(form_source.html?).to be false
+      expect(csv_source.csv?).to be true
+      expect(csv_source.html?).to be false
     end
   end
 

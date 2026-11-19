@@ -76,17 +76,6 @@ RSpec.describe "Sources", type: :system do
       expect(page).to have_content("1 document")
     end
 
-    # BC 211 JSON can no longer be added, but sources added before stay listed.
-    it "still lists an API source added before that input was removed" do
-      legacy = Source.new(name: "BC 211 Shelters", url: "https://example.com/shelters", source_type: "api")
-      legacy.save!(validate: false)
-
-      visit sources_path
-
-      expect(page).to have_content("BC 211 Shelters")
-      expect(page).to have_content("API")
-    end
-
     it "subscribes the sources list to one refresh stream" do
       2.times { |i| Source.create!(name: "Uploaded #{i}", source_type: "csv") }
 

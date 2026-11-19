@@ -51,13 +51,13 @@ RSpec.describe DocumentPolicy do
     end
 
     let!(:form_document) { source.documents.create!(content: "form doc", title: "Form Resource") }
-    let!(:api_source) { Source.create!(name: "API", url: "https://example.com", source_type: "csv") }
-    let!(:api_document) { api_source.documents.create!(content: "api doc", external_id: "1") }
+    let!(:csv_source) { Source.create!(name: "Directory", url: "https://example.com", source_type: "csv") }
+    let!(:csv_document) { csv_source.documents.create!(content: "csv doc", external_id: "1") }
 
     it "returns only form-source documents for admin" do
       scope = described_class::Scope.new(admin, Document).resolve
       expect(scope).to include(form_document)
-      expect(scope).not_to include(api_document)
+      expect(scope).not_to include(csv_document)
     end
 
     it "returns nothing for regular user" do

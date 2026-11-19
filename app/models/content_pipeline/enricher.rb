@@ -60,8 +60,8 @@ module ContentPipeline
           @document.enriched_at = Time.current
           @document.save_with_category_names!(result[:categories])
           # Loaded under the lock, so an import rewriting the row can't be
-          # overwritten with an older copy. Rows imported before services
-          # existed have none yet.
+          # overwritten with an older copy. An admin may have deleted the
+          # row's service, so there may be none.
           service = @document.service
           if service
             fill_in_service(service, result)
