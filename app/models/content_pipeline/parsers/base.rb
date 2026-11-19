@@ -30,9 +30,10 @@ module ContentPipeline
         return if text.empty?
         # The same check services and organizations validate with, so a value
         # kept here never stops the service from saving.
-        return text if text.match?(ApplicationRecord::WEB_ADDRESS)
+        return text if ApplicationRecord.web_address?(text)
 
-        "https://#{text}" if text.match?(/\A[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?\z/i)
+        link = "https://#{text}"
+        link if text.match?(/\A[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?\z/i) && ApplicationRecord.web_address?(link)
       end
     end
   end

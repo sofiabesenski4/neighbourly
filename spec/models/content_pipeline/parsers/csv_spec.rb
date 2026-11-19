@@ -189,10 +189,12 @@ RSpec.describe ContentPipeline::Parsers::Csv do
       end
 
       it "keeps a website with no host in additional details" do
-        chunk = parser.parse("Name,Website\nHarbour Meals,https://?\n").first
+        ["https://?", "https://:443"].each do |website|
+          chunk = parser.parse("Name,Website\nHarbour Meals,#{website}\n").first
 
-        expect(chunk[:service]).not_to have_key(:website)
-        expect(chunk[:service][:additional_details]).to eq("Website" => "https://?")
+          expect(chunk[:service]).not_to have_key(:website)
+          expect(chunk[:service][:additional_details]).to eq("Website" => website)
+        end
       end
 
       it "keeps a website that isn't a web address in additional details" do
