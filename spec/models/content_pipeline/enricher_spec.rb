@@ -234,4 +234,13 @@ RSpec.describe ContentPipeline::Enricher do
     )
     expect(document.content).to start_with("Free hot lunches on weekdays.")
   end
+
+  # A service's address waits while its row awaits enrichment, so enrichment
+  # queues its lookup once it has saved.
+  it "queues the lookup for the address of the service read from this row" do
+    source.update!(enrich_documents: true)
+    service = source.services.create!(name: "Harbour Meals", document: document, address_attributes: {street_address: "100 Harbour St"})
+
+    expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob).with(service.address)
+  end
 end

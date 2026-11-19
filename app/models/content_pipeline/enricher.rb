@@ -64,6 +64,8 @@ module ContentPipeline
       # The row waited for enrichment before its lookup. Its address may have
       # come from its columns, unchanged by this save, so queue the lookup here.
       @document.address&.locate_later if saved && !queued_by_save
+      # The service read from this row waited for the same reason.
+      @document.service&.address&.locate_later if saved
       saved
     end
 

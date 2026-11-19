@@ -38,6 +38,12 @@ RSpec.describe Organization, type: :model do
     expect(organization.errors[:website]).to include("must be a web address starting with http:// or https://")
   end
 
+  it "rejects a web address with no host" do
+    expect(Organization.new(name: "Our Place Society", website: "https://?")).not_to be_valid
+    expect(Organization.new(name: "Our Place Society", website: "https://")).not_to be_valid
+    expect(Organization.new(name: "Our Place Society", website: "HTTPS://example.org/path?q=1")).to be_valid
+  end
+
   it "rejects a web address with anything on a second line" do
     organization = Organization.new(name: "Our Place Society", website: "https://example.org\njavascript:alert(1)")
 
