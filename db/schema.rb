@@ -279,7 +279,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000300) do
     t.bigint "document_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.jsonb "details", default: {}, null: false
+    t.jsonb "additional_details", default: {}, null: false
     t.index ["document_id"], name: "index_services_on_document_id", unique: true
     t.index ["organization_id"], name: "index_services_on_organization_id"
     t.index ["source_id"], name: "index_services_on_source_id"

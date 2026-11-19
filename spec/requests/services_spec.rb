@@ -76,7 +76,7 @@ RSpec.describe "Services", type: :request do
     end
 
     it "lists details that have no field of their own" do
-      service.update!(details: {"languages" => ["English", "Punjabi"], "intake_steps" => {"referral" => false}, "bring" => ""})
+      service.update!(additional_details: {"languages" => ["English", "Punjabi"], "intake_steps" => {"referral" => false}, "bring" => ""})
 
       get service_path(service)
 

@@ -39,7 +39,7 @@
       <dd class="mt-2 break-all text-sm leading-6"><%= link_to @service.website, @service.website, target: "_blank", rel: "noopener noreferrer", class: "admin-link" %></dd>
     </div>
   <% end %>
-  <% @service.details.each do |key, value| %>
+  <% @service.additional_details.each do |key, value| %>
     <% next if value.blank? %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="break-words text-sm font-medium text-stone-500"><%= key.to_s.humanize %></dt>
