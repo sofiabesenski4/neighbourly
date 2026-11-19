@@ -102,7 +102,7 @@ RSpec.describe "Documents", type: :request do
 
         document = Document.last
         expect(GeocodeAddressJob).to have_been_enqueued.with(document.address)
-        expect(GeocodeAddressJob).to have_been_enqueued.with(document.service)
+        expect(GeocodeAddressJob).to have_been_enqueued.with(document.service.address)
       end
 
       it "saves the location and phone on the address and the rest in metadata" do
@@ -152,9 +152,10 @@ RSpec.describe "Documents", type: :request do
         service = Document.last.service
         expect(service).to have_attributes(
           name: "Harbour Street Society", organization: organization, source: form_source,
-          address_line: "100 Harbour St", city: "Victoria", phone: "250-555-0100", hours: "Mon-Sun 7am-11pm",
+          phone: "250-555-0100", hours: "Mon-Sun 7am-11pm",
           website: "https://example.org", description: "Drop-in centre offering meals and shelter"
         )
+        expect(service.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
         expect(service.category_names).to eq(["Clothing", "Meals", "Shelters"])
         expect(service.additional_details).to eq(
           "age_range" => {"min" => 19}, "gender" => ["all"], "notes" => "No referral needed"

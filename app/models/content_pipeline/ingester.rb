@@ -7,8 +7,9 @@ module ContentPipeline
   #   Ingester.new(source).ingest(string) — ingests raw content directly (file upload)
   class Ingester
     # What a changed row no longer says is cleared from its service.
-    CLEARED_SERVICE_FIELDS = %i[description hours phone email website address_line city province postal_code country]
+    CLEARED_SERVICE_FIELDS = %i[description hours phone email website]
       .index_with(nil).merge(closed: false, additional_details: {}).freeze
+    CLEARED_ADDRESS_FIELDS = %i[street_address city province postal_code country].index_with(nil).freeze
 
     def initialize(source)
       @source = source
@@ -109,21 +110,28 @@ module ContentPipeline
     end
 
     # The service this row describes, linked to the organization it names.
-    # Like the address, it is set again from a changed row, clearing what
-    # enrichment filled in. Coordinates are only replaced when the row gives
-    # them, so a lookup already made for the same address is kept.
+    # Like the resource, it is set again from a changed row, clearing what
+    # enrichment filled in.
     def write_service(document, chunk)
       return unless chunk[:service]
 
-      attributes = chunk[:service].dup
-      attributes.delete(:lat) if attributes[:lat].blank?
-      attributes.delete(:lng) if attributes[:lng].blank?
-
       service = document.service || @source.services.build(document: document)
-      service.assign_attributes(CLEARED_SERVICE_FIELDS.merge(attributes))
+      service.assign_attributes(CLEARED_SERVICE_FIELDS.merge(chunk[:service]))
+      write_service_address(service, chunk[:address] || {})
       service.organization = Organization.for_name(chunk.dig(:organization, :name), source: @source)
       service.categories = document.categories
       service.save!
+    end
+
+    # The service's address is where the row says, the same as the resource's.
+    # Coordinates are only replaced when the row gives them, so a lookup
+    # already made for the same address is kept.
+    def write_service_address(service, row_address)
+      location = row_address.slice(*CLEARED_ADDRESS_FIELDS.keys).compact_blank
+      coordinates = row_address.slice(:lat, :lng).compact_blank
+      return if service.address.nil? && location.empty? && coordinates.empty?
+
+      (service.address || service.build_address).assign_attributes(CLEARED_ADDRESS_FIELDS.merge(location).merge(coordinates))
     end
   end
 end

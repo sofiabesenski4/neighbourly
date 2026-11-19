@@ -65,7 +65,7 @@ module ContentPipeline
           service = @document.service
           if service
             fill_in_service(service, result)
-            service_queued_by_save = service.address_line_changed? || service.city_changed?
+            service_queued_by_save = service.address.present? && (service.address.street_address_changed? || service.address.city_changed?)
             service.save!
           end
           true
@@ -100,9 +100,11 @@ module ContentPipeline
     def fill_in_service(service, result)
       service.name = result[:title] if result[:title]
       service.description ||= result[:summary]
-      service.address_line ||= result[:address][:street_address]
-      service.city ||= result[:address][:city]
       service.phone ||= result[:address][:phone]
+      found = result[:address].slice(:street_address, :city).compact
+      address = service.address
+      blanks = found.select { |field, _value| address.nil? || address.public_send(field).blank? }
+      (address || service.build_address).assign_attributes(blanks) if blanks.any?
       service.organization ||= Organization.for_name(result[:organization], source: @document.source)
       service.categories = @document.categories
     end

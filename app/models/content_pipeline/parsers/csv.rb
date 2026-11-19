@@ -16,9 +16,13 @@ module ContentPipeline
       # Column names that hold a row's address, compared after lowercasing
       # and turning anything but letters into single spaces, so "Street
       # Address", "street_address" and "STREET-ADDRESS" all match.
+      # The resource and its service both take their address from these.
       ADDRESS_HEADERS = {
-        street_address: ["address", "street address", "street"],
+        street_address: ["address", "street address", "street", "address line", "address line 1", "address 1"],
         city: ["city", "town", "municipality"],
+        province: ["province", "state", "province or state", "state or province", "prov"],
+        postal_code: ["postal code", "postcode", "postal", "zip", "zip code"],
+        country: ["country"],
         phone: ["phone", "phone number", "telephone"],
         lat: ["lat", "latitude"],
         lng: ["lng", "lon", "long", "longitude"]
@@ -29,21 +33,15 @@ module ContentPipeline
         "agency", "agency name", "provider", "provider name", "operator", "operated by", "run by"].freeze
 
       # Columns that fill in the service's own fields, compared the same way.
-      # The first filled-in match wins. Every other column with a value is
-      # kept in the service's additional details under its own header.
+      # The first filled-in match wins. Every other column with a value, apart
+      # from the address, is kept in the service's additional details under its
+      # own header.
       SERVICE_HEADERS = {
         description: ["description", "service description", "services", "about", "summary"],
         hours: ["hours", "hours of operation", "opening hours", "schedule"],
         phone: ADDRESS_HEADERS[:phone] + ["tel"],
         email: ["email", "e mail", "email address"],
-        website: ["website", "web site", "web", "url", "site"],
-        address_line: ADDRESS_HEADERS[:street_address] + ["address line", "address line 1", "address 1"],
-        city: ADDRESS_HEADERS[:city],
-        province: ["province", "state", "province or state", "state or province", "prov"],
-        postal_code: ["postal code", "postcode", "postal", "zip", "zip code"],
-        country: ["country"],
-        lat: ADDRESS_HEADERS[:lat],
-        lng: ADDRESS_HEADERS[:lng]
+        website: ["website", "web site", "web", "url", "site"]
       }.freeze
 
       # One "Header: value" line per filled-in cell. Enrichment keeps these
@@ -69,14 +67,15 @@ module ContentPipeline
           title_header, title = title_for(fields)
           id_header, external_id = external_id_for(fields)
           organization_header, organization = first_match(fields, ORGANIZATION_HEADERS)
+          address, address_headers = address_for(fields)
           {
             title: title,
             content: self.class.render_fields(fields),
             external_id: external_id,
             categories: [],
             metadata: fields,
-            address: address_for(fields),
-            service: service_for(fields, title, used: [title_header, id_header, organization_header]),
+            address: address,
+            service: service_for(fields, title, used: [title_header, id_header, organization_header, *address_headers]),
             organization: organization && {name: organization}
           }
         end
@@ -171,13 +170,12 @@ module ContentPipeline
         names.lazy.filter_map { |name| by_key[name] }.first
       end
 
-      # The first filled-in column for each part of the address. Enrichment
-      # fills in parts the columns don't give.
+      # The first filled-in column for each part of the address, and the
+      # columns used, so those aren't kept again in the service's additional
+      # details. Enrichment fills in parts the columns don't give.
       def address_for(fields)
-        by_name = fields.each_with_object({}) do |(header, value), found|
-          found[self.class.header_key(header)] ||= value if value.present?
-        end
-        ADDRESS_HEADERS.transform_values { |names| by_name.values_at(*names).compact.first }
+        matches = ADDRESS_HEADERS.transform_values { |names| first_match(fields, names) }
+        [matches.transform_values { |match| match&.last }, matches.values.compact.map(&:first)]
       end
 
       # The ID column and its value, or a hash of the row when it has none.

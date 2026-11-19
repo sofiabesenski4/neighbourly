@@ -42,10 +42,6 @@ class Service < ApplicationRecord
     address&.coordinates
   end
 
-  def location_twins
-    [document&.address].compact
-  end
-
   private
 
   def additional_details_is_an_object

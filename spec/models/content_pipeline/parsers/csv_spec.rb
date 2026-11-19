@@ -31,7 +31,10 @@ RSpec.describe ContentPipeline::Parsers::Csv do
     it "reads the address from columns it recognises, keeping the row whole in metadata" do
       chunks = parser.parse(csv)
 
-      expect(chunks.first[:address]).to eq(street_address: "100 Harbour St", city: nil, phone: "250-555-0100", lat: nil, lng: nil)
+      expect(chunks.first[:address]).to eq(
+        street_address: "100 Harbour St", city: nil, province: nil, postal_code: nil, country: nil,
+        phone: "250-555-0100", lat: nil, lng: nil
+      )
       expect(chunks.first[:metadata]).to include("Address" => "100 Harbour St", "Phone" => "250-555-0100")
       expect(chunks.last[:address]).to include(street_address: "22 North Rd", phone: nil)
     end
@@ -39,7 +42,10 @@ RSpec.describe ContentPipeline::Parsers::Csv do
     it "recognises address columns whatever their spelling" do
       chunk = parser.parse("Name,STREET_ADDRESS,Town,Phone Number,Latitude,Longitude\nHarbour,1 Main St,Sidney,250-555-0100,48.6,-123.4\n").first
 
-      expect(chunk[:address]).to eq(street_address: "1 Main St", city: "Sidney", phone: "250-555-0100", lat: "48.6", lng: "-123.4")
+      expect(chunk[:address]).to eq(
+        street_address: "1 Main St", city: "Sidney", province: nil, postal_code: nil, country: nil,
+        phone: "250-555-0100", lat: "48.6", lng: "-123.4"
+      )
     end
 
     it "keeps blank cells in metadata as nil" do
@@ -161,10 +167,16 @@ RSpec.describe ContentPipeline::Parsers::Csv do
 
       it "fills the service's fields from the columns that match them" do
         expect(chunk[:service]).to include(
-          name: "Community Lunch", description: "Hot lunch", address_line: "100 Harbour St", city: "Victoria",
-          province: "BC", postal_code: "V8W 1A1", country: "Canada", phone: "250-555-0101",
+          name: "Community Lunch", description: "Hot lunch", phone: "250-555-0101",
           email: "lunch@example.org", website: "https://example.org/lunch"
         )
+      end
+
+      it "reads the whole address, which the resource and its service share" do
+        expect(chunk[:address]).to include(
+          street_address: "100 Harbour St", city: "Victoria", province: "BC", postal_code: "V8W 1A1", country: "Canada"
+        )
+        expect(chunk[:service]).not_to include(:street_address, :city, :province)
       end
 
       it "names the organization from its column, without taking it as the title" do

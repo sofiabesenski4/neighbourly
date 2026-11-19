@@ -255,9 +255,9 @@ RSpec.describe ContentPipeline::Ingester do
 
           document = source.documents.find_by!(external_id: "1")
           expect(document.service).to have_attributes(
-            name: "Harbour Meals", address_line: "100 Harbour St", phone: "250-555-0101",
-            source: source, additional_details: {"Ages" => "All ages"}
+            name: "Harbour Meals", phone: "250-555-0101", source: source, additional_details: {"Ages" => "All ages"}
           )
+          expect(document.service.address).to have_attributes(street_address: "100 Harbour St", addressable: document.service)
         end
 
         it "links rows naming the same organization to one organization, first seen in this source" do
@@ -278,17 +278,18 @@ RSpec.describe ContentPipeline::Ingester do
         it "sets a changed row's service again, clearing what the row no longer says" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
-          service.update_columns(city: "Victoria", lat: 48.43, lng: -123.37)
+          service.address.update_columns(city: "Victoria", lat: 48.43, lng: -123.37)
 
           described_class.new(source).ingest(csv.sub("100 Harbour St,250-555-0101,All ages", "200 Harbour St,,All ages"))
 
-          expect(service.reload).to have_attributes(address_line: "200 Harbour St", city: nil, phone: nil, coordinates: nil)
+          expect(service.reload.phone).to be_nil
+          expect(service.address).to have_attributes(street_address: "200 Harbour St", city: nil, coordinates: nil)
         end
 
         it "keeps a service's coordinates when its row changes elsewhere" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
-          service.update_columns(lat: 48.43, lng: -123.37)
+          service.address.update_columns(lat: 48.43, lng: -123.37)
 
           described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
 

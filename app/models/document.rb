@@ -35,8 +35,9 @@ class Document < ApplicationRecord
   # values clear a field. Coordinates are only replaced when given, so a lookup
   # already made for the same address is kept. Nothing is created for a
   # resource that has no address details at all.
-  def assign_address(street_address: nil, city: nil, phone: nil, lat: nil, lng: nil)
-    details = {street_address: street_address.presence, city: city.presence, phone: phone.presence}
+  def assign_address(street_address: nil, city: nil, province: nil, postal_code: nil, country: nil, phone: nil, lat: nil, lng: nil)
+    details = {street_address: street_address.presence, city: city.presence, province: province.presence,
+               postal_code: postal_code.presence, country: country.presence, phone: phone.presence}
     return if address.nil? && details.values.none? && lat.blank? && lng.blank?
 
     (address || build_address).assign_attributes(details.merge({lat: lat, lng: lng}.compact_blank))

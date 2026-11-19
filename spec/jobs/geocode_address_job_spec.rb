@@ -37,10 +37,11 @@ RSpec.describe GeocodeAddressJob, type: :job do
   it "gives the same coordinates to the resource's service at that address" do
     allow(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC").and_return(point)
     saved = address(street_address: "919 Pandora Ave", city: "Victoria")
-    service = source.services.create!(name: "Resource", document: saved.document, address_line: "919 Pandora Ave", city: "Victoria")
+    service = source.services.create!(name: "Resource", document: saved.addressable,
+      address_attributes: {street_address: "919 Pandora Ave", city: "Victoria"})
 
     described_class.perform_now(saved)
-    described_class.perform_now(service)
+    described_class.perform_now(service.address)
 
     expect(service.reload.coordinates).to eq(point)
     expect(Geocoder).to have_received(:locate).once
@@ -49,7 +50,8 @@ RSpec.describe GeocodeAddressJob, type: :job do
   it "leaves a service at a different address alone" do
     allow(Geocoder).to receive(:locate).and_return(point)
     saved = address(street_address: "919 Pandora Ave", city: "Victoria")
-    service = source.services.create!(name: "Resource", document: saved.document, address_line: "535 Ellice St", city: "Victoria")
+    service = source.services.create!(name: "Resource", document: saved.addressable,
+      address_attributes: {street_address: "535 Ellice St", city: "Victoria"})
 
     described_class.perform_now(saved)
 

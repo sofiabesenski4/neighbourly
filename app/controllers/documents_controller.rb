@@ -104,11 +104,13 @@ class DocumentsController < ApplicationController
     p = document_params
     service = @document.service || @document.source.services.build(document: @document)
     service.assign_attributes(
-      name: p[:title], description: p[:description], address_line: p[:address], city: p[:city],
+      name: p[:title], description: p[:description],
       phone: @document.address&.phone, email: p[:email], website: p[:website], hours: p[:hours],
       organization_id: p[:organization_id].presence,
       additional_details: build_metadata.slice(:age_range, :gender, :notes).deep_stringify_keys
     )
+    location = {street_address: p[:address].presence, city: p[:city].presence}
+    (service.address || service.build_address).assign_attributes(location) if service.address || location.values.any?
     service.categories = @document.categories
     service
   end

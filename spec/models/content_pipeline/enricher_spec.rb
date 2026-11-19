@@ -236,7 +236,9 @@ RSpec.describe ContentPipeline::Enricher do
   end
 
   describe "the row's service" do
-    let(:service) { source.services.create!(name: "Harbour Meals", document: document, address_line: "100 Harbour St") }
+    let(:service) do
+      source.services.create!(name: "Harbour Meals", document: document, address_attributes: {street_address: "100 Harbour St"})
+    end
 
     before do
       service
@@ -249,9 +251,9 @@ RSpec.describe ContentPipeline::Enricher do
       described_class.new(document).enrich!
 
       expect(service.reload).to have_attributes(
-        name: "Harbour Community Meals", description: "Free hot lunches on weekdays.",
-        address_line: "100 Harbour St", city: "Victoria", phone: "250-555-0100"
+        name: "Harbour Community Meals", description: "Free hot lunches on weekdays.", phone: "250-555-0100"
       )
+      expect(service.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
       expect(service.category_names).to eq(["Meals"])
     end
 
@@ -272,7 +274,7 @@ RSpec.describe ContentPipeline::Enricher do
     end
 
     it "queues the service's lookup once the row has waited for enrichment" do
-      expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob).with(service)
+      expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob).with(service.address)
     end
 
     it "leaves the service alone when the row changed while the model was answering" do

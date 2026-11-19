@@ -91,6 +91,13 @@ RSpec.describe Organization, type: :model do
     end
   end
 
+  it "has an address of its own, removed with it" do
+    organization = Organization.create!(name: "Our Place Society", address_attributes: {street_address: "919 Pandora Ave", city: "Victoria"})
+
+    expect(organization.reload.address).to have_attributes(street_address: "919 Pandora Ave", addressable: organization)
+    expect { organization.destroy! }.to change(Address, :count).by(-1)
+  end
+
   it "keeps its services, unlinked, when it is deleted" do
     organization = Organization.create!(name: "Our Place Society")
     service = source.services.create!(name: "Community lunch", organization: organization)
