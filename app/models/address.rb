@@ -84,6 +84,10 @@ class Address < ApplicationRecord
     end
   end
 
+  def location_twins
+    [document.service].compact
+  end
+
   private
 
   def moved?

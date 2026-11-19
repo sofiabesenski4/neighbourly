@@ -8,7 +8,7 @@ require "rails_helper"
 RSpec.describe GeocodeAddressJob, type: :job do
   include ActiveJob::TestHelper
 
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
   let(:point) { GeoPoint.new(lat: 48.4271129, lng: -123.3577635) }
 
   # Saving a resource normally calls an embedding service. Tests must not.
@@ -32,6 +32,30 @@ RSpec.describe GeocodeAddressJob, type: :job do
   end
 
   # Saving coordinates must not cost an embedding call or trigger another lookup.
+  # The address and the service each queue a lookup. Sharing the answer means
+  # the second job finds coordinates and doesn't call the geocoder again.
+  it "gives the same coordinates to the resource's service at that address" do
+    allow(Geocoder).to receive(:locate).with("919 Pandora Ave, Victoria, BC").and_return(point)
+    saved = address(street_address: "919 Pandora Ave", city: "Victoria")
+    service = source.services.create!(name: "Resource", document: saved.document, address_line: "919 Pandora Ave", city: "Victoria")
+
+    described_class.perform_now(saved)
+    described_class.perform_now(service)
+
+    expect(service.reload.coordinates).to eq(point)
+    expect(Geocoder).to have_received(:locate).once
+  end
+
+  it "leaves a service at a different address alone" do
+    allow(Geocoder).to receive(:locate).and_return(point)
+    saved = address(street_address: "919 Pandora Ave", city: "Victoria")
+    service = source.services.create!(name: "Resource", document: saved.document, address_line: "535 Ellice St", city: "Victoria")
+
+    described_class.perform_now(saved)
+
+    expect(service.reload.coordinates).to be_nil
+  end
+
   it "doesn't regenerate the embedding or queue itself again" do
     allow(Geocoder).to receive(:locate).and_return(point)
     saved = address(street_address: "919 Pandora Ave")

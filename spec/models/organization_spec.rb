@@ -59,6 +59,38 @@ RSpec.describe Organization, type: :model do
     expect { organization.destroy! }.to change(Address, :count).by(-1)
   end
 
+  describe ".for_name" do
+    it "finds the organization whatever the case and spacing" do
+      existing = Organization.create!(name: "Our Place Society")
+
+      expect(Organization.for_name("  our place  SOCIETY")).to eq(existing)
+    end
+
+    it "creates one, first seen in the given source, when there is none" do
+      created = Organization.for_name("Harbourside Society", source: source)
+
+      expect(created).to be_persisted
+      expect(created).to have_attributes(name: "Harbourside Society", source: source)
+    end
+
+    it "finds the one a concurrent import just created" do
+      existing = Organization.create!(name: "Our Place Society")
+      # The first lookup misses it, as if the other import committed just after.
+      lookups = 0
+      allow(Organization).to receive(:find_by).and_wrap_original do |original, *args, **options|
+        lookups += 1
+        original.call(*args, **options) unless lookups == 1
+      end
+
+      expect(Organization.for_name("Our Place Society")).to eq(existing)
+    end
+
+    it "gives nothing for a blank name" do
+      expect(Organization.for_name("  ")).to be_nil
+      expect(Organization.count).to eq(0)
+    end
+  end
+
   it "keeps its services, unlinked, when it is deleted" do
     organization = Organization.create!(name: "Our Place Society")
     service = source.services.create!(name: "Community lunch", organization: organization)

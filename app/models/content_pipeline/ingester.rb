@@ -6,6 +6,10 @@ module ContentPipeline
   #   Ingester.new(source).call           — fetches content from source URL
   #   Ingester.new(source).ingest(string) — ingests raw content directly (file upload)
   class Ingester
+    # What a changed row no longer says is cleared from its service.
+    CLEARED_SERVICE_FIELDS = %i[description hours phone email website address_line city province postal_code country]
+      .index_with(nil).merge(closed: false, additional_details: {}).freeze
+
     def initialize(source)
       @source = source
       @parser = parser_for(source)
@@ -97,8 +101,31 @@ module ContentPipeline
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
-      document.save_with_category_names!(chunk[:categories] || [])
+      # One transaction, so a row never ends up with a document but no
+      # service, or a service read from an older version of the row.
+      Document.transaction do
+        document.save_with_category_names!(chunk[:categories] || [])
+        write_service(document, chunk)
+      end
       document
+    end
+
+    # The service this row describes, linked to the organization it names.
+    # Like the address, it is set again from a changed row, clearing what
+    # enrichment filled in. Coordinates are only replaced when the row gives
+    # them, so a lookup already made for the same address is kept.
+    def write_service(document, chunk)
+      return unless chunk[:service]
+
+      attributes = chunk[:service].dup
+      attributes.delete(:lat) if attributes[:lat].blank?
+      attributes.delete(:lng) if attributes[:lng].blank?
+
+      service = document.service || @source.services.build(document: document)
+      service.assign_attributes(CLEARED_SERVICE_FIELDS.merge(attributes))
+      service.organization = Organization.for_name(chunk.dig(:organization, :name), source: @source)
+      service.categories = document.categories
+      service.save!
     end
   end
 end

@@ -35,16 +35,25 @@ class GeocodeAddressJob < ApplicationJob
     point = Geocoder.locate(query)
     return if point.nil?
 
+    # A resource's address and its service usually hold the same address, and
+    # each queues a lookup. The answer goes to both, so the second job finds
+    # coordinates and skips its call.
+    [address, *address.location_twins].each { |record| save_point(record, query, point) }
+  end
+
+  private
+
+  def save_point(record, query, point)
     # Someone could edit the address during the network call. Lock its row and
     # reload it, so this can't overwrite that edit with an older copy.
-    address.with_lock do
+    record.with_lock do
       # If the address changed during the lookup, these coordinates belong to the
       # old one. The edit will have queued its own lookup for the new one.
-      next unless address.geocoding_query == query
+      next unless record.geocoding_query == query && record.coordinates.nil?
 
       # update_columns skips callbacks, so saving coordinates can't queue
       # another lookup.
-      address.update_columns(lat: point.lat, lng: point.lng)
+      record.update_columns(lat: point.lat, lng: point.lng)
     end
   end
 end

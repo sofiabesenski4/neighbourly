@@ -150,5 +150,42 @@ RSpec.describe ContentPipeline::Parsers::Csv do
       expect { parser.parse("Name,Notes\nHarbour,\"unclosed\n") }
         .to raise_error(ContentPipeline::Parsers::ParseError, /could not be read as CSV/)
     end
+
+    describe "the service a row describes" do
+      let(:csv) do
+        "ID,Program Name,Organization Name,Description,Street Address,City,State,Zip,Country,Phone,E-mail,Website,Ages,Notes\n" \
+          "7,Community Lunch,Harbourside Society,Hot lunch,100 Harbour St,Victoria,BC,V8W 1A1,Canada,250-555-0101," \
+          "lunch@example.org,example.org/lunch,All ages,\n"
+      end
+      let(:chunk) { parser.parse(csv).first }
+
+      it "fills the service's fields from the columns that match them" do
+        expect(chunk[:service]).to include(
+          name: "Community Lunch", description: "Hot lunch", address_line: "100 Harbour St", city: "Victoria",
+          province: "BC", postal_code: "V8W 1A1", country: "Canada", phone: "250-555-0101",
+          email: "lunch@example.org", website: "https://example.org/lunch"
+        )
+      end
+
+      it "names the organization from its column, without taking it as the title" do
+        expect(chunk[:organization]).to eq(name: "Harbourside Society")
+        expect(chunk[:title]).to eq("Community Lunch")
+      end
+
+      it "keeps every other filled-in column in additional details" do
+        expect(chunk[:service][:additional_details]).to eq("Ages" => "All ages")
+      end
+
+      it "keeps a website that isn't a web address in additional details" do
+        chunk = parser.parse("Name,Website\nHarbour Meals,ask at the desk\n").first
+
+        expect(chunk[:service]).not_to have_key(:website)
+        expect(chunk[:service][:additional_details]).to eq("Website" => "ask at the desk")
+      end
+
+      it "names no organization when the row has no organization column" do
+        expect(parser.parse("Name,Phone\nHarbour Meals,111\n").first[:organization]).to be_nil
+      end
+    end
   end
 end

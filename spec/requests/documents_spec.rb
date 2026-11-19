@@ -94,9 +94,15 @@ RSpec.describe "Documents", type: :request do
 
       # Checks the real form path end to end: submitting the form ends with a lookup
       # queued. address_spec.rb covers the rules for when a lookup is needed.
-      it "queues a coordinate lookup for the new resource's address" do
+      # The resource's address and its service each hold coordinates until the
+      # printout and map read services, so each gets a lookup.
+      it "queues a coordinate lookup for the new resource's address and its service" do
         expect { post documents_path, params: valid_params }
-          .to have_enqueued_job(GeocodeAddressJob)
+          .to have_enqueued_job(GeocodeAddressJob).exactly(2).times
+
+        document = Document.last
+        expect(GeocodeAddressJob).to have_been_enqueued.with(document.address)
+        expect(GeocodeAddressJob).to have_been_enqueued.with(document.service)
       end
 
       it "saves the location and phone on the address and the rest in metadata" do
@@ -136,6 +142,32 @@ RSpec.describe "Documents", type: :request do
       it "renders the form again when content is blank" do
         post documents_path, params: {document: {title: "", description: ""}}
         expect(response).to have_http_status(:unprocessable_entity)
+      end
+
+      it "saves the resource's service, offered by the chosen organization" do
+        organization = Organization.create!(name: "Harbourside Society")
+
+        post documents_path, params: valid_params.deep_merge(document: {organization_id: organization.id})
+
+        service = Document.last.service
+        expect(service).to have_attributes(
+          name: "Harbour Street Society", organization: organization, source: form_source,
+          address_line: "100 Harbour St", city: "Victoria", phone: "250-555-0100", hours: "Mon-Sun 7am-11pm",
+          website: "https://example.org", description: "Drop-in centre offering meals and shelter"
+        )
+        expect(service.category_names).to eq(["Clothing", "Meals", "Shelters"])
+        expect(service.additional_details).to eq(
+          "age_range" => {"min" => 19}, "gender" => ["all"], "notes" => "No referral needed"
+        )
+      end
+
+      it "saves neither the resource nor its service when the service is invalid" do
+        expect { post documents_path, params: valid_params.deep_merge(document: {title: ""}) }
+          .not_to change(Document, :count)
+
+        expect(response).to have_http_status(:unprocessable_entity)
+        expect(response.body).to include("Name can&#39;t be blank")
+        expect(Service.count).to eq(0)
       end
     end
 
@@ -200,6 +232,27 @@ RSpec.describe "Documents", type: :request do
         patch document_path(document), params: valid_params
         expect(response).to redirect_to(document_path(document))
       end
+
+      it "gives a resource added before services existed its service, and keeps it in step" do
+        patch document_path(document), params: valid_params
+        service = document.reload.service
+        expect(service.name).to eq("Harbour Street Society")
+
+        patch document_path(document), params: valid_params.deep_merge(document: {title: "Harbour Hub"})
+
+        expect(service.reload.name).to eq("Harbour Hub")
+        expect(Service.count).to eq(1)
+      end
+
+      it "shows the organization offering it on the form" do
+        organization = Organization.create!(name: "Harbourside Society")
+        form_source.services.create!(name: "Test Shelter", document: document, organization: organization)
+
+        get edit_document_path(document)
+
+        selected = Nokogiri::HTML(response.body).at_css("select#document_organization_id option[selected]")
+        expect(selected.text).to eq("Harbourside Society")
+      end
     end
 
     context "as regular user" do
@@ -223,6 +276,12 @@ RSpec.describe "Documents", type: :request do
         }.to change(Document, :count).by(-1)
       end
 
+      it "deletes its service too" do
+        form_source.services.create!(name: "Test Shelter", document: document)
+
+        expect { delete document_path(document) }.to change(Service, :count).by(-1)
+      end
+
       it "redirects to sources" do
         delete document_path(document)
         expect(response).to redirect_to(sources_path)
@@ -240,7 +299,7 @@ RSpec.describe "Documents", type: :request do
       end
 
       it "redirects to the source show page when referer is a source page" do
-        source = Source.create!(name: "Test Source", source_type: "api")
+        source = Source.create!(name: "Test Source", source_type: "csv")
         source.documents << document
         delete document_path(document), headers: {"HTTP_REFERER" => source_url(source)}
         expect(response).to redirect_to(source_url(source))
