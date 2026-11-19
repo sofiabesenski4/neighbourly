@@ -82,7 +82,7 @@ gem "pundit", "~> 2.5"
 
 gem "rspec-rails", "~> 8.0"
 
-gem "tailwindcss-rails", "~> 4.4"
+gem "tailwindcss-rails", "~> 4.7"
 
 gem "ruby_llm", "~> 2.1"
 
