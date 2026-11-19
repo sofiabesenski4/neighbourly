@@ -35,7 +35,13 @@ RSpec.describe Organization, type: :model do
     organization = Organization.new(name: "Our Place Society", website: "javascript:alert(1)")
 
     expect(organization).not_to be_valid
-    expect(organization.errors[:website]).to include("must start with http:// or https://")
+    expect(organization.errors[:website]).to include("must be a web address starting with http:// or https://")
+  end
+
+  it "rejects a web address with anything on a second line" do
+    organization = Organization.new(name: "Our Place Society", website: "https://example.org\njavascript:alert(1)")
+
+    expect(organization).not_to be_valid
   end
 
   it "keeps its services, unlinked, when it is deleted" do

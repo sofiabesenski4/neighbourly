@@ -13,7 +13,7 @@ class Organization < ApplicationRecord
 
   validates :name, presence: true
   validate :name_not_taken
-  validates :website, format: {with: %r{\Ahttps?://}i, message: "must start with http:// or https://"}, allow_nil: true
+  validates :website, format: {with: WEB_ADDRESS, message: "must be a web address starting with http:// or https://"}, allow_nil: true
 
   scope :alphabetical, -> { order(:normalized_name) }
 

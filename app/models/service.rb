@@ -34,7 +34,7 @@ class Service < ApplicationRecord
   validates :name, presence: true
   validates :document_id, uniqueness: true, allow_nil: true
   validate :additional_details_is_an_object
-  validates :website, format: {with: %r{\Ahttps?://}i, message: "must start with http:// or https://"}, allow_nil: true
+  validates :website, format: {with: WEB_ADDRESS, message: "must be a web address starting with http:// or https://"}, allow_nil: true
 
   scope :alphabetical, -> { order(Arel.sql("LOWER(services.name)"), :id) }
 

@@ -19,7 +19,7 @@
   <% if @organization.website.present? %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="text-sm font-medium text-stone-500">Website</dt>
-      <dd class="mt-2 break-all text-sm leading-6"><%= link_to @organization.website, @organization.website, target: "_blank", rel: "noopener noreferrer", class: "admin-link" %></dd>
+      <dd class="mt-2 break-all text-sm leading-6"><%= web_link(@organization.website) %></dd>
     </div>
   <% end %>
   <% if @organization.source %>
