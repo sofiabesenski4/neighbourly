@@ -20,10 +20,13 @@
       <% end %>
     </dd>
   </div>
-  <% if @service.closed? %>
+  <% removed = @service.document&.removal_accepted? %>
+  <% if @service.closed? || removed %>
     <div class="px-5 py-4 sm:px-6">
       <dt class="text-sm font-medium text-stone-500">Status</dt>
-      <dd class="mt-2 text-sm leading-6 text-stone-900">Closed</dd>
+      <dd class="mt-2 text-sm leading-6 text-stone-900">
+        <%= [("Closed" if @service.closed?), ("Removed by a moderator after a report, so it is left off printouts" if removed)].compact.join(". ") %>
+      </dd>
     </div>
   <% end %>
   <% [["Description", @service.description], ["Location", location], ["Phone", @service.phone], ["Email", @service.email], ["Hours of operation", @service.hours], ["Categories", @service.category_names.join(", ")]].each do |label, value| %>

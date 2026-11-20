@@ -23,6 +23,9 @@
             <td>
               <p class="font-medium text-stone-900"><%= report.document.title.presence || "Untitled" %></p>
               <%= link_to report.document.source.name, source_path(report.document.source), class: "admin-link text-xs" %>
+              <% if report.document.service %>
+                <p class="text-xs text-stone-600">Service: <%= link_to report.document.service.name, report.document.service, class: "admin-link" %></p>
+              <% end %>
             </td>
             <td><%= report.user&.email || "Anonymous" %></td>
             <td><%= report.reason.capitalize %></td>
@@ -42,7 +45,7 @@
               <% if report.pending? %>
                 <div class="flex justify-end gap-2 whitespace-nowrap">
                   <%= button_to "Accept removal", validate_report_path(report), method: :patch,
-                      class: "admin-button-danger", data: { turbo_confirm: "This will remove '#{report.document.title}' from search results. Continue?" } %>
+                      class: "admin-button-danger", data: { turbo_confirm: "This will remove '#{report.document.title}' from #{removal_places(report.document)}. Continue?" } %>
                   <%= button_to "Dismiss", dismiss_report_path(report), method: :patch,
                       class: "admin-button-secondary", data: { turbo_confirm: "Dismiss this report?" } %>
                 </div>

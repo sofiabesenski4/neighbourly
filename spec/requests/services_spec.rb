@@ -75,6 +75,19 @@ RSpec.describe "Services", type: :request do
       expect(response.body).to include(%(href="#{document_path(document)}"))
     end
 
+    it "says when a moderator removed the service's row after a report" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      document = Source.form_entry_source.documents.create!(title: "Lunch row", content: "Lunch")
+      service.update!(document: document)
+
+      get service_path(service)
+      expect(response.body).not_to include("Removed by a moderator")
+
+      document.reports.create!(reason: "out of date", status: "valid")
+      get service_path(service)
+      expect(response.body).to include("Removed by a moderator after a report")
+    end
+
     it "lists details that have no field of their own" do
       service.update!(additional_details: {"languages" => ["English", "Punjabi"], "intake_steps" => {"referral" => false},
                                            "bring" => "", "referral_required" => false})
