@@ -17,6 +17,7 @@ module ContentPipeline
       address: the street address where people go, such as "919 Pandora Ave", or a corner such as "Douglas St and Yates St", exactly as the row gives it. Leave it empty if the row has no street address.
       city: the city or town of that address. Leave it empty if the row does not say.
       phone: the phone number to call, exactly as the row gives it. Leave it empty if the row has none.
+      organization: the name of the organization that runs the service, exactly as the row gives it. Leave it empty if the row does not say.
     TEXT
 
     def initialize(document, model: nil)
@@ -37,6 +38,8 @@ module ContentPipeline
       embedding = Embedder.embed(content)
 
       queued_by_save = false
+      service_queued_by_save = false
+      service = nil
       saved = @document.with_lock do
         # Rows geocoded before addresses had their own table may gain
         # coordinates in metadata meanwhile. Those do not change the row, so
@@ -56,6 +59,16 @@ module ContentPipeline
           queued_by_save = @document.address.present? && (@document.address.street_address_changed? || @document.address.city_changed?)
           @document.enriched_at = Time.current
           @document.save_with_category_names!(result[:categories])
+          # Loaded under the lock, so an import rewriting the row can't be
+          # overwritten with an older copy. An admin may have deleted the
+          # row's service, so there may be none.
+          service = @document.service
+          if service
+            fill_in_service(service, result)
+            service_queued_by_save = service.address.present? && (service.address.street_address_changed? || service.address.city_changed?)
+            service.save!
+          end
+          true
         else
           false
         end
@@ -65,7 +78,7 @@ module ContentPipeline
       # come from its columns, unchanged by this save, so queue the lookup here.
       @document.address&.locate_later if saved && !queued_by_save
       # The service read from this row waited for the same reason.
-      @document.service&.address&.locate_later if saved
+      service&.address&.locate_later if saved && !service_queued_by_save
       saved
     end
 
@@ -79,6 +92,21 @@ module ContentPipeline
       return if blanks.empty?
 
       (current || @document.build_address).assign_attributes(blanks)
+    end
+
+    # The row's own columns come first here too. The model's answer only fills
+    # in what they left blank, and only links an organization when the row
+    # named none.
+    def fill_in_service(service, result)
+      service.name = result[:title] if result[:title]
+      service.description ||= result[:summary]
+      service.phone ||= result[:address][:phone]
+      found = result[:address].slice(:street_address, :city).compact
+      address = service.address
+      blanks = found.select { |field, _value| address.nil? || address.public_send(field).blank? }
+      (address || service.build_address).assign_attributes(blanks) if blanks.any?
+      service.organization ||= Organization.for_name(result[:organization], source: @document.source)
+      service.categories = @document.categories
     end
 
     def describe(metadata)
@@ -109,9 +137,10 @@ module ContentPipeline
             categories: {type: "array", items: category},
             address: {type: "string"},
             city: {type: "string"},
-            phone: {type: "string"}
+            phone: {type: "string"},
+            organization: {type: "string"}
           },
-          required: %w[title summary categories address city phone],
+          required: %w[title summary categories address city phone organization],
           additionalProperties: false
         }
       }
@@ -130,6 +159,7 @@ module ContentPipeline
         title: title&.truncate(Parsers::Csv::MAX_TITLE_LENGTH),
         address: {street_address: text_in(data["address"]), city: text_in(data["city"]), phone: text_in(data["phone"])},
         summary: summary.truncate(MAX_SUMMARY_LENGTH),
+        organization: text_in(data["organization"]),
         categories: Array(data["categories"]).filter_map { |name| by_name[name.to_s.strip.downcase] }.uniq
       }
     end

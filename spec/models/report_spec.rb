@@ -2,7 +2,7 @@ require "rails_helper"
 
 RSpec.describe Report, type: :model do
   let(:user) { User.create!(email: "user@example.com", password: "password123") }
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
   let(:document) {
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
     source.documents.create!(content: "test content", title: "Test Doc", external_id: "1")

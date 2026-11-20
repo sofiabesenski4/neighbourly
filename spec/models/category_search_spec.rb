@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe CategorySearch do
-  let(:source) { Source.create!(name: "Local guide", source_type: "api") }
+  let(:source) { Source.create!(name: "Local guide", source_type: "csv") }
   let!(:meals) { Category.create!(name: "Meals") }
   let!(:shelters) { Category.create!(name: "Shelters") }
   let!(:showers) { Category.create!(name: "Showers") }

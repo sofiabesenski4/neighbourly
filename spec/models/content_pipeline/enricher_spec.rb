@@ -235,12 +235,55 @@ RSpec.describe ContentPipeline::Enricher do
     expect(document.content).to start_with("Free hot lunches on weekdays.")
   end
 
-  # A service's address waits while its row awaits enrichment, so enrichment
-  # queues its lookup once it has saved.
-  it "queues the lookup for the address of the service read from this row" do
-    source.update!(enrich_documents: true)
-    service = source.services.create!(name: "Harbour Meals", document: document, address_attributes: {street_address: "100 Harbour St"})
+  describe "the row's service" do
+    let(:service) do
+      source.services.create!(name: "Harbour Meals", document: document, address_attributes: {street_address: "100 Harbour St"})
+    end
 
-    expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob).with(service.address)
+    before do
+      service
+      reply.replace({title: "Harbour Community Meals", summary: "Free hot lunches on weekdays.", categories: ["Meals"],
+                     address: "999 Other St", city: "Victoria", phone: "250-555-0100",
+                     organization: "Harbourside Society"}.to_json)
+    end
+
+    it "fills in what the row left blank, keeping the row's own columns" do
+      described_class.new(document).enrich!
+
+      expect(service.reload).to have_attributes(
+        name: "Harbour Community Meals", description: "Free hot lunches on weekdays.", phone: "250-555-0100"
+      )
+      expect(service.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
+      expect(service.category_names).to eq(["Meals"])
+    end
+
+    it "links the organization the model found when the row named none" do
+      described_class.new(document).enrich!
+
+      expect(service.reload.organization).to have_attributes(name: "Harbourside Society", source: source)
+    end
+
+    it "keeps the organization the row named" do
+      named = Organization.create!(name: "Our Place Society")
+      service.update!(organization: named)
+
+      described_class.new(document).enrich!
+
+      expect(service.reload.organization).to eq(named)
+      expect(Organization.count).to eq(1)
+    end
+
+    it "queues the service's lookup once the row has waited for enrichment" do
+      expect { described_class.new(document).enrich! }.to have_enqueued_job(GeocodeAddressJob).with(service.address)
+    end
+
+    it "leaves the service alone when the row changed while the model was answering" do
+      allow(chat).to receive(:ask) do
+        Document.find(document.id).update!(metadata: metadata.merge("Phone" => "250-555-0100"))
+        instance_double(RubyLLM::Message, content: reply)
+      end
+
+      expect { described_class.new(document).enrich! }.not_to(change { service.reload.attributes })
+    end
   end
 end

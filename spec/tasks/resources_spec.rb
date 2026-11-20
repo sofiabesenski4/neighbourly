@@ -11,7 +11,7 @@ RSpec.describe "resources rake tasks" do
     Rails.application.load_tasks unless Rake::Task.task_defined?(:environment)
   end
 
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))

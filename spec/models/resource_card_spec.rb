@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe ResourceCard do
-  let(:source) { Source.new(name: "Guide", source_type: "api") }
+  let(:source) { Source.new(name: "Guide", source_type: "csv") }
 
   def card(metadata: {}, content: "Saved resource", title: "Meal program")
     described_class.new(Document.new(title: title, content: content, metadata: metadata, source: source))

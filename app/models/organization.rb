@@ -1,5 +1,5 @@
 # A group that offers services, like a society, charity or health authority.
-# Admins see which services each one runs. Imports will link services to the
+# Admins see which services each one runs. Imports link services to the
 # organization a row names, matching it by name.
 class Organization < ApplicationRecord
   include HasWebsite
@@ -26,6 +26,21 @@ class Organization < ApplicationRecord
   # one organization.
   def self.normalize_name(name)
     name.to_s.squish.downcase.presence
+  end
+
+  # The organization with this name, created as first seen in the source when
+  # there is none yet. Nil for a blank name. Imports call this for each row,
+  # so two rows naming one organization share it.
+  def self.for_name(name, source: nil)
+    normalized = normalize_name(name)
+    return if normalized.nil?
+
+    find_by(normalized_name: normalized) ||
+      # A savepoint, so a clash with a concurrent import doesn't abort the
+      # import's own transaction.
+      transaction(requires_new: true) { create!(name: name, source: source) }
+  rescue ActiveRecord::RecordNotUnique, ActiveRecord::RecordInvalid
+    find_by!(normalized_name: normalized)
   end
 
   private

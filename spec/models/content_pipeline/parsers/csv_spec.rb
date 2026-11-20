@@ -31,7 +31,10 @@ RSpec.describe ContentPipeline::Parsers::Csv do
     it "reads the address from columns it recognises, keeping the row whole in metadata" do
       chunks = parser.parse(csv)
 
-      expect(chunks.first[:address]).to eq(street_address: "100 Harbour St", city: nil, phone: "250-555-0100", lat: nil, lng: nil)
+      expect(chunks.first[:address]).to eq(
+        street_address: "100 Harbour St", city: nil, province: nil, postal_code: nil, country: nil,
+        phone: "250-555-0100", lat: nil, lng: nil
+      )
       expect(chunks.first[:metadata]).to include("Address" => "100 Harbour St", "Phone" => "250-555-0100")
       expect(chunks.last[:address]).to include(street_address: "22 North Rd", phone: nil)
     end
@@ -39,7 +42,10 @@ RSpec.describe ContentPipeline::Parsers::Csv do
     it "recognises address columns whatever their spelling" do
       chunk = parser.parse("Name,STREET_ADDRESS,Town,Phone Number,Latitude,Longitude\nHarbour,1 Main St,Sidney,250-555-0100,48.6,-123.4\n").first
 
-      expect(chunk[:address]).to eq(street_address: "1 Main St", city: "Sidney", phone: "250-555-0100", lat: "48.6", lng: "-123.4")
+      expect(chunk[:address]).to eq(
+        street_address: "1 Main St", city: "Sidney", province: nil, postal_code: nil, country: nil,
+        phone: "250-555-0100", lat: "48.6", lng: "-123.4"
+      )
     end
 
     it "keeps blank cells in metadata as nil" do
@@ -149,6 +155,65 @@ RSpec.describe ContentPipeline::Parsers::Csv do
     it "raises a ParseError for malformed CSV" do
       expect { parser.parse("Name,Notes\nHarbour,\"unclosed\n") }
         .to raise_error(ContentPipeline::Parsers::ParseError, /could not be read as CSV/)
+    end
+
+    describe "the service a row describes" do
+      let(:csv) do
+        "ID,Program Name,Organization Name,Description,Street Address,City,State,Zip,Country,Phone,E-mail,Website,Ages,Notes\n" \
+          "7,Community Lunch,Harbourside Society,Hot lunch,100 Harbour St,Victoria,BC,V8W 1A1,Canada,250-555-0101," \
+          "lunch@example.org,example.org/lunch,All ages,\n"
+      end
+      let(:chunk) { parser.parse(csv).first }
+
+      it "fills the service's fields from the columns that match them" do
+        expect(chunk[:service]).to include(
+          name: "Community Lunch", description: "Hot lunch", phone: "250-555-0101",
+          email: "lunch@example.org", website: "https://example.org/lunch"
+        )
+      end
+
+      it "reads the whole address, which the resource and its service share" do
+        expect(chunk[:address]).to include(
+          street_address: "100 Harbour St", city: "Victoria", province: "BC", postal_code: "V8W 1A1", country: "Canada"
+        )
+        expect(chunk[:service]).not_to include(:street_address, :city, :province)
+      end
+
+      it "names the organization from its column, without taking it as the title" do
+        expect(chunk[:organization]).to eq(name: "Harbourside Society")
+        expect(chunk[:title]).to eq("Community Lunch")
+      end
+
+      it "keeps every other filled-in column in additional details" do
+        expect(chunk[:service][:additional_details]).to eq("Ages" => "All ages")
+      end
+
+      it "keeps a website with no host in additional details" do
+        ["https://?", "https://:443"].each do |website|
+          chunk = parser.parse("Name,Website\nHarbour Meals,#{website}\n").first
+
+          expect(chunk[:service]).not_to have_key(:website)
+          expect(chunk[:service][:additional_details]).to eq("Website" => website)
+        end
+      end
+
+      it "keeps a website that isn't a web address in additional details" do
+        chunk = parser.parse("Name,Website\nHarbour Meals,ask at the desk\n").first
+
+        expect(chunk[:service]).not_to have_key(:website)
+        expect(chunk[:service][:additional_details]).to eq("Website" => "ask at the desk")
+      end
+
+      it "takes the street address from Address Line 1, keeping Address Line 2 as a detail" do
+        chunk = parser.parse("Name,Address Line 2,Address Line 1\nHarbour Meals,Unit 4,100 Harbour St\n").first
+
+        expect(chunk[:address][:street_address]).to eq("100 Harbour St")
+        expect(chunk[:service][:additional_details]).to eq("Address Line 2" => "Unit 4")
+      end
+
+      it "names no organization when the row has no organization column" do
+        expect(parser.parse("Name,Phone\nHarbour Meals,111\n").first[:organization]).to be_nil
+      end
     end
   end
 end

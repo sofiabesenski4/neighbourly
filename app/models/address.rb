@@ -84,6 +84,16 @@ class Address < ApplicationRecord
     end
   end
 
+  # A resource and the service read from it usually share an address, and
+  # each queues a lookup. GeocodeAddressJob gives its answer to both.
+  def location_twins
+    twin = case addressable
+    when Document then addressable.service
+    when Service then addressable.document
+    end
+    [twin&.address].compact
+  end
+
   private
 
   def moved?

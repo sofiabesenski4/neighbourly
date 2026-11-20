@@ -9,6 +9,13 @@
   </div>
 
   <div class="space-y-2">
+    <%= form.label :organization_id, "Offered by", class: "admin-label" %>
+    <%= form.select :organization_id,
+        options_from_collection_for_select(Organization.alphabetical, :id, :name, params.dig(:document, :organization_id) || @document.service&.organization_id),
+        { include_blank: "No organization" }, class: "admin-input" %>
+  </div>
+
+  <div class="space-y-2">
     <%= form.label :description, "Description of services", class: "admin-label" %>
     <%= form.text_area :description, value: @document.metadata&.dig("description") || params.dig(:document, :description),
         placeholder: "Describe the services offered by this resource...", rows: 4, class: "admin-input" %>

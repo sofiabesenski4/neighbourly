@@ -152,7 +152,7 @@ RSpec.describe "Rate limiting", type: :request do
 
   describe "POST /reports (anonymous)" do
     let(:fake_vector) { Array.new(1536, 0.0) }
-    let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+    let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
     let(:document) { source.documents.create!(title: "Test Shelter", content: "Test", external_id: "1") }
     let(:other_document) { source.documents.create!(title: "Other Shelter", content: "Test", external_id: "2") }
 

@@ -16,18 +16,45 @@ module ContentPipeline
       # Column names that hold a row's address, compared after lowercasing
       # and turning anything but letters into single spaces, so "Street
       # Address", "street_address" and "STREET-ADDRESS" all match.
+      # The resource and its service both take their address from these.
       ADDRESS_HEADERS = {
-        street_address: ["address", "street address", "street"],
+        street_address: ["address", "street address", "street", "address line", "address line 1", "address 1"],
         city: ["city", "town", "municipality"],
+        province: ["province", "state", "province or state", "state or province", "prov"],
+        postal_code: ["postal code", "postcode", "postal", "zip", "zip code"],
+        country: ["country"],
         phone: ["phone", "phone number", "telephone"],
         lat: ["lat", "latitude"],
         lng: ["lng", "lon", "long", "longitude"]
+      }.freeze
+
+      # Columns naming who offers the service, compared the same way.
+      ORGANIZATION_HEADERS = ["organization", "organisation", "organization name", "organisation name", "org",
+        "agency", "agency name", "provider", "provider name", "operator", "operated by", "run by"].freeze
+
+      # Columns that fill in the service's own fields, compared the same way.
+      # The first filled-in match wins. Every other column with a value, apart
+      # from the address, is kept in the service's additional details under its
+      # own header.
+      SERVICE_HEADERS = {
+        description: ["description", "service description", "services", "about", "summary"],
+        hours: ["hours", "hours of operation", "opening hours", "schedule"],
+        phone: ADDRESS_HEADERS[:phone] + ["tel"],
+        email: ["email", "e mail", "email address"],
+        website: ["website", "web site", "web", "url", "site"]
       }.freeze
 
       # One "Header: value" line per filled-in cell. Enrichment keeps these
       # lines under the summary so exact details stay searchable.
       def self.render_fields(fields)
         fields.filter_map { |header, value| "#{header}: #{value}" if value.present? }.join("\n")
+      end
+
+      # "Street Address", "street_address" and "STREET-ADDRESS" all become
+      # "street address". Digits stay, so "Address Line 1" and "Address Line 2"
+      # remain different columns.
+      def self.header_key(header)
+        header.downcase.gsub(/[^a-z0-9]+/, " ").strip
       end
 
       def parse(raw_content)
@@ -38,13 +65,19 @@ module ContentPipeline
           fields = row_fields(headers, row.fields)
           next if fields.values.all?(&:nil?)
 
+          title_header, title = title_for(fields)
+          id_header, external_id = external_id_for(fields)
+          organization_header, organization = first_match(fields, ORGANIZATION_HEADERS)
+          address, address_headers = address_for(fields)
           {
-            title: title_for(fields),
+            title: title,
             content: self.class.render_fields(fields),
-            external_id: external_id_for(fields),
+            external_id: external_id,
             categories: [],
             metadata: fields,
-            address: address_for(fields)
+            address: address,
+            service: service_for(fields, title, used: [title_header, id_header, organization_header, *address_headers]),
+            organization: organization && {name: organization}
           }
         end
 
@@ -99,23 +132,57 @@ module ContentPipeline
         name
       end
 
+      # The column the title came from and the title. "Organization Name" is
+      # who runs the service, not its name, so it is never the title.
       def title_for(fields)
-        named = fields.find { |header, value| header.match?(TITLE_HEADER) && value.present? }&.last
-        (named || fields.values.compact.first).truncate(MAX_TITLE_LENGTH)
-      end
-
-      # The first filled-in column for each part of the address. Enrichment
-      # fills in parts the columns don't give.
-      def address_for(fields)
-        by_name = fields.each_with_object({}) do |(header, value), found|
-          found[header.downcase.gsub(/[^a-z]+/, " ").strip] ||= value if value.present?
+        header, value = fields.find do |name, text|
+          name.match?(TITLE_HEADER) && text.present? && !ORGANIZATION_HEADERS.include?(self.class.header_key(name))
         end
-        ADDRESS_HEADERS.transform_values { |names| by_name.values_at(*names).compact.first }
+        header, value = fields.find { |_name, text| text.present? } if header.nil?
+        [header, value.truncate(MAX_TITLE_LENGTH)]
       end
 
+      # The service's fields from the columns that match them, and every other
+      # filled-in column in additional details. Columns already used for the
+      # title, ID or organization are left out of the details.
+      def service_for(fields, title, used:)
+        used = used.compact.to_set
+        service = {name: title}
+        SERVICE_HEADERS.each do |attribute, names|
+          header, value = first_match(fields, names)
+          next if header.nil?
+
+          # A website that isn't a web address stays in the details as written.
+          value = web_address(value) if attribute == :website
+          next if value.nil?
+
+          service[attribute] = value
+          used << header
+        end
+        service[:additional_details] = fields.reject { |header, value| value.blank? || used.include?(header) }
+        service
+      end
+
+      # The first filled-in column, in the order of names, as [header, value].
+      def first_match(fields, names)
+        by_key = fields.each_with_object({}) do |(header, value), found|
+          found[self.class.header_key(header)] ||= [header, value] if value.present?
+        end
+        names.lazy.filter_map { |name| by_key[name] }.first
+      end
+
+      # The first filled-in column for each part of the address, and the
+      # columns used, so those aren't kept again in the service's additional
+      # details. Enrichment fills in parts the columns don't give.
+      def address_for(fields)
+        matches = ADDRESS_HEADERS.transform_values { |names| first_match(fields, names) }
+        [matches.transform_values { |match| match&.last }, matches.values.compact.map(&:first)]
+      end
+
+      # The ID column and its value, or a hash of the row when it has none.
       def external_id_for(fields)
-        id = fields.find { |header, value| header.match?(ID_HEADER) && value.present? }&.last
-        id || Digest::SHA256.hexdigest(fields.to_json)
+        header, id = fields.find { |name, value| name.match?(ID_HEADER) && value.present? }
+        header ? [header, id] : [nil, Digest::SHA256.hexdigest(fields.to_json)]
       end
     end
   end

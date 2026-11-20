@@ -3,7 +3,7 @@ require "rails_helper"
 RSpec.describe Source, type: :model do
   def build_source(**overrides)
     Source.new(
-      {name: "Test Source", url: "https://example.com/data", source_type: "api"}.merge(overrides)
+      {name: "Test Source", url: "https://example.com/data", source_type: "html"}.merge(overrides)
     )
   end
 
@@ -25,13 +25,13 @@ RSpec.describe Source, type: :model do
       expect(source.errors[:url]).to include("can't be blank")
     end
 
-    it "does not require a url for api sources" do
-      source = build_source(source_type: "api", url: nil)
+    it "does not require a url for csv sources" do
+      source = build_source(source_type: "csv", url: nil)
       expect(source).to be_valid
     end
 
     it "allows two sources to share a url" do
-      Source.create!(name: "First", url: "https://example.com/data", source_type: "api")
+      Source.create!(name: "First", url: "https://example.com/data", source_type: "html")
       expect { build_source(name: "Second", url: "https://example.com/data").save! }
         .to change(Source.where(url: "https://example.com/data"), :count).by(1)
     end
@@ -41,12 +41,12 @@ RSpec.describe Source, type: :model do
       expect(source).not_to be_valid
     end
 
-    it "only allows api, html, form, or csv as source_type" do
-      expect(build_source(source_type: "api")).to be_valid
+    it "only allows html, form, or csv as source_type" do
       expect(build_source(source_type: "html")).to be_valid
       expect(build_source(source_type: "form", url: nil)).to be_valid
       expect(build_source(source_type: "csv")).to be_valid
       expect(build_source(source_type: "rss")).not_to be_valid
+      expect(build_source(source_type: "api")).not_to be_valid
     end
 
     it "does not require a url for form sources" do
@@ -79,13 +79,8 @@ RSpec.describe Source, type: :model do
 
   describe "scopes" do
     before do
-      Source.create!(name: "API Source", url: "https://example.com/api", source_type: "api")
       Source.create!(name: "HTML Source", url: "https://example.com/page", source_type: "html")
       Source.create!(name: "CSV Source", source_type: "csv")
-    end
-
-    it ".api_sources returns only api sources" do
-      expect(Source.api_sources.pluck(:name)).to eq(["API Source"])
     end
 
     it ".html_sources returns only html sources" do
@@ -100,25 +95,23 @@ RSpec.describe Source, type: :model do
       Source.create!(name: "Linked CSV", url: "https://example.com/data.csv", source_type: "csv")
       Source.form_entry_source
 
-      expect(Source.fetchable.pluck(:name)).to contain_exactly("API Source", "HTML Source", "Linked CSV")
+      expect(Source.fetchable.pluck(:name)).to contain_exactly("HTML Source", "Linked CSV")
     end
   end
 
-  describe "#api?, #html?, and #form?" do
+  describe "#html?, #form?, and #csv?" do
     it "returns true for matching type" do
-      api_source = build_source(source_type: "api")
       html_source = build_source(source_type: "html")
       form_source = build_source(source_type: "form", url: nil)
+      csv_source = build_source(source_type: "csv", url: nil)
 
-      expect(api_source.api?).to be true
-      expect(api_source.html?).to be false
-      expect(api_source.form?).to be false
       expect(html_source.html?).to be true
-      expect(html_source.api?).to be false
+      expect(html_source.form?).to be false
+      expect(html_source.csv?).to be false
       expect(form_source.form?).to be true
-      expect(form_source.api?).to be false
-      expect(build_source(source_type: "csv", url: nil).csv?).to be true
-      expect(api_source.csv?).to be false
+      expect(form_source.html?).to be false
+      expect(csv_source.csv?).to be true
+      expect(csv_source.html?).to be false
     end
   end
 
@@ -182,7 +175,7 @@ RSpec.describe Source, type: :model do
     it "destroys associated documents when destroyed" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
 
-      source = Source.create!(name: "Test", url: "https://example.com", source_type: "api")
+      source = Source.create!(name: "Test", url: "https://example.com", source_type: "html")
       source.documents.create!(content: "test content", external_id: "1")
 
       expect { source.destroy! }.to change(Document, :count).by(-1)

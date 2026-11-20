@@ -3,10 +3,11 @@
 # in development only. The notes say much of this comes from a 2022 guide, so
 # hours and intake details may be out of date.
 #
-# The JSON file is kept exactly as it was supplied. It is in the shape
-# ContentPipeline::Parsers::Api reads, so it goes through the same ingestion as an
-# API source. Saving each resource calls the embedding API set in your .env, and
-# queues a geocoding lookup for its address.
+# The JSON file is kept exactly as it was supplied, in the BC 211 shape. The app
+# no longer takes BC 211 JSON as a source, so each record becomes one CSV row and
+# goes through the same ingestion as an uploaded CSV, service included. Saving
+# each resource calls the embedding API set in your .env, and queues a geocoding
+# lookup for its address.
 #
 # The file's taxonomies are more detailed than the app's categories, and the
 # importer only attaches categories whose names match exactly. TAXONOMY_CATEGORIES
@@ -14,6 +15,8 @@
 # in UNCATEGORIZED_TAXONOMIES; they stay in each resource's searchable text but get
 # no category. A taxonomy in neither list stops the seed, so a changed file can't
 # lose categories without anyone noticing.
+require "csv"
+
 module GreaterVictoriaResources
   DATA_FILE = Rails.root.join("db/seeds/greater_victoria_street_survival_resources.json")
   SOURCE_NAME = "Greater Victoria street survival resources"
@@ -57,21 +60,50 @@ module GreaterVictoriaResources
     "Outreach", "Peer support", "Storage", "Support groups", "Transportation support"
   ].freeze
 
+  # Headers the CSV parser recognises, so each record fills its resource's and
+  # service's fields. "Taxonomies", "Notes", "Intake", "Beds" and "Ages" have no
+  # field of their own and stay in the service's additional details.
+  CSV_HEADERS = ["id", "Name", "Address", "City", "Phone", "Taxonomies", "Notes", "Intake", "Beds", "Ages"].freeze
+
   def self.seed
-    raw = File.read(DATA_FILE)
-    records = JSON.parse(raw)
+    records = JSON.parse(File.read(DATA_FILE, encoding: "UTF-8"))
     check_taxonomies(records)
     check_categories
 
-    source = Source.find_or_create_by!(name: SOURCE_NAME, source_type: "api")
-    count = ContentPipeline::Ingester.new(source).ingest(raw)
+    source = Source.find_or_create_by!(name: SOURCE_NAME, source_type: "csv")
+    count = ContentPipeline::Ingester.new(source).ingest(csv_for(records))
 
     records.each do |record|
       document = source.documents.find_by!(external_id: record["id"])
       document.save_with_category_names!(categories_for(record))
+      document.service.update!(categories: document.categories)
     end
 
     puts "Seeded #{count} resources from #{DATA_FILE.basename}"
+  end
+
+  def self.csv_for(records)
+    CSV.generate do |csv|
+      csv << CSV_HEADERS
+      records.each { |record| csv << row_for(record) }
+    end
+  end
+
+  def self.row_for(record)
+    location = record["location"] || {}
+    ages = record["age_range"]
+    [
+      record["id"],
+      record["post_title"],
+      location["street_address"],
+      location.dig("city", "label"),
+      Array(record["contact"]).filter_map { |contact| contact.dig("contact", "phone_number") }.join(", "),
+      Array(record["taxonomies"]).pluck("name").join(", "),
+      record["notes"],
+      record["intake_info"],
+      record.dig("beds", "availability"),
+      ages && [ages["min"], ages["max"]].compact.join("-").then { |range| ages["max"] ? range : "#{range}+" }
+    ]
   end
 
   def self.categories_for(record)
