@@ -320,6 +320,38 @@ RSpec.describe ContentPipeline::Ingester do
           expect(Organization.for_name("Harbourside Society")).to eq(other)
         end
 
+        # Someone uploading the details signs off on them again, even unchanged.
+        # A scheduled refresh confirms nothing.
+        it "confirms every service an upload brings in, as the person uploading it" do
+          uploader = User.create!(email: "uploader@example.com", password: "password123")
+          ingester.ingest(csv)
+          expect(source.services.pluck(:confirmed_at)).to all(be_nil)
+          service = source.documents.find_by!(external_id: "1").service
+          service.confirm!(by: User.create!(email: "checker@example.com", password: "password123"), method: "phone")
+
+          travel_to(1.day.from_now) { described_class.new(source, confirmed_by: uploader).ingest(csv.sub("Bike Repair", "Bike Shop")) }
+
+          expect(source.services.reload).to all(have_attributes(confirmed_by: uploader, confirmation_method: "upload"))
+          expect(service.reload.confirmed_at).to be > 12.hours.from_now
+        end
+
+        # Nobody has checked what a changed row now says.
+        it "clears a service's confirmation when a detail it vouched for changes, and keeps it otherwise" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+          service.confirm!(by: User.create!(email: "checker@example.com", password: "password123"), method: "phone")
+
+          described_class.new(source).ingest(csv)
+          expect(service.reload.confirmation_method).to eq("phone")
+
+          # The row reads differently, but names the same organization and details.
+          described_class.new(source).ingest(csv.sub("Meals,Harbourside Society", "Meals,harbourside  SOCIETY"))
+          expect(service.reload.confirmation_method).to eq("phone")
+
+          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
+          expect(service.reload).to have_attributes(confirmed_at: nil, confirmed_by: nil, confirmation_method: nil)
+        end
+
         it "keeps a service's coordinates when its row changes elsewhere" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service

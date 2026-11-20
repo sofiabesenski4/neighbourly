@@ -28,6 +28,28 @@
       <% end %>
     </dd>
   </div>
+  <div class="px-5 py-4 sm:px-6">
+    <dt class="text-sm font-medium text-stone-500">Last confirmed</dt>
+    <dd class="mt-2 space-y-3 text-sm leading-6 text-stone-900">
+      <p>
+        <% if @service.confirmation %>
+          <%= @service.confirmation %><%= " by #{@service.confirmed_by.email}" if current_user.admin? && @service.confirmed_by %>
+        <% else %>
+          Not confirmed yet
+        <% end %>
+      </p>
+      <% if policy(@service).update? %>
+        <%= form_with url: confirm_service_path(@service), method: :post, class: "flex flex-wrap items-end gap-3" do |form| %>
+          <div class="min-w-0 space-y-1">
+            <%= form.label :confirmation_method, "How did you check the details are right?", class: "admin-label" %>
+            <%= form.select :confirmation_method, Service::CHECKING_METHODS.map { |key, wording| [wording.capitalize, key] },
+                { include_blank: "Choose one" }, required: true, class: "admin-input" %>
+          </div>
+          <%= form.submit "Confirm details", class: "admin-button-secondary" %>
+        <% end %>
+      <% end %>
+    </dd>
+  </div>
   <% removed = @service.document&.removal_accepted? %>
   <% if @service.closed? || removed %>
     <div class="px-5 py-4 sm:px-6">

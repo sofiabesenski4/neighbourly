@@ -11,6 +11,57 @@ RSpec.describe Service, type: :model do
     source.services.create!(name: "Community lunch", **attributes)
   end
 
+  describe "confirming its details" do
+    let(:checker) { User.create!(email: "checker@example.com", password: "password123") }
+
+    it "records when, who and how, and says so in a line" do
+      listing = service
+      expect(listing.confirmation).to be_nil
+
+      travel_to Time.zone.parse("2026-11-20 10:00") do
+        listing.confirm!(by: checker, method: "website")
+      end
+
+      expect(listing.reload).to have_attributes(confirmed_by: checker, confirmation_method: "website")
+      expect(listing.confirmation).to eq("Nov 20, 2026 from its website")
+    end
+
+    it "accepts only the known ways of checking" do
+      expect { service.confirm!(by: checker, method: "rumour") }.to raise_error(ActiveRecord::RecordInvalid)
+    end
+
+    # Someone confirms by phone, then changes the number. Nobody checked the new one.
+    it "forgets the confirmation when a detail it vouched for changes" do
+      listing = service(phone: "250-555-0100", address_attributes: {street_address: "1 Main St"})
+      [{phone: "250-555-0199"}, {hours: "Daily"}, {additional_details: {"Intake" => "Walk in"}},
+        {address_attributes: {id: listing.address.id, street_address: "2 Main St"}}].each do |change|
+        listing.confirm!(by: checker, method: "phone")
+
+        listing.update!(change)
+
+        expect(listing.reload).to have_attributes(confirmed_at: nil, confirmed_by: nil, confirmation_method: nil)
+      end
+    end
+
+    it "keeps the confirmation when a save changes nothing it vouched for" do
+      listing = service(phone: "250-555-0100")
+      listing.confirm!(by: checker, method: "phone")
+
+      listing.update!(phone: " 250-555-0100 ", closed: true, categories: [Category.create!(name: "Meals")])
+
+      expect(listing.reload.confirmation_method).to eq("phone")
+    end
+
+    it "keeps the confirmation when the account that made it is removed" do
+      listing = service
+      listing.confirm!(by: checker, method: "phone")
+
+      checker.destroy!
+
+      expect(listing.reload).to have_attributes(confirmed_by: nil, confirmation_method: "phone")
+    end
+  end
+
   it "needs a name and a source" do
     service = Service.new
 

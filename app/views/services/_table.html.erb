@@ -6,7 +6,7 @@
     <caption class="sr-only">Services<%= ", sorted by #{sort_label(@sort)} #{@direction == "desc" ? "descending" : "ascending"}" if sortable %></caption>
     <thead>
       <tr>
-        <% columns = [["Name", "name"], (["Offered by", "organization"] if show_organization), ["City", "city"], ["Phone", nil], ["Categories", nil], ["Updated", "updated"]].compact %>
+        <% columns = [["Name", "name"], (["Offered by", "organization"] if show_organization), ["City", "city"], ["Phone", nil], ["Categories", nil], ["Confirmed", "confirmed"], ["Updated", "updated"]].compact %>
         <% columns.each do |label, column| %>
           <% if sortable && column %>
             <th scope="col" aria-sort="<%= service_sort_state(column) %>"><%= service_sort_link(label, column) %></th>
@@ -32,6 +32,13 @@
           <td><%= service.address&.city.presence || "—" %></td>
           <td class="whitespace-nowrap"><%= service.phone.presence || "—" %></td>
           <td><%= service.category_names.join(", ").presence || "—" %></td>
+          <td class="whitespace-nowrap">
+            <% if service.confirmed_at %>
+              <time datetime="<%= service.confirmed_at.iso8601 %>"><%= service.confirmed_at.strftime("%b %d, %Y") %></time>
+            <% else %>
+              Never
+            <% end %>
+          </td>
           <td class="whitespace-nowrap"><time datetime="<%= service.updated_at.iso8601 %>"><%= service.updated_at.strftime("%b %d, %Y") %></time></td>
           <td class="text-right"><%= link_to "Edit", edit_service_path(service), class: "admin-button-secondary", aria: { label: "Edit #{service.name}" } %></td>
         </tr>

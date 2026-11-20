@@ -25,7 +25,9 @@ Rails.application.routes.draw do
   get "admin", to: "admin#index", as: :admin
   resources :users, only: [:index, :show, :edit, :update, :destroy]
   resources :organizations
-  resources :services
+  resources :services do
+    post :confirm, on: :member
+  end
   resources :sources, only: [:index, :show, :new, :create, :destroy]
   resources :documents, except: [:index]
   resources :reports, only: [:index, :create] do

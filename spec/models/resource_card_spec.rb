@@ -114,6 +114,14 @@ RSpec.describe ResourceCard do
     expect(fields).to include({label: "Ages served", value: "19+"}, {label: "Eligibility", value: "women, non-binary"})
   end
 
+  it "says when and how the service was last confirmed, without who" do
+    confirmed = card(confirmed_at: Time.zone.parse("2026-11-20 10:00"), confirmation_method: "phone",
+      confirmed_by: User.new(email: "checker@example.com"))
+
+    expect(confirmed.fields).to eq([{label: "Last confirmed", value: "Nov 20, 2026 by phone"}])
+    expect(confirmed.as_json.to_json).not_to include("checker@example.com")
+  end
+
   it "puts separate phone numbers on separate lines" do
     expect(card(phone: "250-555-0100, 250-555-0101").fields)
       .to include({label: "Phone", value: "250-555-0100\n250-555-0101"})

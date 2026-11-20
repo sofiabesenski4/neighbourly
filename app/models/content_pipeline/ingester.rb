@@ -6,13 +6,18 @@ module ContentPipeline
   #   Ingester.new(source).call           — fetches content from source URL
   #   Ingester.new(source).ingest(string) — ingests raw content directly (file upload)
   class Ingester
-    # What a changed row no longer says is cleared from its service.
+    # What a changed row no longer says is cleared from its service. The
+    # service forgets an earlier confirmation itself, only if a detail it
+    # vouched for now reads differently.
     CLEARED_SERVICE_FIELDS = %i[description hours phone email website]
       .index_with(nil).merge(closed: false, additional_details: {}).freeze
     CLEARED_ADDRESS_FIELDS = %i[street_address city province postal_code country].index_with(nil).freeze
 
-    def initialize(source)
+    # confirmed_by is the person uploading the content. Everything their
+    # upload brings in counts as confirmed by them, changed or not.
+    def initialize(source, confirmed_by: nil)
       @source = source
+      @confirmed_by = confirmed_by
       @parser = parser_for(source)
     end
 
@@ -31,14 +36,18 @@ module ContentPipeline
       Rails.logger.info "[ContentPipeline] Parsed #{chunks.size} chunks from #{@source.name}"
 
       written = []
+      rows = []
       begin
         chunks.each_with_index do |chunk, index|
           document = upsert_document(chunk)
           written << document if document
+          rows << chunk[:external_id]
           Rails.logger.info "[ContentPipeline] Embedded chunk #{index + 1}/#{chunks.size}"
         end
       ensure
-        # Rows saved before a later row fails are kept, so they are enriched too.
+        # Rows saved before a later row fails are kept, so they are enriched
+        # and confirmed too.
+        confirm_uploaded(rows)
         enqueue_enrichment(written) if @source.enrich_documents?
       end
       @source.update!(last_fetched_at: Time.current)
@@ -54,6 +63,13 @@ module ContentPipeline
     end
 
     private
+
+    def confirm_uploaded(external_ids)
+      return if @confirmed_by.nil? || external_ids.empty?
+
+      @source.services.where(document: @source.documents.where(external_id: external_ids))
+        .update_all(confirmed_at: Time.current, confirmed_by_id: @confirmed_by.id, confirmation_method: "upload")
+    end
 
     # CSV rows arrive as raw "Header: value" text. Each row this run wrote
     # gets its own job to summarize and categorize it, so one slow or failed

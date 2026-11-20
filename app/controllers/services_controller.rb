@@ -1,6 +1,6 @@
 class ServicesController < ApplicationController
   before_action :authenticate_user!
-  before_action :set_service, only: [:show, :edit, :update, :destroy]
+  before_action :set_service, only: [:show, :edit, :update, :destroy, :confirm]
   after_action :verify_authorized
 
   def index
@@ -45,6 +45,18 @@ class ServicesController < ApplicationController
       redirect_to @service, notice: "Service '#{@service.name}' was updated."
     else
       render :edit, status: :unprocessable_entity
+    end
+  end
+
+  # Someone who can edit a service checked its details are still right.
+  def confirm
+    authorize @service, :update?
+    how = params[:confirmation_method]
+    if Service::CHECKING_METHODS.key?(how)
+      @service.confirm!(by: current_user, method: how)
+      redirect_to @service, notice: "Service '#{@service.name}' was confirmed #{Service::CONFIRMATION_METHODS[how]}."
+    else
+      redirect_to @service, alert: "Choose how you confirmed the details."
     end
   end
 
