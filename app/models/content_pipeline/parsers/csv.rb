@@ -57,6 +57,16 @@ module ContentPipeline
         header.downcase.gsub(/[^a-z0-9]+/, " ").strip
       end
 
+      FIELD_HEADERS = (SERVICE_HEADERS.values.flatten + ADDRESS_HEADERS.values.flatten + ORGANIZATION_HEADERS).to_set.freeze
+
+      # True for a column that fills a service, address or organization field,
+      # like "Schedule" for hours. A row can have two such columns, and only
+      # the first fills the field, so the other is kept in additional details.
+      # A repeated header, renamed "Phone (2)", counts as the one it repeats.
+      def self.field_header?(header)
+        FIELD_HEADERS.include?(header_key(header.to_s.sub(/ \(\d+\)\z/, "")))
+      end
+
       def parse(raw_content)
         table = CSV.parse(normalize_encoding(raw_content), headers: true)
         headers = unique_headers(table.headers)

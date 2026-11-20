@@ -8,7 +8,8 @@
 # imported row (Document) when there is one. A service added by an admin
 # belongs to the form entries source and has no row.
 #
-# Printouts and their map list services.
+# Printouts and their map list services. Chat searches the rows, and gives
+# each matched row's service by name and with its current details.
 class Service < ApplicationRecord
   include HasWebsite
 

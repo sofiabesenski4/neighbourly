@@ -6,11 +6,11 @@
       </summary>
       <div class="mt-2 rounded-lg border border-stone-200 bg-white px-4 pb-2">
         <p class="py-3 text-xs text-stone-500">Reference material found for this reply. Cited items are marked.</p>
-        <% message.rag_documents.includes(:source).order("document_messages.id").each_with_index do |doc, index| %>
-          <div id="message_<%= message.id %>_reference_<%= doc.id %>" tabindex="-1" data-reference-id="<%= doc.id %>" data-reference-number="<%= index + 1 %>" data-reference-title="<%= doc.title.presence || "Untitled reference" %>" class="border-t border-stone-100 py-3 focus-visible:outline-sage-600" data-controller="dialog">
+        <% message.rag_documents.includes(:source, :service).order("document_messages.id").each_with_index do |doc, index| %>
+          <div id="message_<%= message.id %>_reference_<%= doc.id %>" tabindex="-1" data-reference-id="<%= doc.id %>" data-reference-number="<%= index + 1 %>" data-reference-title="<%= reference_title(doc) %>" class="border-t border-stone-100 py-3 focus-visible:outline-sage-600" data-controller="dialog">
             <div class="flex justify-between items-start gap-3">
               <div class="min-w-0 flex-1">
-                <p class="break-words text-sm font-medium text-stone-800"><span class="mr-1 text-xs text-stone-400">[<%= index + 1 %>]</span><%= doc.title.presence || "Untitled reference" %></p>
+                <p class="break-words text-sm font-medium text-stone-800"><span class="mr-1 text-xs text-stone-400">[<%= index + 1 %>]</span><%= reference_title(doc) %></p>
                 <span data-citation-status hidden class="mr-1.5 rounded bg-sage-50 px-1.5 py-0.5 text-xs font-medium text-sage-700">Cited</span>
                 <% if (source_url = reference_source_url(doc.source)) %>
                   <%= link_to source_url, target: "_blank", rel: "noopener noreferrer", class: "inline-block min-h-11 max-w-full py-3 text-sm text-sage-700 underline break-words focus-visible:outline-sage-600" do %>
@@ -43,7 +43,7 @@
                 <div class="p-4 sm:p-6">
                   <h3 id="<%= report_heading_id %>" class="text-lg font-semibold text-stone-900 mb-1">Report Document</h3>
                   <p class="break-words text-sm text-stone-500 mb-4">
-                    Reporting: <span class="font-medium"><%= doc.title %></span>
+                    Reporting: <span class="font-medium"><%= reference_title(doc) %></span>
                   </p>
 
                   <%= form_with url: reports_path, scope: :report, method: :post, class: "space-y-4" do |f| %>
