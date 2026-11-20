@@ -10,8 +10,15 @@ RSpec.describe CategorySearch do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
   end
 
-  def resource(title, categories, metadata = {})
-    source.documents.create!(title: title, content: title, categories: categories, metadata: metadata)
+  def resource(name, categories, **attributes)
+    source.services.create!(name: name, categories: categories, **attributes)
+  end
+
+  # A moderator accepted a report on the row the service was read from.
+  def removed(name, categories)
+    row = source.documents.create!(title: name, content: name)
+    row.reports.create!(reason: "out of date", status: "valid")
+    resource(name, categories, document: row)
   end
 
   it "returns any selected category in name order, repeating shared resources in each section" do
@@ -49,38 +56,20 @@ RSpec.describe CategorySearch do
     expect(sections.first.resources).to eq([zebra, alpha])
   end
 
-  it "uses associations exclusively, ignoring stale category metadata" do
-    listing = resource("Shelter", [shelters], categories: ["Meals"], resource_categories: ["food"])
-    metadata_only = resource("Metadata only", [], categories: ["Meals"], resource_categories: ["food"])
-
-    expect(described_class.call(categories: [meals.id.to_s]).first.resources).to be_empty
-    expect(described_class.call(categories: [shelters.id.to_s]).first.resources).to eq([listing])
-    expect(described_class.call(categories: []).last.resources).to eq([metadata_only])
-  end
-
-  it "includes resources without embeddings while excluding accepted removals and closed listings" do
+  it "excludes accepted removals and closed services" do
     visible = resource("Visible", [meals])
-    missing_embedding = resource("No embedding", [meals])
-    missing_embedding.update_column(:embedding, nil)
-    reported = resource("Accepted removal", [meals])
-    reported.reports.create!(reason: "out of date", status: "valid")
+    removed("Accepted removal", [meals])
     resource("Closed", [meals], closed: true)
 
-    expect(described_class.call(categories: [meals.id.to_s]).first.resources).to contain_exactly(visible, missing_embedding)
+    expect(described_class.call(categories: [meals.id.to_s]).first.resources).to eq([visible])
   end
 
   it "keeps pending reports visible" do
-    listing = resource("Meals", [meals])
-    listing.reports.create!(reason: "unclear")
+    row = source.documents.create!(title: "Meals", content: "Meals")
+    row.reports.create!(reason: "unclear")
+    listing = resource("Meals", [meals], document: row)
 
     expect(described_class.call(categories: [meals.id.to_s]).first.resources).to eq([listing])
-  end
-
-  it "respects a narrower supplied scope" do
-    chosen = resource("Chosen", [meals])
-    resource("Other", [meals])
-
-    expect(described_class.call(categories: [meals.id.to_s], scope: Document.where(id: chosen.id)).first.resources).to eq([chosen])
   end
 
   it "returns an empty section for an existing category with no results" do
@@ -97,17 +86,15 @@ RSpec.describe CategorySearch do
     shelter = resource("Shelter", [shelters])
     other = resource("Other service", [])
     resource("Closed", [], closed: true)
-    removed = resource("Accepted removal", [])
-    removed.reports.create!(reason: "out of date", status: "valid")
-    unsearchable = resource("No embedding", [])
-    unsearchable.update_column(:embedding, nil)
+    removed("Accepted removal", [])
+    another = resource("Another service", [])
 
     sections = described_class.call(categories: [])
 
     expect(sections.map(&:category)).to eq([meals, shelters, showers, nil])
-    expect(sections.flat_map(&:resources)).to match_array([meal, shelter, other, unsearchable])
+    expect(sections.flat_map(&:resources)).to match_array([meal, shelter, other, another])
     expect(sections.last.name).to eq("Other resources")
-    expect(sections.last.resources).to eq([unsearchable, other])
+    expect(sections.last.resources).to eq([another, other])
   end
 
   it "shows uncategorized resources when no database categories exist" do
@@ -118,15 +105,6 @@ RSpec.describe CategorySearch do
 
     expect(sections.map(&:name)).to eq(["Other resources"])
     expect(sections.first.resources).to eq([listing])
-  end
-
-  it "keeps an unfiltered guide within its supplied scope" do
-    chosen = resource("Chosen", [])
-    resource("Other", [meals])
-
-    sections = described_class.call(categories: [], scope: Document.where(id: chosen.id))
-
-    expect(sections.flat_map(&:resources)).to eq([chosen])
   end
 
   it "leaves uncategorized resources out of an explicit selection" do
@@ -142,14 +120,5 @@ RSpec.describe CategorySearch do
     expect(RubyLLM).not_to receive(:chat)
 
     expect(described_class.call(categories: [meals.id.to_s]).first.resources).to eq([listing])
-  end
-
-  it "does not load embedding vectors into memory for resource cards" do
-    resource("Meals", [meals])
-
-    listing = described_class.call(categories: [meals.id.to_s]).first.resources.first
-
-    expect(listing.has_attribute?(:embedding)).to be(false)
-    expect(listing.categories).to eq([meals])
   end
 end

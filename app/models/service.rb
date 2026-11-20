@@ -8,8 +8,7 @@
 # imported row (Document) when there is one. A service added by an admin
 # belongs to the form entries source and has no row.
 #
-# Chat and printouts still read documents. They move to services in a later
-# phase of NEI-34.
+# Printouts and their map list services.
 class Service < ApplicationRecord
   include HasWebsite
 
@@ -32,6 +31,15 @@ class Service < ApplicationRecord
   validate :additional_details_is_an_object
 
   scope :alphabetical, -> { order(Arel.sql("LOWER(services.name)"), :id) }
+  scope :in_categories, ->(category_ids) {
+    where(id: Service.joins(:categories).where(categories: {id: category_ids}).select(:id))
+  }
+  # What printouts and chat may show. A closed service is left out, and so is
+  # one whose row a moderator removed after a report.
+  scope :visible, -> {
+    where(closed: false)
+      .where.not(id: Service.joins(document: :reports).where(reports: {status: "valid"}).select(:id))
+  }
 
   def category_names
     categories.map(&:name)

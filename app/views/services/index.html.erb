@@ -3,7 +3,7 @@
   <%= link_to "Add service", new_service_path, class: "admin-button-primary" %>
 <% end %>
 
-<%= render "admin/page_header", title: "Services", description: "The services people can go to, and the organizations that offer them. Chat and printouts don't read these yet." %>
+<%= render "admin/page_header", title: "Services", description: "The services people can go to, and the organizations that offer them." %>
 
 <% if @services.any? %>
   <%= render "list", services: @services, show_organization: true %>
