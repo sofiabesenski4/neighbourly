@@ -5,7 +5,9 @@ class ServicesController < ApplicationController
 
   def index
     authorize Service
-    @services = policy_scope(Service).alphabetical.includes(:organization, :categories, :address)
+    @sort = Service::SORTS.key?(params[:sort]) ? params[:sort] : "name"
+    @direction = (params[:direction] == "desc") ? "desc" : "asc"
+    @services = policy_scope(Service).sorted_by(@sort, @direction).includes(:organization, :categories, :address)
   end
 
   def show

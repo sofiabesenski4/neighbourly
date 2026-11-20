@@ -50,7 +50,7 @@
     <%= link_to "Add service", new_service_path(organization_id: @organization.id), class: "admin-button-secondary" %>
   </div>
   <% if @services.any? %>
-    <%= render "services/list", services: @services, show_organization: false %>
+    <%= render "services/table", services: @services, show_organization: false %>
   <% else %>
     <p class="admin-empty-state">This organization has no services yet.</p>
   <% end %>

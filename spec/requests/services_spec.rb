@@ -30,8 +30,27 @@ RSpec.describe "Services", type: :request do
 
       expect(response).to have_http_status(:ok)
       page = Nokogiri::HTML(response.body)
-      expect(page.css("article a.admin-link").map(&:text)).to eq(["Bike repair", "Community lunch"])
+      expect(page.css("tbody tr td:first-child a").map(&:text)).to eq(["Bike repair", "Community lunch"])
+      expect(page.css("thead th").map { |th| th.text.squish }).to include("Name ↑", "Offered by", "City", "Phone", "Categories", "Updated")
       expect(page.text.squish).to include("Our Place Society", "Victoria")
+    end
+
+    it "sorts the table by a column, either way, with blank values last" do
+      service
+      Source.form_entry_source.services.create!(name: "Bike repair", address_attributes: {city: "Victoria"})
+      Source.form_entry_source.services.create!(name: "Arts drop-in", address_attributes: {city: "Esquimalt"})
+
+      names = ->(params) {
+        get services_path, params: params
+        Nokogiri::HTML(response.body).css("tbody tr td:first-child a").map(&:text)
+      }
+
+      expect(names.call(sort: "city")).to eq(["Arts drop-in", "Bike repair", "Community lunch"])
+      expect(names.call(sort: "city", direction: "desc")).to eq(["Bike repair", "Arts drop-in", "Community lunch"])
+      expect(names.call(sort: "organization")).to eq(["Community lunch", "Arts drop-in", "Bike repair"])
+      expect(names.call(sort: "name", direction: "desc")).to eq(["Community lunch", "Bike repair", "Arts drop-in"])
+      expect(Nokogiri::HTML(response.body).at_css("th[aria-sort='descending']").text.squish).to eq("Name ↓")
+      expect(names.call(sort: "id; DROP TABLE services")).to eq(["Arts drop-in", "Bike repair", "Community lunch"])
     end
 
     it "starts a new service linked to the organization it was opened from" do

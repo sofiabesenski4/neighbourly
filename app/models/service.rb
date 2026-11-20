@@ -42,6 +42,22 @@ class Service < ApplicationRecord
       .where.not(id: Service.joins(document: :reports).where(reports: {status: "valid"}).select(:id))
   }
 
+  # The columns the services table sorts by. Blank values go last either way.
+  SORTS = {
+    "name" => "LOWER(services.name)",
+    "organization" => "LOWER(organizations.name)",
+    "city" => "LOWER(addresses.city)",
+    "updated" => "services.updated_at"
+  }.freeze
+
+  # Sorted by one of SORTS, then by name. Anything unknown sorts by name.
+  def self.sorted_by(column, direction)
+    expression = SORTS.fetch(column.to_s, SORTS["name"])
+    direction = (direction.to_s == "desc") ? "DESC" : "ASC"
+    left_joins(:organization, :address)
+      .order(Arel.sql("#{expression} #{direction} NULLS LAST"), Arel.sql("LOWER(services.name)"), :id)
+  end
+
   def category_names
     categories.map(&:name)
   end
