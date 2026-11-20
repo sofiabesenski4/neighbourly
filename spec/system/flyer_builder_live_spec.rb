@@ -14,9 +14,9 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
     source = Source.create!(name: "Local", source_type: "csv")
-    source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food])
-    source.documents.create!(title: "Beta clinic", content: "Clinic", categories: [health])
-    source.documents.create!(title: "Gamma noticeboard", content: "Noticeboard", metadata: {})
+    source.services.create!(name: "Alpha meals", categories: [food])
+    source.services.create!(name: "Beta clinic", categories: [health])
+    source.services.create!(name: "Gamma noticeboard")
   end
 
   # Distance checks allow any space after the label. CI doesn't build the stylesheet, so there
@@ -143,8 +143,8 @@ RSpec.describe "Live resource guide builder", type: :system do
 
   it "fills the final row when a category has an odd number of cards" do
     source = Source.find_by!(name: "Local")
-    source.documents.create!(title: "Bravo meals", content: "Meals", categories: [food])
-    source.documents.create!(title: "Charlie meals", content: "Meals", categories: [food])
+    source.services.create!(name: "Bravo meals", categories: [food])
+    source.services.create!(name: "Charlie meals", categories: [food])
     page.current_window.resize_to(1280, 900)
     visit_builder
 
@@ -160,7 +160,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
   it "pins the full-height desktop panel once the introduction scrolls past" do
     source = Source.find_by!(name: "Local")
-    18.times { |index| source.documents.create!(title: "Extra meal #{index}", content: "Meals", categories: [food]) }
+    18.times { |index| source.services.create!(name: "Extra meal #{index}", categories: [food]) }
     page.current_window.resize_to(1280, 700)
     visit_builder
     expect(page).to have_css("article h4", text: "Extra meal 17")
@@ -402,7 +402,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     let(:point) { GeoPoint.new(lat: 48.42, lng: -123.36) }
 
     before do
-      Document.find_by!(title: "Alpha meals").update_columns(metadata: {lat: 48.43, lng: -123.36})
+      Service.find_by!(name: "Alpha meals").create_address!(lat: 48.43, lng: -123.36)
     end
 
     # Keeps a copy of the PDF as the page turns it into a link. Fetching the link
@@ -454,7 +454,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     it "enables distance sorting on both layouts and resets it when distances are skipped" do
       allow(Geocoder).to receive(:locate).and_return(point)
-      Document.find_by!(title: "Beta clinic").update_columns(metadata: {lat: 48.421, lng: -123.36})
+      Service.find_by!(name: "Beta clinic").create_address!(lat: 48.421, lng: -123.36)
       page.current_window.resize_to(1280, 900)
       visit_location_screen
       continue_with_place("919 Pandora Ave")

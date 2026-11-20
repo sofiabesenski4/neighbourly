@@ -11,9 +11,9 @@ RSpec.describe "Mobile printouts", type: :system do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
     allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
     source = Source.create!(name: "Victoria Community Directory", source_type: "csv")
-    source.documents.create!(title: "Farther kitchen", content: "Meals", categories: [meals], metadata: {lat: 48.44, lng: -123.36})
-    source.documents.create!(title: "Nearby kitchen", content: "Meals", categories: [meals], metadata: {lat: 48.421, lng: -123.36})
-    source.documents.create!(title: "Community clinic", content: "Health care", categories: [health], metadata: {lat: 48.425, lng: -123.36})
+    source.services.create!(name: "Farther kitchen", categories: [meals], address_attributes: {lat: 48.44, lng: -123.36})
+    source.services.create!(name: "Nearby kitchen", categories: [meals], address_attributes: {lat: 48.421, lng: -123.36})
+    source.services.create!(name: "Community clinic", categories: [health], address_attributes: {lat: 48.425, lng: -123.36})
   end
 
   after do

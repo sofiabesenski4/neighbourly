@@ -11,7 +11,7 @@ class CategorySearch
     end
   end
 
-  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, origin: nil, scope: Document.all)
+  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, origin: nil)
     selection = Flyer.new(categories: categories, query: query, sort: sort)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
@@ -20,23 +20,12 @@ class CategorySearch
     selected = selected.where(id: selection.categories) unless unfiltered
     selected = selected.to_a
 
-    # A saved resource is printable without a search embedding. Keep closed
-    # resources and accepted removals hidden until a publication workflow
-    # replaces this prototype visibility rule (issue #65).
-    resources = scope
-      .where.not(id: Report.where(status: "valid").select(:document_id))
-      .where("metadata ->> 'closed' IS DISTINCT FROM 'true'")
-      .select(:id, :source_id, :title, :content, :metadata)
-
-    unless unfiltered
-      matching = Document.in_categories(selection.categories)
-      resources = resources.where(id: matching.select(:id))
-    end
-
-    resources = resources
-      .includes(:source, :categories, :address)
-      .order(Arel.sql("LOWER(documents.title) ASC"), :id)
-      .to_a
+    # Printouts list services. Closed services and accepted removals stay
+    # hidden until a publication workflow replaces this prototype visibility
+    # rule (issue #65).
+    resources = Service.visible
+    resources = resources.in_categories(selection.categories) unless unfiltered
+    resources = resources.includes(:source, :categories, :address).alphabetical.to_a
 
     if selection.query.present?
       term = selection.query.downcase

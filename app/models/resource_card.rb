@@ -1,10 +1,7 @@
-# The allowlist of saved resource information used by both HTML and PDF cards.
+# The allowlist of a service's saved information used by both HTML and PDF cards.
 # Missing values remove the complete field, including its label. These values
 # are never supplemented with model-generated information.
 class ResourceCard
-  CONTENT_LABELS = ["City", "Address", "Phone", "Email", "Website", "Hours",
-    "Age range", "Gender", "Categories", "Description", "Notes", "Intake", "Beds"].freeze
-
   # Assumes about 5 km/h, a common estimate for walking. Many people using these
   # guides may be slower, which is why the printout calls this an estimate.
   WALKING_MINUTES_PER_KM = 12
@@ -16,52 +13,50 @@ class ResourceCard
   # docs/resource-map-notes.md.
   STREET_ROUTE_FACTOR = 1.3
 
-  attr_reader :document
+  attr_reader :service
 
   # The origin is optional. The preview and printout pass the same one, so they show
-  # the same distances. Without it, or when the resource's location isn't known, the
+  # the same distances. Without it, or when the service's location isn't known, the
   # card simply has no Distance row, like any other missing field.
-  def initialize(document, origin: nil)
-    @document = document
+  def initialize(service, origin: nil)
+    @service = service
     @origin = origin
   end
 
   def title
-    text(document.title) || "Resource"
+    text(service.name) || "Resource"
   end
 
   def fields
-    location = document.location
-    address = text(location.street_address) || text(content_fields["Address"])
-    city = text(content_fields["City"]) || text(location.city)
-    # Several numbers are saved as one comma-separated value. Each gets a line.
-    phone = text(location.phone&.split(/,\s*/), separator: "\n") || text(content_fields["Phone"])
+    address = text(service.address&.street_address)
+    city = text(service.address&.city)
     rows = [
-      ["Services", value("description", "Description") || text(document.category_names)],
+      ["Services", text(service.description) || text(service.category_names)],
       ["Address", address && [address, city].compact.join(", ")],
       ["City", (city unless address)],
       ["Distance", distance],
-      ["Hours", value("hours", "Hours")],
-      ["Phone", phone],
-      ["Email", value("email", "Email")],
-      ["Website", value("website", "Website")],
+      ["Hours", text(service.hours)],
+      # Several numbers are saved as one comma-separated value. Each gets a line.
+      ["Phone", text(service.phone&.split(/,\s*/), separator: "\n")],
+      ["Email", text(service.email)],
+      ["Website", text(service.website)],
       ["Ages served", ages],
-      ["Eligibility", value("gender", "Gender")],
-      ["Languages", value("language_services")],
-      ["Notes", value("notes", "Notes")],
-      ["Intake", value("intake_info", "Intake")],
-      ["Last updated", value("last_updated_at") || value("last_updated")],
-      ["Information source", value("source_url") || text(document.source&.url)]
+      ["Eligibility", detail("gender", "eligibility")],
+      ["Languages", detail("languages", "language", "language services")],
+      ["Notes", detail("notes")],
+      ["Intake", detail("intake", "intake info")],
+      ["Last updated", detail("last updated at", "last updated")],
+      ["Information source", detail("source url") || text(service.source&.url)]
     ]
     rows.filter_map { |label, content| {label: label, value: content} if content }
   end
 
   def as_json(*)
-    {id: document.id, title: title, fields: fields}
+    {id: service.id, title: title, fields: fields}
   end
 
   def distance_km
-    point = document.coordinates if @origin&.located?
+    point = service.coordinates if @origin&.located?
     @origin.point.distance_km_to(point) if point
   end
 
@@ -86,10 +81,6 @@ class ResourceCard
     leftover.zero? ? "#{hours} hr" : "#{hours} hr #{leftover} min"
   end
 
-  def value(key, legacy_label = nil, separator: ", ")
-    text(document.metadata[key], separator: separator) || (text(content_fields[legacy_label], separator: separator) if legacy_label)
-  end
-
   def text(value, separator: ", ")
     case value
     when nil, Hash then nil
@@ -98,26 +89,29 @@ class ResourceCard
     end
   end
 
+  # The first of the named details the service has. Imports keep each column
+  # under its own header, so "Intake Info", "intake_info" and "INTAKE INFO"
+  # are all found as "intake info".
+  def detail(*names)
+    names.lazy.filter_map { |name| text(details[name]) }.first
+  end
+
+  def details
+    @details ||= service.additional_details.each_with_object({}) do |(key, value), found|
+      found[ContentPipeline::Parsers::Csv.header_key(key.to_s)] ||= value
+    end
+  end
+
+  # The resource form saves the range as numbers. An import keeps whatever its
+  # column said.
   def ages
-    range = document.metadata["age_range"]
+    range = details["age range"]
     if range.is_a?(Hash)
       minimum, maximum = text(range["min"]), text(range["max"])
       return "#{minimum}-#{maximum}" if minimum && maximum
       return "#{minimum}+" if minimum
       return "Up to #{maximum}" if maximum
     end
-    value("age_range_text", "Age range")
-  end
-
-  # Older imports kept Notes and Intake only in the searchable text. Read the
-  # importer's labelled fields deterministically so those records retain all
-  # their information without a fresh scrape, import, or LLM call.
-  def content_fields
-    @content_fields ||= document.content.to_s
-      .split(/\n(?=(?:#{CONTENT_LABELS.map { |label| Regexp.escape(label) }.join("|")}):)/)
-      .filter_map { |part|
-        label, content = part.split(":", 2)
-        [label, content] if CONTENT_LABELS.include?(label) && content
-      }.to_h
+    detail("age range", "ages", "age")
   end
 end

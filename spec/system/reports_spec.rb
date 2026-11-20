@@ -110,6 +110,18 @@ RSpec.describe "Reports", type: :system do
         expect(document.reload.embedding).to be_nil
       end
 
+      it "names the service the row was read into, and takes it off printouts too" do
+        service = source.services.create!(name: "Test Shelter service", document: document)
+        Report.create!(document: document, user: regular_user, reason: "false information")
+
+        visit reports_path
+        expect(page).to have_link("Test Shelter service", href: service_path(service))
+        click_button "Accept removal"
+
+        expect(page).to have_content("removed from search results and printouts")
+        expect(Service.visible).not_to include(service)
+      end
+
       it "marks all pending reports for the same document as valid" do
         report1 = Report.create!(document: document, user: regular_user, reason: "false information")
         report2 = Report.create!(document: document, user: admin, reason: "out of date")

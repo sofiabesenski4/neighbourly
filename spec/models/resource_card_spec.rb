@@ -3,8 +3,14 @@ require "rails_helper"
 RSpec.describe ResourceCard do
   let(:source) { Source.new(name: "Guide", source_type: "csv") }
 
-  def card(metadata: {}, content: "Saved resource", title: "Meal program")
-    described_class.new(Document.new(title: title, content: content, metadata: metadata, source: source))
+  def service(name: "Meal program", address: nil, **attributes)
+    Service.new(name: name, source: source, **attributes).tap do |service|
+      service.build_address(**address) if address
+    end
+  end
+
+  def card(...)
+    described_class.new(service(...))
   end
 
   # The Distance row a printed card gets when someone enters a location. 0.01 degrees
@@ -13,9 +19,8 @@ RSpec.describe ResourceCard do
   describe "distance from an origin" do
     let(:origin) { FlyerOrigin.new(label: "Here", point: GeoPoint.new(lat: 48.42, lng: -123.36)) }
 
-    def distance_row(metadata, origin: self.origin)
-      document = Document.new(title: "Meal program", content: "Saved", metadata: metadata, source: source)
-      described_class.new(document, origin: origin).fields.find { |field| field[:label] == "Distance" }
+    def distance_row(address, origin: self.origin)
+      described_class.new(service(address: address), origin: origin).fields.find { |field| field[:label] == "Distance" }
     end
 
     it "shows the distance and walking time" do
@@ -34,15 +39,18 @@ RSpec.describe ResourceCard do
     end
 
     it "follows the address, so the location details stay together" do
-      document = Document.new(title: "Meal program", content: "Saved", source: source,
-        metadata: {address: "919 Pandora Ave", lat: 48.43, lng: -123.36, hours: "Daily"})
-      labels = described_class.new(document, origin: origin).fields.map { |field| field[:label] }
+      labels = described_class.new(service(hours: "Daily", address: {street_address: "919 Pandora Ave", lat: 48.43, lng: -123.36}),
+        origin: origin).fields.map { |field| field[:label] }
 
       expect(labels).to eq(["Address", "Distance", "Hours"])
     end
 
-    it "has no row for a resource whose location isn't known" do
-      expect(distance_row({address: "919 Pandora Ave"})).to be_nil
+    it "has no row for a service whose location isn't known" do
+      expect(distance_row({street_address: "919 Pandora Ave"})).to be_nil
+    end
+
+    it "has no row for a service with no address" do
+      expect(described_class.new(service, origin: origin).fields).to be_empty
     end
 
     it "has no row when no location was entered" do
@@ -57,71 +65,67 @@ RSpec.describe ResourceCard do
   end
 
   it "uses database category names for service labels" do
-    document = Document.new(content: "Resource", source: source)
-    document.categories.build(name: "Meals")
+    listing = service
+    listing.categories.build(name: "Meals")
 
-    expect(described_class.new(document).fields).to include({label: "Services", value: "Meals"})
+    expect(described_class.new(listing).fields).to include({label: "Services", value: "Meals"})
   end
 
   it "omits complete fields whose values are missing" do
     expect(card.fields).to be_empty
-    expect(card(metadata: {notes: " ", hours: nil, phone: [], email: ""}).fields).to be_empty
+    expect(card(hours: " ", email: "", additional_details: {notes: " ", intake: nil, languages: []}).fields).to be_empty
   end
 
   it "uses the agreed labels, puts Intake after Notes, and prints only provided dates" do
-    fields = card(metadata: {description: "Meals", address: "123 Main St", city: "Victoria",
-                             hours: "Noon", notes: "Call ahead", intake_info: "Walk in", last_updated_at: "2026-10-15"}).fields
+    fields = card(description: "Meals", hours: "Noon", address: {street_address: "123 Main St", city: "Victoria"},
+      additional_details: {notes: "Call ahead", intake_info: "Walk in", last_updated_at: "2026-10-15"}).fields
 
     expect(fields.map { |field| field[:label] }).to eq(["Services", "Address", "Hours", "Notes", "Intake", "Last updated"])
     expect(fields.find { |field| field[:label] == "Address" }[:value]).to eq("123 Main St, Victoria")
     expect(fields.map { |field| field[:label] }).not_to include("Last checked", "Information source")
   end
 
-  it "reads multiline Notes and Intake from an older import's saved content" do
-    fields = card(content: "Place\nCity: Victoria\nNotes: First line\nSecond line\nIntake: Call first").fields
-
-    expect(fields).to include({label: "Notes", value: "First line\nSecond line"}, {label: "Intake", value: "Call first"})
+  it "shows the city alone when there is no street address" do
+    expect(card(address: {city: "Victoria"}).fields).to eq([{label: "City", value: "Victoria"}])
   end
 
-  it "uses the saved city display name instead of its slug in an address" do
-    fields = card(metadata: {address: "123 Main St", city: "north_vancouver"},
-      content: "Place\nCity: North Vancouver\nAddress: 123 Main St").fields
-
-    expect(fields).to include({label: "Address", value: "123 Main St, North Vancouver"})
-    expect(fields.map { |field| field[:label] }).not_to include("City")
-  end
-
-  it "uses the saved city display name when no street address is provided" do
-    fields = card(metadata: {city: "north_vancouver"}, content: "Place\nCity: North Vancouver").fields
-
-    expect(fields).to include({label: "City", value: "North Vancouver"})
-  end
-
-  it "labels the saved description Services" do
-    expect(card(metadata: {description: "Free hot meals"}).fields)
+  it "labels the description Services" do
+    expect(card(description: "Free hot meals").fields)
       .to include({label: "Services", value: "Free hot meals"})
   end
 
-  it "ignores category metadata and content without mixing them into adjacent fields" do
-    fields = card(metadata: {categories: ["Meals"], resource_categories: ["food"]},
-      content: "Place\nNotes: Call ahead\nCategories: Shelters\nIntake: Walk in").fields
+  # An import keeps each extra column under its own header.
+  it "finds imported details whatever their headers' case and spacing" do
+    fields = card(additional_details: {"Intake Info" => "Call first", "NOTES" => "Bring ID", "Ages" => "19+",
+                                       "Gender" => "Women", "Languages" => "French"}).fields
 
-    expect(fields).to contain_exactly({label: "Notes", value: "Call ahead"}, {label: "Intake", value: "Walk in"})
+    expect(fields).to eq([
+      {label: "Ages served", value: "19+"},
+      {label: "Eligibility", value: "Women"},
+      {label: "Languages", value: "French"},
+      {label: "Notes", value: "Bring ID"},
+      {label: "Intake", value: "Call first"}
+    ])
   end
 
-  it "prefers metadata over old content and puts separate phone numbers on separate lines" do
-    fields = card(metadata: {notes: "Updated note", phone: ["250-555-0100", "250-555-0101"]}, content: "Place\nNotes: Old note").fields
+  it "shows the age range and genders saved by the resource form" do
+    fields = card(additional_details: {"age_range" => {"min" => 19, "max" => nil}, "gender" => ["women", "non-binary"]}).fields
 
-    expect(fields).to include({label: "Notes", value: "Updated note"}, {label: "Phone", value: "250-555-0100\n250-555-0101"})
+    expect(fields).to include({label: "Ages served", value: "19+"}, {label: "Eligibility", value: "women, non-binary"})
+  end
+
+  it "puts separate phone numbers on separate lines" do
+    expect(card(phone: "250-555-0100, 250-555-0101").fields)
+      .to include({label: "Phone", value: "250-555-0100\n250-555-0101"})
   end
 
   it "preserves zero and false rather than treating them as missing" do
-    expect(card(metadata: {notes: false, age_range: {min: 0, max: 18}}).fields)
+    expect(card(additional_details: {notes: false, age_range: {min: 0, max: 18}}).fields)
       .to include({label: "Notes", value: "false"}, {label: "Ages served", value: "0-18"})
   end
 
-  it "does not expose arbitrary metadata, embeddings, or administrative fields" do
-    data = card(metadata: {notes: "Public note", private_email: "secret@example.org", internal_review: "Hidden"}).as_json
+  it "does not expose other details, embeddings, or administrative fields" do
+    data = card(additional_details: {notes: "Public note", private_email: "secret@example.org", internal_review: "Hidden"}).as_json
 
     expect(data.keys).to eq([:id, :title, :fields])
     expect(data.to_json).not_to include("secret@example.org", "Hidden", "embedding")

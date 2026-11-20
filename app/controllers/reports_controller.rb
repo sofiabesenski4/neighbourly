@@ -18,7 +18,7 @@ class ReportsController < ApplicationController
 
   def index
     authorize Report
-    @reports = policy_scope(Report).most_recent.includes(document: :source, user: [])
+    @reports = policy_scope(Report).most_recent.includes(document: [:source, :service], user: [])
   end
 
   def create
@@ -53,7 +53,7 @@ class ReportsController < ApplicationController
       document.update_column(:embedding, nil)
     end
 
-    redirect_to reports_path, notice: "Removal accepted. '#{document.title}' has been removed from search results."
+    redirect_to reports_path, notice: "Removal accepted. '#{document.title}' has been removed from #{helpers.removal_places(document)}."
   end
 
   private
