@@ -41,6 +41,29 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
   end
 
+  it "narrows the guide to chosen organizations on desktop and in the mobile filters" do
+    organization = Organization.create!(name: "Our Place Society")
+    Service.find_by!(name: "Alpha meals").update!(organization: organization)
+    visit_builder
+    expect(page).to have_css("article h4", count: 3)
+
+    find("summary", text: "Organizations").click
+    check "Our Place Society"
+    expect(page).to have_css("article h4", count: 1)
+    expect(page).to have_css("article h4", text: "Alpha meals")
+
+    emulate_mobile
+    find("button[aria-label='Filters (active)']").click
+    within("#flyer-filters") do
+      expect(page).to have_checked_field("Our Place Society")
+      uncheck "Our Place Society"
+      click_button "Apply filters"
+    end
+    expect(page).to have_css("article h4", count: 3)
+  ensure
+    clear_mobile_emulation if organization
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)

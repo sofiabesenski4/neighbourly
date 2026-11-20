@@ -215,6 +215,15 @@ RSpec.describe "Flyers", type: :request do
       expect(response.parsed_body["errors"]).to include("Categories must be provided as a list")
     end
 
+    it "rejects a malformed organization filter instead of broadening it to all resources" do
+      expect(FlyerGenerator).not_to receive(:call)
+
+      post flyers_path, params: {flyer: {organizations: "7"}}, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body["errors"]).to include("Organizations must be provided as a list")
+    end
+
     it "rejects an unsupported filter key instead of printing every resource" do
       expect(FlyerGenerator).not_to receive(:call)
 
@@ -612,6 +621,23 @@ RSpec.describe "Flyers", type: :request do
       text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
       expect(text).to include("Internet access", "Community computers")
       expect(text).not_to include("Computer access", "Community meal", "Unrelated clinic")
+    end
+
+    it "shows only the chosen organization's services in the preview and PDF" do
+      organization = Organization.create!(name: "Our Place Society")
+      Service.find_by!(name: "Community meal").update!(organization: organization)
+      selection = {flyer: {organizations: [organization.id.to_s]}}
+
+      get preview_flyers_path(format: :json), params: selection
+
+      titles = response.parsed_body.fetch("categories").flat_map { |category| category.fetch("resources") }.map { |card| card.fetch("title") }
+      expect(titles).to eq(["Community meal"])
+
+      post flyers_path, params: selection, headers: {"Accept" => "application/pdf"}
+
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text).to include("Community meal")
+      expect(text).not_to include("Unrelated clinic")
     end
 
     it "shows all visible resources in JSON when no filters are specified" do
