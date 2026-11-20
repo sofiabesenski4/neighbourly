@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_20_061900) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -165,6 +165,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
     t.bigint "source_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "former_names", default: [], null: false, array: true
+    t.index ["former_names"], name: "index_organizations_on_former_names", using: :gin
     t.index ["normalized_name"], name: "index_organizations_on_normalized_name", unique: true
     t.index ["source_id"], name: "index_organizations_on_source_id"
   end
@@ -461,7 +463,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
     t.datetime "updated_at", null: false
+    t.bigint "organization_id"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["organization_id"], name: "index_users_on_organization_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
@@ -494,4 +498,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "users", "organizations", on_delete: :nullify
 end

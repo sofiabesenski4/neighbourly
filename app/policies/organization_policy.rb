@@ -1,12 +1,14 @@
 # frozen_string_literal: true
 
+# Admins manage every organization. A member sees and edits their own, and
+# nothing else. Only admins add or delete organizations.
 class OrganizationPolicy < ApplicationPolicy
   def index?
-    admin?
+    admin? || member?
   end
 
   def show?
-    admin?
+    admin? || user&.member_of?(record) || false
   end
 
   def create?
@@ -14,7 +16,7 @@ class OrganizationPolicy < ApplicationPolicy
   end
 
   def update?
-    admin?
+    show?
   end
 
   def destroy?
@@ -25,6 +27,8 @@ class OrganizationPolicy < ApplicationPolicy
     def resolve
       if user&.admin?
         scope.all
+      elsif user&.member?
+        scope.where(id: user.organization_id)
       else
         scope.none
       end

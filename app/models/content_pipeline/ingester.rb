@@ -123,7 +123,10 @@ module ContentPipeline
       service = document.service || @source.services.build(document: document)
       service.assign_attributes(CLEARED_SERVICE_FIELDS.merge(chunk[:service]))
       write_service_address(service, chunk[:address] || {})
-      service.organization = Organization.for_name(chunk.dig(:organization, :name), source: @source)
+      # A service stays with its organization while the row names it by any
+      # name it has had, even if another organization now uses an old one.
+      name = chunk.dig(:organization, :name)
+      service.organization = Organization.for_name(name, source: @source) unless service.organization&.goes_by?(name)
       service.categories = document.categories
       service.save!
     end

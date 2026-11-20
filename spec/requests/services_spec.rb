@@ -115,4 +115,81 @@ RSpec.describe "Services", type: :request do
       expect(Service.exists?(service.id)).to be(false)
     end
   end
+
+  context "as a member of an organization" do
+    let(:member) { User.create!(email: "services-org-member@example.com", password: "password123", organization: organization) }
+    let(:other_organization) { Organization.create!(name: "Harbour Street Society") }
+    let(:other_service) { Source.form_entry_source.services.create!(name: "Night shelter", organization: other_organization) }
+
+    before { sign_in member }
+
+    it "lists only their organization's services, in the same admin pages" do
+      service
+      other_service
+
+      get services_path
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("Community lunch", "Your organization")
+      expect(response.body).not_to include("Night shelter", "Sources", "Moderation")
+    end
+
+    it "adds a service to their organization, whichever organization the request names" do
+      post services_path, params: {service: {name: "Breakfast club", organization_id: other_organization.id}}
+
+      expect(Service.find_by!(name: "Breakfast club").organization).to eq(organization)
+    end
+
+    it "edits their organization's services without moving them to another organization" do
+      patch service_path(service), params: {service: {phone: "250-555-0199", organization_id: other_organization.id}}
+
+      expect(service.reload).to have_attributes(phone: "250-555-0199", organization: organization)
+    end
+
+    it "deletes their organization's services" do
+      delete service_path(service)
+
+      expect(Service.exists?(service.id)).to be(false)
+    end
+
+    it "keeps them away from other organizations' services" do
+      get service_path(other_service)
+      expect(response).to redirect_to(root_path)
+
+      patch service_path(other_service), params: {service: {name: "Taken"}}
+      expect(other_service.reload.name).to eq("Night shelter")
+
+      delete service_path(other_service)
+      expect(Service.exists?(other_service.id)).to be(true)
+    end
+
+    it "names where an imported service came from without linking to admin-only pages" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Victoria directory", source_type: "csv")
+      row = source.documents.create!(title: "Lunch row", content: "Lunch")
+      imported = source.services.create!(name: "Imported lunch", organization: organization, document: row)
+
+      get service_path(imported)
+
+      expect(response.body).to include("Lunch row", "Victoria directory")
+      expect(response.body).not_to include(document_path(row), source_path(source))
+    end
+
+    it "closes an imported service rather than deleting it" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Victoria directory", source_type: "csv")
+      imported = source.services.create!(name: "Imported lunch", organization: organization,
+        document: source.documents.create!(title: "Lunch row", content: "Lunch"))
+
+      get service_path(imported)
+      expect(response.body).to include("can't be deleted here").and include("mark it closed")
+      expect(Nokogiri::HTML(response.body).css("button").map(&:text)).not_to include("Delete")
+
+      delete service_path(imported)
+      expect(Service.exists?(imported.id)).to be(true)
+
+      patch service_path(imported), params: {service: {closed: "1"}}
+      expect(imported.reload).to be_closed
+    end
+  end
 end
