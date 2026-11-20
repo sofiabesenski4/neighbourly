@@ -94,6 +94,25 @@ RSpec.describe "Services", type: :request do
       expect(response.body).to include(%(href="#{document_path(document)}"))
     end
 
+    it "confirms a service's details, saying when, how and by whom" do
+      get service_path(service)
+      expect(response.body).to include("Not confirmed yet")
+
+      post confirm_service_path(service), params: {confirmation_method: "phone"}
+
+      expect(response).to redirect_to(service_path(service))
+      expect(service.reload).to have_attributes(confirmed_by: admin, confirmation_method: "phone")
+      get service_path(service)
+      expect(response.body).to include("by phone by services-admin@example.com")
+    end
+
+    it "doesn't confirm without knowing how the details were checked" do
+      post confirm_service_path(service), params: {confirmation_method: "guess"}
+
+      expect(flash[:alert]).to eq("Choose how you confirmed the details.")
+      expect(service.reload.confirmed_at).to be_nil
+    end
+
     it "says when a moderator removed the service's row after a report" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
       document = Source.form_entry_source.documents.create!(title: "Lunch row", content: "Lunch")
@@ -169,6 +188,14 @@ RSpec.describe "Services", type: :request do
       delete service_path(service)
 
       expect(Service.exists?(service.id)).to be(false)
+    end
+
+    it "confirms their organization's services, but not others'" do
+      post confirm_service_path(service), params: {confirmation_method: "in_person"}
+      expect(service.reload).to have_attributes(confirmed_by: member, confirmation_method: "in_person")
+
+      post confirm_service_path(other_service), params: {confirmation_method: "in_person"}
+      expect(other_service.reload.confirmed_at).to be_nil
     end
 
     it "keeps them away from other organizations' services" do

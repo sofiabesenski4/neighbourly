@@ -1,5 +1,5 @@
 module ServicesHelper
-  SORT_LABELS = {"name" => "name", "organization" => "organization", "city" => "city", "updated" => "last updated"}.freeze
+  SORT_LABELS = {"name" => "name", "organization" => "organization", "city" => "city", "updated" => "last updated", "confirmed" => "last confirmed"}.freeze
 
   def sort_label(column)
     SORT_LABELS.fetch(column, "name")

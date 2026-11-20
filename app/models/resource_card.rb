@@ -45,6 +45,8 @@ class ResourceCard
       ["Languages", detail("languages", "language", "language services")],
       ["Notes", detail("notes")],
       ["Intake", detail("intake", "intake info")],
+      # Tells someone how far to trust the card, so it says when and how.
+      ["Last confirmed", service.confirmation],
       ["Last updated", detail("last updated at", "last updated")],
       ["Information source", detail("source url") || text(service.source&.url)]
     ]

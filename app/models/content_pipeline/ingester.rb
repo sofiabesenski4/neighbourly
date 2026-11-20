@@ -6,7 +6,9 @@ module ContentPipeline
   #   Ingester.new(source).call           — fetches content from source URL
   #   Ingester.new(source).ingest(string) — ingests raw content directly (file upload)
   class Ingester
-    # What a changed row no longer says is cleared from its service.
+    # What a changed row no longer says is cleared from its service. The
+    # service forgets an earlier confirmation itself, only if a detail it
+    # vouched for now reads differently.
     CLEARED_SERVICE_FIELDS = %i[description hours phone email website]
       .index_with(nil).merge(closed: false, additional_details: {}).freeze
     CLEARED_ADDRESS_FIELDS = %i[street_address city province postal_code country].index_with(nil).freeze

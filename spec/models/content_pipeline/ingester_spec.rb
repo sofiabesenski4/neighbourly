@@ -320,6 +320,23 @@ RSpec.describe ContentPipeline::Ingester do
           expect(Organization.for_name("Harbourside Society")).to eq(other)
         end
 
+        # Nobody has checked what a changed row now says.
+        it "clears a service's confirmation when a detail it vouched for changes, and keeps it otherwise" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+          service.confirm!(by: User.create!(email: "checker@example.com", password: "password123"), method: "phone")
+
+          described_class.new(source).ingest(csv)
+          expect(service.reload.confirmation_method).to eq("phone")
+
+          # The row reads differently, but names the same organization and details.
+          described_class.new(source).ingest(csv.sub("Meals,Harbourside Society", "Meals,harbourside  SOCIETY"))
+          expect(service.reload.confirmation_method).to eq("phone")
+
+          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
+          expect(service.reload).to have_attributes(confirmed_at: nil, confirmed_by: nil, confirmation_method: nil)
+        end
+
         it "keeps a service's coordinates when its row changes elsewhere" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
