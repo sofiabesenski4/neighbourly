@@ -188,6 +188,21 @@ RSpec.describe ContentPipeline::Parsers::Csv do
         expect(chunk[:service][:additional_details]).to eq("Ages" => "All ages")
       end
 
+      it "puts every phone column on the service's phone, rather than in additional details" do
+        chunk = parser.parse("Name,Phone,Phone Number,Telephone\nHarbour Meals,111,222,111\n").first
+
+        expect(chunk[:service][:phone]).to eq("111, 222")
+        expect(chunk[:service][:additional_details]).to eq({})
+      end
+
+      it "puts a repeated phone header's number on the service's phone too" do
+        chunk = parser.parse("Name,Phone,Phone\nHarbour Meals,111,222\n").first
+
+        expect(chunk[:metadata]).to include("Phone" => "111", "Phone (2)" => "222")
+        expect(chunk[:service][:phone]).to eq("111, 222")
+        expect(chunk[:service][:additional_details]).to eq({})
+      end
+
       it "keeps a website with no host in additional details" do
         ["https://?", "https://:443"].each do |website|
           chunk = parser.parse("Name,Website\nHarbour Meals,#{website}\n").first

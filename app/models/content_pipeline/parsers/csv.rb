@@ -148,7 +148,16 @@ module ContentPipeline
       def service_for(fields, title, used:)
         used = used.compact.to_set
         service = {name: title}
-        SERVICE_HEADERS.each do |attribute, names|
+        # A row can give several phone columns, like "Phone" and "Phone
+        # Number". All of them go on the service's phone, so an admin who
+        # clears it clears every number the row gave. Printouts put each on
+        # its own line.
+        phones = all_matches(fields, SERVICE_HEADERS[:phone])
+        if phones.any?
+          service[:phone] = phones.map(&:last).uniq.join(", ")
+          used.merge(phones.map(&:first))
+        end
+        SERVICE_HEADERS.except(:phone).each do |attribute, names|
           header, value = first_match(fields, names)
           next if header.nil?
 
@@ -169,6 +178,15 @@ module ContentPipeline
           found[self.class.header_key(header)] ||= [header, value] if value.present?
         end
         names.lazy.filter_map { |name| by_key[name] }.first
+      end
+
+      # Every filled-in column matching one of the names, in the row's order.
+      # A repeated header, which unique_headers renamed to "Phone (2)",
+      # matches as the header it repeats.
+      def all_matches(fields, names)
+        fields.select { |header, value|
+          value.present? && names.include?(self.class.header_key(header.sub(/ \(\d+\)\z/, "")))
+        }.to_a
       end
 
       # The first filled-in column for each part of the address, and the
