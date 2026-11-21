@@ -15,13 +15,25 @@ function locationController() {
   controller.locationStatusTarget = stub({ textContent: "", hidden: true });
   controller.placeErrorTarget = stub({ textContent: "", hidden: true });
   controller.confirmPlaceButtonTarget = stub({ textContent: "Continue" });
-  controller.locationStepTarget = stub();
+  controller.locationStepTarget = {
+    open: true,
+    showModal() {
+      this.open = true;
+    },
+    close() {
+      this.open = false;
+    },
+  };
   controller.locationHeadingTarget = stub();
   controller.subtitleTarget = stub();
+  controller.desktopActionsTarget = stub({ hidden: true });
   controller.builderStepTarget = stub({ hidden: true });
   controller.builderHeadingTarget = stub();
-  controller.locationSummaryRowTarget = stub({ hidden: true });
   controller.locationSummaryTarget = stub({ textContent: "" });
+  controller.distanceButtonTarget = stub();
+  controller.distanceLabelTarget = stub();
+  controller.distanceWarningTarget = stub();
+  controller.closeLocationTarget = stub();
   controller.printErrorTarget = stub({ hidden: true });
   controller.clearPrintout = () => {};
   controller.updateFilterControls = () => {};
@@ -30,12 +42,12 @@ function locationController() {
 }
 
 function assertOnBuilderStep(controller) {
-  assert.equal(controller.locationStepTarget.hidden, true);
+  assert.equal(controller.locationStepTarget.open, false);
   assert.equal(controller.builderStepTarget.hidden, false);
 }
 
 function assertOnLocationStep(controller) {
-  assert.equal(controller.locationStepTarget.hidden, false);
+  assert.equal(controller.locationStepTarget.open, true);
   assert.equal(controller.builderStepTarget.hidden, true);
 }
 
@@ -209,7 +221,7 @@ test("skipping clears any location and moves on", () => {
 
 // A finished or in-progress printout has distances from the old location, so it
 // must not stay available once the person goes back to change it.
-test("changing the location discards a printout and returns to the first screen", () => {
+test("editing distances opens the dialog and discards a printout", () => {
   const events = [];
   const controller = locationController();
   controller.printRequest = { abort: () => events.push("aborted") };
@@ -220,7 +232,8 @@ test("changing the location discards a printout and returns to the first screen"
   controller.changeLocation();
 
   assert.deepEqual(events, ["aborted", "cleared"]);
-  assertOnLocationStep(controller);
+  assert.equal(controller.locationStepTarget.open, true);
+  assert.equal(controller.builderStepTarget.hidden, false);
 });
 
 test("checks a typed place with the server, then moves on", async () => {

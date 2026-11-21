@@ -5,13 +5,26 @@
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
      data-flyer-builder-locate-url-value="<%= locate_flyers_path(format: :json) %>"
      data-action="turbo:before-cache@document->flyer-builder#beforeCache resize@window->flyer-builder#layoutChanged">
-  <header class="mb-3 pt-3 sm:mb-7 sm:pt-0">
-    <h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Build your resource guide</h1>
-    <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="subtitle">Print a guide with addresses, hours, and contacts.</p>
-  </header>
-
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
         data: { turbo: false, flyer_builder_target: "form", action: "submit->flyer-builder#generate" } do |form| %>
+    <header class="mb-3 pt-3 sm:mb-7 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:pt-0">
+      <div class="min-w-0">
+        <h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Build your resource guide</h1>
+        <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="subtitle">Print a guide with addresses, hours, and contacts.</p>
+      </div>
+      <div class="hidden shrink-0 items-center gap-2 sm:flex" hidden data-flyer-builder-target="desktopActions">
+        <button type="button" hidden class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-sage-800 hover:bg-sage-50 max-sm:w-full"
+                aria-haspopup="dialog" aria-controls="flyer-distances"
+                data-flyer-builder-target="distanceButton" data-action="flyer-builder#changeLocation">
+          <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z" />
+            <circle cx="12" cy="10" r="2.5" />
+          </svg>
+          <span data-flyer-builder-target="distanceLabel">Add distances</span>
+        </button>
+      </div>
+    </header>
+
     <% if @flyer.errors.any? %>
       <div role="alert" class="bg-red-50 text-red-700 px-4 py-3 rounded-lg mb-5">
         <ul class="list-disc ml-5">
@@ -26,14 +39,24 @@
         controller shows one at a time and switches between them without a page load,
         which keeps a typed address out of the URL and browser history. Without
         JavaScript, both show as one long form, which still works. %>
-    <section class="mb-5 max-w-2xl rounded-xl border border-stone-200 bg-white p-4 sm:mb-8 sm:p-6"
+    <dialog id="flyer-distances" open
+             class="static m-0 mb-5 w-full max-w-2xl rounded-xl border border-stone-200 bg-white p-4 text-stone-900 backdrop:bg-stone-900/40 sm:mb-8 sm:p-6 [&:modal]:fixed [&:modal]:inset-0 [&:modal]:m-auto [&:modal]:max-h-[calc(100dvh-2rem)] [&:modal]:w-[calc(100%-2rem)] [&:modal]:max-w-lg"
              aria-labelledby="flyer-location-heading"
-             data-flyer-builder-target="locationStep">
-      <h2 id="flyer-location-heading" tabindex="-1" class="font-semibold text-xl text-stone-900"
-          data-flyer-builder-target="locationHeading">Where should we measure distances from?</h2>
+             data-flyer-builder-target="locationStep" data-action="cancel->flyer-builder#cancelLocation:prevent">
+      <div class="flex items-start justify-between gap-2">
+        <h2 id="flyer-location-heading" tabindex="-1" class="font-semibold text-xl text-stone-900"
+            data-flyer-builder-target="locationHeading">Where should we measure distances from?</h2>
+        <button type="button" hidden class="grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-stone-600 hover:bg-stone-100"
+                aria-label="Close distances" data-flyer-builder-target="closeLocation" data-action="flyer-builder#cancelLocation">
+          <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
+            <path stroke-linecap="round" d="m6 6 12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
       <p class="mt-2 text-stone-600">
         Your printout can show how far away each resource is, with a walking time. This is optional, and your location isn't saved.
       </p>
+      <p class="mt-2 text-sm font-medium text-stone-700" data-flyer-builder-target="locationSummary" hidden></p>
 
       <%# The buttons here are shown by the controller, since they need JavaScript. %>
       <button type="button" hidden
@@ -68,17 +91,9 @@
 
       <%= form.hidden_field :lat, autocomplete: "off", data: { flyer_builder_target: "lat" } %>
       <%= form.hidden_field :lng, autocomplete: "off", data: { flyer_builder_target: "lng" } %>
-    </section>
+    </dialog>
 
     <div data-flyer-builder-target="builderStep">
-    <p class="mb-5 flex flex-wrap items-center gap-x-3 rounded-lg border border-stone-200 bg-white px-4 py-3 text-stone-800"
-       data-flyer-builder-target="locationSummaryRow" hidden>
-      <span data-flyer-builder-target="locationSummary"></span>
-      <button type="button"
-              class="min-h-11 cursor-pointer font-medium text-sage-800 underline"
-              data-action="flyer-builder#changeLocation">Change</button>
-    </p>
-
     <%= render "mobile_filters", form: form, categories: categories %>
 
     <div class="grid grid-cols-1 gap-5 items-start sm:grid-cols-[240px_minmax(0,1fr)] lg:gap-7">
@@ -134,20 +149,8 @@
         </button>
       </aside>
 
-      <section class="min-w-0" aria-labelledby="flyer-preview-heading">
-        <p class="my-3 text-lg font-semibold text-stone-900 sm:hidden">Guide preview</p>
-
-        <div class="flex sm:justify-end">
-          <%= form.button type: :submit,
-                class: "inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto",
-                data: { flyer_builder_target: "generate" } do %>
-            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 8.25V3.75h10.5v4.5m-10.5 9H4.5A2.25 2.25 0 0 1 2.25 15V10.5A2.25 2.25 0 0 1 4.5 8.25h15a2.25 2.25 0 0 1 2.25 2.25V15a2.25 2.25 0 0 1-2.25 2.25h-2.25m-10.5-3h10.5v6H6.75v-6Zm10.5-3h.008v.008h-.008v-.008Z" />
-            </svg>
-            <span data-flyer-builder-target="generateLabel">Generate printout</span>
-          <% end %>
-        </div>
-
+      <section class="min-w-0 max-sm:pb-[calc(4.25rem+env(safe-area-inset-bottom))]" aria-labelledby="flyer-preview-heading">
+        <p class="mt-2 text-sm text-stone-600" role="status" data-flyer-builder-target="distanceWarning" hidden></p>
         <div class="mt-2 text-sm text-red-700" data-flyer-builder-target="printError" role="alert" hidden></div>
         <div class="mt-2 rounded-lg border border-sage-200 bg-sage-50 px-3 py-2 sm:p-4" data-flyer-builder-target="printout" hidden>
           <p class="text-sm text-stone-800 sm:text-base" role="status">Your printout is ready.<span class="hidden sm:inline"> Use the PDF viewer to print or save it.</span></p>
@@ -178,6 +181,18 @@
             </div>
           </div>
           <noscript><p class="mt-5 text-stone-600">Preview needs JavaScript. You can still select categories and generate a PDF.</p></noscript>
+        </div>
+
+        <div class="flex max-sm:fixed max-sm:inset-x-0 max-sm:bottom-0 max-sm:z-10 max-sm:bg-white max-sm:px-4 max-sm:pt-2 max-sm:pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:justify-end"
+             data-flyer-builder-target="previewActions">
+          <%= form.button type: :submit,
+                class: "inline-flex min-h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto",
+                data: { flyer_builder_target: "generate" } do %>
+            <svg class="size-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" focusable="false">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 8.25V3.75h10.5v4.5m-10.5 9H4.5A2.25 2.25 0 0 1 2.25 15V10.5A2.25 2.25 0 0 1 4.5 8.25h15a2.25 2.25 0 0 1 2.25 2.25V15a2.25 2.25 0 0 1-2.25 2.25h-2.25m-10.5-3h10.5v6H6.75v-6Zm10.5-3h.008v.008h-.008v-.008Z" />
+            </svg>
+            <span data-flyer-builder-target="generateLabel">Generate printout</span>
+          <% end %>
         </div>
       </section>
     </div>

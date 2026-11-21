@@ -46,8 +46,14 @@ export default class extends Controller {
     "locationHeading",
     "builderStep",
     "builderHeading",
-    "locationSummaryRow",
     "locationSummary",
+    "desktopActions",
+    "previewActions",
+    "mobileDistances",
+    "distanceButton",
+    "distanceLabel",
+    "distanceWarning",
+    "closeLocation",
     "subtitle",
   ];
   static values = { previewUrl: String, locateUrl: String };
@@ -59,6 +65,7 @@ export default class extends Controller {
     this.excludedResources = new Map();
     this.previewReady = false;
     this.locationRequest = 0;
+    this.locationBeforeEdit = null;
     // Browsers can restore a page's old field values, but not which screen it was on.
     // Starting clean on the first screen means a location is never used invisibly.
     this.forgetLocationChoice();
@@ -67,6 +74,7 @@ export default class extends Controller {
     this.locationNoteTarget.hidden = !supported;
     this.confirmPlaceButtonTarget.hidden = false;
     this.skipLocationTarget.hidden = false;
+    this.distanceButtonTarget.hidden = false;
     this.showLocationStep();
     // The guide loads behind the first screen, so it's ready when the person moves on.
     this.toolbarTarget.hidden = false;
@@ -87,7 +95,12 @@ export default class extends Controller {
     this.printRequest?.abort();
     this.closeFilters();
     this.clearPrintout();
+    if (this.locationBeforeEdit) this.locationStepTarget.close();
+    this.locationBeforeEdit = null;
     this.forgetLocationChoice();
+    this.nearTarget.value = "";
+    this.locationSummaryTarget.textContent = "";
+    this.distanceWarningTarget.textContent = "";
     this.generateLabelTarget.textContent = "Generate printout";
   }
 
@@ -108,39 +121,68 @@ export default class extends Controller {
   // The first screen: where distances are measured from. The person has to make a
   // choice here, even if that choice is to skip, before seeing the second screen.
   showLocationStep() {
-    this.locationStepTarget.hidden = false;
+    this.locationStepTarget.open = true;
     this.builderStepTarget.hidden = true;
-    this.locationSummaryRowTarget.hidden = true;
-    // "Choose what to include" describes the second screen, not this one.
     this.subtitleTarget.hidden = true;
+    this.desktopActionsTarget.hidden = true;
+    this.closeLocationTarget.hidden = true;
+    this.locationHeadingTarget.textContent =
+      "Where should we measure distances from?";
+    this.locationSummaryTarget.hidden = true;
+    this.distanceWarningTarget.hidden = true;
   }
 
-  // The second screen: categories and preview, with a line saying what was chosen.
-  // Focus moves to its heading so keyboard and screen reader users follow the change.
-  // The preview reloads because its distances depend on the choice just made.
-  showBuilderStep(summary) {
+  showBuilderStep(summary = "", warn = false) {
+    const editing = Boolean(this.locationBeforeEdit);
+    const hasLocation = Boolean(this.latTarget.value && this.lngTarget.value);
     this.locationSummaryTarget.textContent = summary;
-    this.locationSummaryRowTarget.hidden = false;
-    this.locationStepTarget.hidden = true;
+    this.locationSummaryTarget.hidden = !summary;
+    this.distanceWarningTarget.textContent = warn ? summary : "";
+    this.distanceWarningTarget.hidden = !warn;
+    this.distanceLabelTarget.textContent = hasLocation
+      ? "Edit distances"
+      : "Add distances";
+    this.locationBeforeEdit = null;
+    if (editing) this.locationStepTarget.close();
+    else this.locationStepTarget.open = false;
     this.builderStepTarget.hidden = false;
     this.subtitleTarget.hidden = false;
+    this.desktopActionsTarget.hidden = false;
     this.updateFilterControls();
-    this.builderHeadingTarget.focus();
+    if (editing) this.distanceButtonTarget.focus();
+    else this.builderHeadingTarget.focus();
     this.refresh();
   }
 
-  // Back to the first screen. Any printout is discarded, because its distances are
-  // for the choice being changed. Selected categories and the preview are kept.
   changeLocation() {
+    this.locationBeforeEdit = {
+      near: this.nearTarget.value,
+      lat: this.latTarget.value,
+      lng: this.lngTarget.value,
+    };
     this.discardPrintout();
-    this.showLocationStep();
+    this.closeLocationTarget.hidden = false;
+    this.locationHeadingTarget.textContent =
+      this.distanceLabelTarget.textContent;
+    this.locationStepTarget.showModal();
     this.locationHeadingTarget.focus();
+  }
+
+  cancelLocation() {
+    const { near, lat, lng } = this.locationBeforeEdit;
+    this.forgetLocationChoice();
+    this.nearTarget.value = near;
+    this.latTarget.value = lat;
+    this.lngTarget.value = lng;
+    this.locationBeforeEdit = null;
+    this.locationStepTarget.close();
+    this.distanceButtonTarget.focus();
   }
 
   skipLocation() {
     this.forgetLocationChoice();
     this.nearTarget.value = "";
-    this.showBuilderStep("Distances won't be shown on your printout.");
+    this.showBuilderStep();
   }
 
   // Typing a place replaces any device location, so only one is ever sent.
@@ -192,6 +234,7 @@ export default class extends Controller {
         // the person. The printout itself explains any missing distances.
         this.showBuilderStep(
           `We can't check ${place} right now, so your printout may not show distances.`,
+          true,
         );
       }
     } catch (error) {
@@ -216,9 +259,7 @@ export default class extends Controller {
     this.placeErrorTarget.hidden = false;
   }
 
-  // A printout made for the previous location would show the wrong distances, so
-  // it's discarded as soon as the location changes. The preview stays as it is,
-  // because the location only affects the printout.
+  // Remove any generated or pending printout when the builder's inputs change.
   discardPrintout() {
     this.printRequest?.abort();
     this.clearPrintout();
@@ -258,7 +299,10 @@ export default class extends Controller {
     this.lngTarget.value = longitude.toFixed(3);
     this.nearTarget.value = "";
     this.locationStatusTarget.hidden = true;
-    this.showBuilderStep(this.deviceLocationMessage(accuracy));
+    this.showBuilderStep(
+      this.deviceLocationMessage(accuracy),
+      accuracy >= 1000,
+    );
   }
 
   // Laptops estimate their position from nearby Wi-Fi and can be far off. Saying how
@@ -300,7 +344,10 @@ export default class extends Controller {
     const headers = { Accept: "application/json" };
     const query = this.searchTarget.value.trim();
     const sort = this.sortTarget.value;
-    if (!this.hasLatTarget || !this.latTarget.value) {
+    const lat =
+      this.locationBeforeEdit?.lat ??
+      (this.hasLatTarget ? this.latTarget.value : "");
+    if (!lat) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
@@ -313,8 +360,11 @@ export default class extends Controller {
     categories.forEach((key) => body.append("flyer[categories][]", key));
     if (query) body.append("flyer[query]", query);
     if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
-    body.append("flyer[lat]", this.latTarget.value);
-    body.append("flyer[lng]", this.lngTarget.value);
+    body.append("flyer[lat]", lat);
+    body.append(
+      "flyer[lng]",
+      this.locationBeforeEdit?.lng ?? this.lngTarget.value,
+    );
     return {
       method: "POST",
       body,
@@ -360,6 +410,16 @@ export default class extends Controller {
     const destination = desktop ? this.desktopSearchTarget : this.toolbarTarget;
     if (this.searchFieldTarget.parentElement !== destination)
       destination.prepend(this.searchFieldTarget);
+    const distanceDestination = desktop
+      ? this.desktopActionsTarget
+      : this.mobileDistancesTarget;
+    if (this.distanceButtonTarget.parentElement !== distanceDestination)
+      distanceDestination.prepend(this.distanceButtonTarget);
+    const generateDestination = desktop
+      ? this.desktopActionsTarget
+      : this.previewActionsTarget;
+    if (this.generateTarget.parentElement !== generateDestination)
+      generateDestination.append(this.generateTarget);
     this.desktopSearchTarget.hidden = !desktop;
     if (!desktop) this.desktopSortTarget.open = false;
     if (desktop && this.filterDialogTarget.open) this.closeFilters();
@@ -417,8 +477,12 @@ export default class extends Controller {
   updateFilterControls() {
     const canSortByDistance =
       this.latTarget.value !== "" && this.lngTarget.value !== "";
-    if (!canSortByDistance && this.sortTarget.value === DISTANCE_SORT)
-      this.sortTarget.value = DEFAULT_SORT;
+    if (!canSortByDistance) {
+      if (this.sortTarget.value === DISTANCE_SORT)
+        this.sortTarget.value = DEFAULT_SORT;
+      if (this.draftSortTarget.value === DISTANCE_SORT)
+        this.draftSortTarget.value = DEFAULT_SORT;
+    }
     this.draftSortTarget.querySelector(
       `option[value="${DISTANCE_SORT}"]`,
     ).disabled = !canSortByDistance;
