@@ -27,6 +27,7 @@ class Flyer
   PDF_DETAIL_KEYS = %w[service address distance phone].freeze
 
   attribute :categories, default: -> { [] }
+  attribute :excluded_resource_ids, default: -> { [] }
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
   attribute :include_map, default: DEFAULT_INCLUDE_MAP
@@ -46,6 +47,7 @@ class Flyer
 
   validates :near, length: {maximum: 200}
   validate :categories_are_available
+  validate :excluded_resource_ids_are_valid
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
@@ -61,6 +63,10 @@ class Flyer
 
   def categories=(value)
     super(Array(value).compact_blank.map(&:to_s).uniq)
+  end
+
+  def excluded_resource_ids=(value)
+    super(Array(value).map(&:to_s).uniq)
   end
 
   def near=(value)
@@ -96,6 +102,7 @@ class Flyer
     {categories: categories}.tap do |filters|
       filters[:query] = query if query.present?
       filters[:sort] = sort if sort != DEFAULT_SORT
+      filters[:excluded_resource_ids] = excluded_resource_ids if excluded_resource_ids.any?
     end
   end
 
@@ -129,6 +136,12 @@ class Flyer
       text_size.to_f.between?(MIN_TEXT_SIZE, MAX_TEXT_SIZE)
 
     errors.add(:text_size, "must be between #{MIN_TEXT_SIZE} and #{MAX_TEXT_SIZE} pixels in #{TEXT_SIZE_STEP} pixel increments")
+  end
+
+  def excluded_resource_ids_are_valid
+    return if excluded_resource_ids.all? { |id| /\A[1-9][0-9]*\z/.match?(id) }
+
+    errors.add(:excluded_resource_ids, "must contain valid resource IDs")
   end
 
   def coordinates_are_usable

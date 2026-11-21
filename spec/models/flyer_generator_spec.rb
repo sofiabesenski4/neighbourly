@@ -10,7 +10,7 @@ RSpec.describe FlyerGenerator do
   end
 
   it "passes the grouped resources and print time to the PDF renderer" do
-    sections = [CategorySearch::Section.new(category: Category.new(name: "Food"), resources: [Document.new])]
+    sections = [CategorySearch::Section.new(category: Category.new(name: "Food"), resources: [Service.new])]
     time = Time.current
     allow(CategorySearch).to receive(:call).with(categories: ["17"], origin: nil).and_return(sections)
     renderer = instance_double(FlyerPdf, render: "%PDF-real")
@@ -21,7 +21,7 @@ RSpec.describe FlyerGenerator do
   end
 
   it "passes the place to measure distances from to the PDF renderer" do
-    sections = [CategorySearch::Section.new(category: Category.new(name: "Food"), resources: [Document.new])]
+    sections = [CategorySearch::Section.new(category: Category.new(name: "Food"), resources: [Service.new])]
     origin = FlyerOrigin.new(label: "919 Pandora Ave", point: GeoPoint.new(lat: 48.42, lng: -123.35))
     allow(CategorySearch).to receive(:call).with(categories: [], origin: origin).and_return(sections)
     renderer = instance_double(FlyerPdf, render: "%PDF-real")

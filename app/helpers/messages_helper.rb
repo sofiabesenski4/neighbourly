@@ -6,6 +6,12 @@ module MessagesHelper
     nil
   end
 
+  # A reference read into a service goes by the service's current name, so it
+  # matches what printouts and admins call it.
+  def reference_title(document)
+    document.service&.name.presence || document.title.presence || "Untitled reference"
+  end
+
   def tool_result_partial(message)
     name = message.respond_to?(:parent_tool_call) ? message.parent_tool_call&.name.to_s : ""
     partial_for(prefix: "messages/tool_results", name: name)

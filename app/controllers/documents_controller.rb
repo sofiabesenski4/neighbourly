@@ -22,7 +22,7 @@ class DocumentsController < ApplicationController
       metadata: build_metadata
     )
     assign_address
-    if @document.save_with_category_names(selected_category_names)
+    if save_resource
       redirect_to sources_path, notice: "Resource '#{@document.title}' was created."
     else
       render :new, status: :unprocessable_entity
@@ -42,7 +42,7 @@ class DocumentsController < ApplicationController
       metadata: build_metadata
     )
     assign_address
-    if @document.save_with_category_names(selected_category_names)
+    if save_resource
       redirect_to @document, notice: "Resource '#{@document.title}' was updated."
     else
       render :edit, status: :unprocessable_entity
@@ -52,7 +52,11 @@ class DocumentsController < ApplicationController
   def destroy
     authorize @document
     title = @document.title
-    @document.destroy!
+    # A form entry and its service are one resource, so both go.
+    Document.transaction do
+      @document.service&.destroy!
+      @document.destroy!
+    end
     redirect_to referer_or_default_path, notice: "Resource '#{title}' was deleted.", status: :see_other
   end
 
@@ -73,8 +77,42 @@ class DocumentsController < ApplicationController
   def document_params
     params.require(:document).permit(
       :title, :description, :city, :address, :phone, :email,
-      :website, :hours, :age_min, :age_max, :gender, :notes, category_ids: []
+      :website, :hours, :age_min, :age_max, :gender, :notes, :organization_id, category_ids: []
     )
+  end
+
+  # The resource and its service are saved together or not at all. The
+  # service's errors show on the form like the resource's own.
+  def save_resource
+    saved = Document.transaction do
+      raise ActiveRecord::Rollback unless @document.save_with_category_names(selected_category_names)
+
+      service = service_from_form
+      unless service.save
+        @document.errors.merge!(service.errors)
+        raise ActiveRecord::Rollback
+      end
+      true
+    end
+    saved || false
+  end
+
+  # Admins see the same details on the service as on the resource. Age,
+  # gender and notes have no field on the service, so they are kept in its
+  # additional details.
+  def service_from_form
+    p = document_params
+    service = @document.service || @document.source.services.build(document: @document)
+    service.assign_attributes(
+      name: p[:title], description: p[:description],
+      phone: @document.address&.phone, email: p[:email], website: p[:website], hours: p[:hours],
+      organization_id: p[:organization_id].presence,
+      additional_details: build_metadata.slice(:age_range, :gender, :notes).deep_stringify_keys
+    )
+    location = {street_address: p[:address].presence, city: p[:city].presence}
+    (service.address || service.build_address).assign_attributes(location) if service.address || location.values.any?
+    service.categories = @document.categories
+    service
   end
 
   def build_content

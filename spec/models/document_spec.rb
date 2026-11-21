@@ -1,7 +1,7 @@
 require "rails_helper"
 
 RSpec.describe Document, type: :model do
-  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test", url: "https://example.com", source_type: "csv") }
 
   describe "validations" do
     it "is valid with content and a source" do
@@ -37,6 +37,18 @@ RSpec.describe Document, type: :model do
       expect(document.location).to have_attributes(street_address: "919 Pandora Ave", phone: "250-555-0100, 250-555-0101")
       expect(document.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.35))
       expect(Address.count).to eq(0)
+    end
+
+    # The resource form has no province, postal code or country, so saving it
+    # must not clear the ones an import set.
+    it "only changes the address parts it is given" do
+      document = source.documents.build(content: "Resource")
+      document.assign_address(street_address: "400 Broad St", city: "Seattle", province: "WA", country: "USA")
+      document.save!
+
+      document.assign_address(street_address: "400 Broad St", city: "Seattle", phone: "206-555-0100")
+
+      expect(document.address).to have_attributes(province: "WA", country: "USA", phone: "206-555-0100")
     end
 
     it "creates no address for a resource with no address details" do

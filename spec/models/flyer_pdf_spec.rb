@@ -2,8 +2,13 @@ require "rails_helper"
 require "pdf/reader"
 
 RSpec.describe FlyerPdf do
-  def resource(title: "Meal program", **metadata)
-    Document.new(title: title, content: title, metadata: metadata, source: Source.new(name: "Guide", source_type: "api"))
+  # Coordinates go on the address. Other details, like notes, are kept as an
+  # import keeps its extra columns.
+  def resource(title: "Meal program", id: nil, lat: nil, lng: nil, description: nil, **details)
+    Service.new(id: id, name: title, description: description, additional_details: details,
+      source: Source.new(name: "Guide", source_type: "csv")).tap do |service|
+      service.build_address(lat: lat, lng: lng) if lat
+    end
   end
 
   def reader_for(resources)
@@ -79,10 +84,8 @@ RSpec.describe FlyerPdf do
     end
 
     it "gives a resource in two categories the same number on both cards" do
-      shared = Document.new(id: 7, title: "Shared", content: "Shared", metadata: {},
-        source: Source.new(name: "Guide", source_type: "api"))
-      copy = Document.new(id: 7, title: "Shared", content: "Shared", metadata: {},
-        source: Source.new(name: "Guide", source_type: "api"))
+      shared = resource(id: 7, title: "Shared")
+      copy = resource(id: 7, title: "Shared")
       text = text_of([section("Food", [shared, resource(title: "Other")]), section("Health", [copy])])
 
       expect(text.scan("1. Shared").size).to be >= 2

@@ -137,8 +137,8 @@ RSpec.describe "Landing question composer", type: :system do
 
   it "keeps a guest conversation while using Printout in the same tab" do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
-    source = Source.create!(name: "Local guide", source_type: "api")
-    source.documents.create!(title: "Community meal", content: "Free meals downtown")
+    source = Source.create!(name: "Local guide", source_type: "csv")
+    source.services.create!(name: "Community meal")
 
     visit root_path
     fill_in "What are you looking for?", with: "Find a meal near downtown"

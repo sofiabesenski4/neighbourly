@@ -6,6 +6,11 @@ module ContentPipeline
   #   Ingester.new(source).call           — fetches content from source URL
   #   Ingester.new(source).ingest(string) — ingests raw content directly (file upload)
   class Ingester
+    # What a changed row no longer says is cleared from its service.
+    CLEARED_SERVICE_FIELDS = %i[description hours phone email website]
+      .index_with(nil).merge(closed: false, additional_details: {}).freeze
+    CLEARED_ADDRESS_FIELDS = %i[street_address city province postal_code country].index_with(nil).freeze
+
     def initialize(source)
       @source = source
       @parser = parser_for(source)
@@ -63,8 +68,6 @@ module ContentPipeline
 
     def parser_for(source)
       case source.source_type
-      when "api"
-        Parsers::Api.new(source)
       when "html"
         Parsers::Html.new(source)
       when "csv"
@@ -83,12 +86,17 @@ module ContentPipeline
       document.with_lock { write_document(document, chunk) }
     end
 
-    # Returns the document when it was written, or nil when an unchanged
-    # enriched row was kept as it was.
+    # Returns the document when enrichment may still be due for it, or nil
+    # when an unchanged enriched row was kept as it was.
     def write_document(document, chunk)
-      # An unchanged row keeps the summary and categories enrichment gave it.
-      # A changed row is written fresh and enriched again.
-      return if document.enriched_at? && Document.same_row?(document.metadata, chunk[:metadata])
+      # An unchanged row is left as it is, so it keeps the summary and
+      # categories enrichment gave it, and admins' edits to its service. It
+      # only gets a service when it has none, as when an admin deleted it. Web
+      # page chunks are always written: their metadata doesn't hold their text.
+      if chunk[:service] && document.persisted? && Document.same_row?(document.metadata, chunk[:metadata])
+        write_service(document, chunk) if document.service.nil?
+        return document.enriched_at? ? nil : document
+      end
 
       document.enriched_at = nil
       # The address is set again from what this row gives, which clears any
@@ -97,8 +105,38 @@ module ContentPipeline
       document.title = chunk[:title]
       document.content = chunk[:content]
       document.metadata = chunk[:metadata]
-      document.save_with_category_names!(chunk[:categories] || [])
+      # One transaction, so a row never ends up with a document but no
+      # service, or a service read from an older version of the row.
+      Document.transaction do
+        document.save_with_category_names!(chunk[:categories] || [])
+        write_service(document, chunk)
+      end
       document
+    end
+
+    # The service this row describes, linked to the organization it names.
+    # Like the resource, it is set again from a changed row, clearing what
+    # enrichment filled in.
+    def write_service(document, chunk)
+      return unless chunk[:service]
+
+      service = document.service || @source.services.build(document: document)
+      service.assign_attributes(CLEARED_SERVICE_FIELDS.merge(chunk[:service]))
+      write_service_address(service, chunk[:address] || {})
+      service.organization = Organization.for_name(chunk.dig(:organization, :name), source: @source)
+      service.categories = document.categories
+      service.save!
+    end
+
+    # The service's address is where the row says, the same as the resource's.
+    # Coordinates are only replaced when the row gives them, so a lookup
+    # already made for the same address is kept.
+    def write_service_address(service, row_address)
+      location = row_address.slice(*CLEARED_ADDRESS_FIELDS.keys).compact_blank
+      coordinates = row_address.slice(:lat, :lng).compact_blank
+      return if service.address.nil? && location.empty? && coordinates.empty?
+
+      (service.address || service.build_address).assign_attributes(CLEARED_ADDRESS_FIELDS.merge(location).merge(coordinates))
     end
   end
 end

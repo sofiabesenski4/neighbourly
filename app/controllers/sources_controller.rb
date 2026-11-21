@@ -29,7 +29,7 @@ class SourcesController < ApplicationController
     end
 
     unless valid_file_type?(file, @source.source_type)
-      @source.errors.add(:file, "must be a .json file for API sources, an .html file for HTML sources, or a .csv file for CSV sources")
+      @source.errors.add(:file, "must be an .html file for HTML sources, or a .csv file for CSV sources")
       render :new, status: :unprocessable_entity and return
     end
 
@@ -82,7 +82,6 @@ class SourcesController < ApplicationController
   def valid_file_type?(file, source_type)
     extension = File.extname(file.original_filename).downcase
     case source_type
-    when "api" then extension == ".json"
     when "html" then extension.in?([".html", ".htm"])
     when "csv" then extension == ".csv"
     else false

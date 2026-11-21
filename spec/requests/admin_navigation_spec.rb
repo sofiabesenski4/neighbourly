@@ -20,7 +20,7 @@ RSpec.describe "Administration navigation", type: :request do
     Nokogiri::HTML(response.body).at_css("nav[aria-label='Administration']")
   end
 
-  %w[users sources reports models].each do |section|
+  %w[users organizations services sources reports models].each do |section|
     it "shares the support header and selects the #{section} section" do
       sign_in admin
       destination = public_send("#{section}_path")
@@ -35,7 +35,7 @@ RSpec.describe "Administration navigation", type: :request do
       expect(printout["data-turbo"]).to eq("false")
       expect(navigation.css("a[aria-current='page']").map { |link| link["href"] }).to eq([admin_path])
       expect(navigation.css("a").map { |link| link["href"] }).to eq([root_path, new_chat_path, new_flyer_path, admin_path])
-      expect(administration.css("a").map { |link| link["href"] }).to eq([admin_path, users_path, sources_path, reports_path, models_path])
+      expect(administration.css("a").map { |link| link["href"] }).to eq([admin_path, users_path, organizations_path, services_path, sources_path, reports_path, models_path])
       expect(administration.at_css("a[aria-current='page']")["href"]).to eq(destination)
       expect(navigation.at_css("form[action='#{destroy_user_session_path}']")).to be_present
     end
@@ -58,7 +58,7 @@ RSpec.describe "Administration navigation", type: :request do
     get root_path
 
     expect(administration).to be_nil
-    [admin_path, users_path, sources_path, reports_path, models_path].each do |destination|
+    [admin_path, users_path, organizations_path, services_path, sources_path, reports_path, models_path].each do |destination|
       expect(navigation.at_css("a[href='#{destination}']")).to be_nil
     end
   end

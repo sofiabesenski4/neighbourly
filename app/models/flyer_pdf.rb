@@ -64,20 +64,20 @@ class FlyerPdf
       .gsub(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/, "")
   end
 
-  def key_for(document)
-    document.id || document.object_id
+  def key_for(service)
+    service.id || service.object_id
   end
 
-  def entry_for(document)
-    entries.fetch(key_for(document))
+  def entry_for(service)
+    entries.fetch(key_for(service))
   end
 
   # Every resource's entry, numbered in the order the cards print. A resource in two
   # categories prints two cards, and both share its one entry and number, so the same pin
   # matches both.
   def entries
-    @entries ||= @sections.flat_map(&:resources).uniq { |document| key_for(document) }
-      .each_with_index.to_h { |document, index| [key_for(document), build_entry(document, index + 1)] }
+    @entries ||= @sections.flat_map(&:resources).uniq { |service| key_for(service) }
+      .each_with_index.to_h { |service, index| [key_for(service), build_entry(service, index + 1)] }
   end
 
   def render_map
@@ -88,14 +88,14 @@ class FlyerPdf
   end
 
   def map_items
-    @sections.flat_map(&:resources).uniq { |document| key_for(document) }.map do |document|
-      entry = entry_for(document)
-      MapPinLayout::Item.new(number: entry.number, title: entry.title, point: document.coordinates)
+    @sections.flat_map(&:resources).uniq { |service| key_for(service) }.map do |service|
+      entry = entry_for(service)
+      MapPinLayout::Item.new(number: entry.number, title: entry.title, point: service.coordinates)
     end
   end
 
-  def build_entry(document, number)
-    card = ResourceCard.new(document, origin: @origin)
+  def build_entry(service, number)
+    card = ResourceCard.new(service, origin: @origin)
     title = clean(card.title)
     fields = card.fields.reject { |field| @hidden_detail_labels.include?(field[:label]) }
     rows = fields.map { |field|
@@ -108,7 +108,7 @@ class FlyerPdf
       rows.unshift({label: "Resource name", value: title, size: @body_size})
       title = title.each_grapheme_cluster.take(80).join + "…"
     end
-    Entry.new(key: key_for(document), number: number, title: title, rows: rows)
+    Entry.new(key: key_for(service), number: number, title: title, rows: rows)
   end
 
   def fragments(row)
@@ -186,7 +186,7 @@ class FlyerPdf
   end
 
   def render_section(section)
-    remaining = section.resources.map { |document| entry_for(document) }
+    remaining = section.resources.map { |service| entry_for(service) }
     continued = false
     heading_pending = true
     while remaining.any?

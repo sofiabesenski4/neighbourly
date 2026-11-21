@@ -78,10 +78,10 @@ RSpec.describe "Flyers", type: :request do
   describe "POST /printout" do
     it "omits phone numbers while retaining other ways to contact the resource" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      meal = source.documents.create!(title: "Community meal", content: "Meals",
-        categories: [food], metadata: {email: "help@example.com", website: "https://example.com/meals"})
-      meal.create_address!(street_address: "919 Pandora Ave", phone: "250-555-0101")
+      source = Source.create!(name: "Local", source_type: "csv")
+      meal = source.services.create!(name: "Community meal", categories: [food],
+        phone: "250-555-0101", email: "help@example.com", website: "https://example.com/meals")
+      meal.create_address!(street_address: "919 Pandora Ave")
 
       post flyers_path, params: {print_settings: {include_map: "no", details: Flyer::DETAIL_FIELDS.keys - ["phone"]}}
 
@@ -93,11 +93,10 @@ RSpec.describe "Flyers", type: :request do
 
     it "omits service, address, and distance rows independently while preserving the map" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      meal = source.documents.create!(title: "Community meal", content: "Meals", categories: [food])
-      meal.create_address!(street_address: "919 Pandora Ave", city: "Victoria", phone: "250-555-0101",
-        lat: 48.43, lng: -123.36)
-      clinic = source.documents.create!(title: "Community clinic", content: "Clinic", categories: [health])
+      source = Source.create!(name: "Local", source_type: "csv")
+      meal = source.services.create!(name: "Community meal", phone: "250-555-0101", categories: [food])
+      meal.create_address!(street_address: "919 Pandora Ave", city: "Victoria", lat: 48.43, lng: -123.36)
+      clinic = source.services.create!(name: "Community clinic", categories: [health])
       clinic.create_address!(city: "Victoria")
       visible_rows = {
         "service" => ["Services:"],
@@ -105,7 +104,7 @@ RSpec.describe "Flyers", type: :request do
         "distance" => ["Distance:"]
       }
       expect(FlyerMapPage).to receive(:new).exactly(4).times.and_wrap_original do |build_map, pdf, items:, **options|
-        expect(items.find { |item| item.title == meal.title }.point).to eq(meal.coordinates)
+        expect(items.find { |item| item.title == meal.name }.point).to eq(meal.coordinates)
         build_map.call(pdf, items: items, **options)
       end
 
@@ -134,9 +133,9 @@ RSpec.describe "Flyers", type: :request do
 
     it "prints larger card text at the selected pixel size" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      source.documents.create!(title: "Community meal", content: "Meals",
-        categories: [food], metadata: {notes: "Ask at the front desk"})
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Community meal", categories: [food],
+        additional_details: {"notes" => "Ask at the front desk"})
 
       post flyers_path, params: {print_settings: {include_map: "no", text_size: "25"}}
 
@@ -156,8 +155,8 @@ RSpec.describe "Flyers", type: :request do
 
     it "includes the map by default and can generate the same cards without it" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      source.documents.create!(title: "Community meal", content: "Meals", categories: [food])
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Community meal", categories: [food])
 
       post flyers_path
       expect(response).to have_http_status(:ok)
@@ -175,6 +174,38 @@ RSpec.describe "Flyers", type: :request do
 
       expect(response).to have_http_status(:unprocessable_content)
       expect(response.parsed_body.fetch("errors")).to include("Include map must be yes or no")
+    end
+
+    it "omits an excluded resource from every category and the map pins" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "csv")
+      removed = source.services.create!(name: "Excluded service",
+        categories: [food, shelter])
+      removed.create_address!(lat: 48.42, lng: -123.36)
+      kept = source.services.create!(name: "Included service",
+        categories: [food, shelter])
+      kept.create_address!(lat: 48.43, lng: -123.36)
+      expect(FlyerMapPage).to receive(:new).and_wrap_original do |build_map, pdf, items:, **options|
+        expect(items.map(&:title)).to eq([kept.name])
+        expect(items.first.point).to eq(kept.coordinates)
+        build_map.call(pdf, items: items, **options)
+      end
+
+      post flyers_path, params: {flyer: {categories: [food.id.to_s, shelter.id.to_s], excluded_resource_ids: [removed.id.to_s]}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text.scan(kept.name).length).to eq(2)
+      expect(text).not_to include(removed.name)
+    end
+
+    it "rejects exclusions that are not a list of positive IDs" do
+      ["17", ["invalid"]].each do |value|
+        post flyers_path, params: {flyer: {excluded_resource_ids: value}}, headers: {"Accept" => "application/pdf"}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body.fetch("errors").join).to include("Excluded resource ids")
+      end
     end
 
     it "hands the selected categories to the generator" do
@@ -199,10 +230,10 @@ RSpec.describe "Flyers", type: :request do
 
     it "prints the same matching resources in the same order as the preview" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food, shelter])
-      source.documents.create!(title: "Zebra meals", content: "Meals", categories: [shelter])
-      source.documents.create!(title: "Other clinic", content: "Clinic", categories: [health])
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Alpha meals", categories: [food, shelter])
+      source.services.create!(name: "Zebra meals", categories: [shelter])
+      source.services.create!(name: "Other clinic", categories: [health])
       filters = {flyer: {query: "meals", sort: "desc"}}
 
       get preview_flyers_path(format: :json), params: filters
@@ -220,11 +251,11 @@ RSpec.describe "Flyers", type: :request do
 
     it "sorts the preview and PDF nearest first, placing unknown distances last" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      source.documents.create!(title: "Alpha meals", content: "Meals", categories: [food], metadata: {lat: 48.44, lng: -123.36})
-      source.documents.create!(title: "Zebra meals", content: "Meals", categories: [food, shelter], metadata: {lat: 48.421, lng: -123.36})
-      source.documents.create!(title: "Aardvark meals", content: "Meals", categories: [shelter])
-      source.documents.create!(title: "Other clinic", content: "Clinic", categories: [health])
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Alpha meals", categories: [food], address_attributes: {lat: 48.44, lng: -123.36})
+      source.services.create!(name: "Zebra meals", categories: [food, shelter], address_attributes: {lat: 48.421, lng: -123.36})
+      source.services.create!(name: "Aardvark meals", categories: [shelter])
+      source.services.create!(name: "Other clinic", categories: [health])
       filters = {flyer: {categories: [food.id.to_s, shelter.id.to_s], query: "meals", sort: "distance", lat: "48.42", lng: "-123.36"}}
 
       post preview_flyers_path(format: :json), params: filters
@@ -259,8 +290,8 @@ RSpec.describe "Flyers", type: :request do
     it "prints uncategorized resources when no categories have been configured" do
       Category.delete_all
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      source.documents.create!(title: "Community noticeboard", content: "Noticeboard")
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Community noticeboard")
 
       post flyers_path
 
@@ -372,10 +403,8 @@ RSpec.describe "Flyers", type: :request do
 
       before do
         allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-        Source.create!(name: "Local", source_type: "api").documents.create!(
-          title: "Community meal", content: "Community meal", categories: [food],
-          metadata: {address: "1 Test St", lat: 48.43, lng: -123.36}
-        )
+        Source.create!(name: "Local", source_type: "csv").services.create!(name: "Community meal", categories: [food],
+          address_attributes: {street_address: "1 Test St", lat: 48.43, lng: -123.36})
       end
 
       def pdf_text
@@ -590,16 +619,16 @@ RSpec.describe "Flyers", type: :request do
   describe "GET /printout/preview" do
     before do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
-      source = Source.create!(name: "Local", source_type: "api")
-      source.documents.create!(title: "Community meal", content: "Community meal", categories: [food], metadata: {notes: "Call ahead"})
-      source.documents.create!(title: "Unrelated clinic", content: "Clinic", categories: [health])
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Community meal", categories: [food], additional_details: {notes: "Call ahead"})
+      source.services.create!(name: "Unrelated clinic", categories: [health])
     end
 
     # The preview should show the same distances as the printout, using the same card
     # code. It must never call the geocoder: it runs each time a category changes.
     context "with a chosen location" do
       before do
-        Document.find_by!(title: "Community meal").update_columns(metadata: {lat: 48.43, lng: -123.36})
+        Service.find_by!(name: "Community meal").create_address!(lat: 48.43, lng: -123.36)
       end
 
       def card_fields(title)
@@ -693,7 +722,7 @@ RSpec.describe "Flyers", type: :request do
     it "offers new database categories and uses their renamed labels in both preview and PDF" do
       category = Category.create!(name: "Computer access")
       source = Source.find_by!(name: "Local")
-      listing = source.documents.create!(title: "Community computers", content: "Computers", categories: [category])
+      listing = source.services.create!(name: "Community computers", categories: [category])
 
       get new_flyer_path
 
@@ -715,24 +744,6 @@ RSpec.describe "Flyers", type: :request do
       text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
       expect(text).to include("Internet access", "Community computers")
       expect(text).not_to include("Computer access", "Community meal", "Unrelated clinic")
-    end
-
-    it "includes a category-tagged resource without an embedding in the preview and PDF" do
-      source = Source.find_by!(name: "Local")
-      listing = source.documents.create!(title: "Offline listing", content: "Offline listing", categories: [food])
-      listing.update_column(:embedding, nil)
-
-      get preview_flyers_path(format: :json), params: {flyer: {categories: [food.id.to_s]}}
-
-      expect(response).to have_http_status(:ok)
-      titles = response.parsed_body.fetch("categories").first.fetch("resources").map { |resource| resource.fetch("title") }
-      expect(titles).to include("Offline listing")
-
-      post flyers_path, params: {flyer: {categories: [food.id.to_s]}}, headers: {"Accept" => "application/pdf"}
-
-      expect(response).to have_http_status(:ok)
-      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
-      expect(text).to include("Offline listing")
     end
 
     it "shows all visible resources in JSON when no filters are specified" do

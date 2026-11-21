@@ -40,9 +40,7 @@ RSpec.describe "Flyers", type: :system do
   # form fields, and flyer_builder_controller.test.js covers its own behaviour.
   it "lets a visitor enter a location and get distances on the printout" do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-    Source.create!(name: "Local", source_type: "api").documents.create!(
-      title: "Community meal", content: "Community meal", metadata: {lat: 48.43, lng: -123.36}
-    )
+    Source.create!(name: "Local", source_type: "csv").services.create!(name: "Community meal", address_attributes: {lat: 48.43, lng: -123.36})
     allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
 
     visit new_flyer_path

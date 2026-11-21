@@ -24,6 +24,9 @@ export default class extends Controller {
     "clearSearchOrder",
     "cards",
     "count",
+    "resourceSelection",
+    "selectAll",
+    "deselectAll",
     "status",
     "generate",
     "generateLabel",
@@ -50,8 +53,14 @@ export default class extends Controller {
     "locationHeading",
     "builderStep",
     "builderHeading",
-    "locationSummaryRow",
     "locationSummary",
+    "desktopActions",
+    "previewActions",
+    "mobileDistances",
+    "distanceButton",
+    "distanceLabel",
+    "distanceWarning",
+    "closeLocation",
     "subtitle",
   ];
   static values = { previewUrl: String, locateUrl: String };
@@ -60,7 +69,10 @@ export default class extends Controller {
     this.revision = (this.revision || 0) + 1;
     this.hasResults = false;
     this.generating = false;
+    this.excludedResources = new Map();
+    this.previewReady = false;
     this.locationRequest = 0;
+    this.locationBeforeEdit = null;
     // Browsers can restore a page's old field values, but not which screen it was on.
     // Starting clean on the first screen means a location is never used invisibly.
     this.forgetLocationChoice();
@@ -69,6 +81,7 @@ export default class extends Controller {
     this.locationNoteTarget.hidden = !supported;
     this.confirmPlaceButtonTarget.hidden = false;
     this.skipLocationTarget.hidden = false;
+    this.distanceButtonTarget.hidden = false;
     this.showLocationStep();
     // The guide loads behind the first screen, so it's ready when the person moves on.
     this.toolbarTarget.hidden = false;
@@ -122,7 +135,12 @@ export default class extends Controller {
     this.printRequest?.abort();
     this.closeFilters();
     this.clearPrintout();
+    if (this.locationBeforeEdit) this.locationStepTarget.close();
+    this.locationBeforeEdit = null;
     this.forgetLocationChoice();
+    this.nearTarget.value = "";
+    this.locationSummaryTarget.textContent = "";
+    this.distanceWarningTarget.textContent = "";
     this.generateLabelTarget.textContent = "Generate printout";
   }
 
@@ -143,39 +161,68 @@ export default class extends Controller {
   // The first screen: where distances are measured from. The person has to make a
   // choice here, even if that choice is to skip, before seeing the second screen.
   showLocationStep() {
-    this.locationStepTarget.hidden = false;
+    this.locationStepTarget.open = true;
     this.builderStepTarget.hidden = true;
-    this.locationSummaryRowTarget.hidden = true;
-    // "Choose what to include" describes the second screen, not this one.
     this.subtitleTarget.hidden = true;
+    this.desktopActionsTarget.hidden = true;
+    this.closeLocationTarget.hidden = true;
+    this.locationHeadingTarget.textContent =
+      "Where should we measure distances from?";
+    this.locationSummaryTarget.hidden = true;
+    this.distanceWarningTarget.hidden = true;
   }
 
-  // The second screen: categories and preview, with a line saying what was chosen.
-  // Focus moves to its heading so keyboard and screen reader users follow the change.
-  // The preview reloads because its distances depend on the choice just made.
-  showBuilderStep(summary) {
+  showBuilderStep(summary = "", warn = false) {
+    const editing = Boolean(this.locationBeforeEdit);
+    const hasLocation = Boolean(this.latTarget.value && this.lngTarget.value);
     this.locationSummaryTarget.textContent = summary;
-    this.locationSummaryRowTarget.hidden = false;
-    this.locationStepTarget.hidden = true;
+    this.locationSummaryTarget.hidden = !summary;
+    this.distanceWarningTarget.textContent = warn ? summary : "";
+    this.distanceWarningTarget.hidden = !warn;
+    this.distanceLabelTarget.textContent = hasLocation
+      ? "Edit distances"
+      : "Add distances";
+    this.locationBeforeEdit = null;
+    if (editing) this.locationStepTarget.close();
+    else this.locationStepTarget.open = false;
     this.builderStepTarget.hidden = false;
     this.subtitleTarget.hidden = false;
+    this.desktopActionsTarget.hidden = false;
     this.updateFilterControls();
-    this.builderHeadingTarget.focus();
+    if (editing) this.distanceButtonTarget.focus();
+    else this.builderHeadingTarget.focus();
     this.refresh();
   }
 
-  // Back to the first screen. Any printout is discarded, because its distances are
-  // for the choice being changed. Selected categories and the preview are kept.
   changeLocation() {
+    this.locationBeforeEdit = {
+      near: this.nearTarget.value,
+      lat: this.latTarget.value,
+      lng: this.lngTarget.value,
+    };
     this.discardPrintout();
-    this.showLocationStep();
+    this.closeLocationTarget.hidden = false;
+    this.locationHeadingTarget.textContent =
+      this.distanceLabelTarget.textContent;
+    this.locationStepTarget.showModal();
     this.locationHeadingTarget.focus();
+  }
+
+  cancelLocation() {
+    const { near, lat, lng } = this.locationBeforeEdit;
+    this.forgetLocationChoice();
+    this.nearTarget.value = near;
+    this.latTarget.value = lat;
+    this.lngTarget.value = lng;
+    this.locationBeforeEdit = null;
+    this.locationStepTarget.close();
+    this.distanceButtonTarget.focus();
   }
 
   skipLocation() {
     this.forgetLocationChoice();
     this.nearTarget.value = "";
-    this.showBuilderStep("Distances won't be shown on your printout.");
+    this.showBuilderStep();
   }
 
   // Typing a place replaces any device location, so only one is ever sent.
@@ -227,6 +274,7 @@ export default class extends Controller {
         // the person. The printout itself explains any missing distances.
         this.showBuilderStep(
           `We can't check ${place} right now, so your printout may not show distances.`,
+          true,
         );
       }
     } catch (error) {
@@ -251,9 +299,7 @@ export default class extends Controller {
     this.placeErrorTarget.hidden = false;
   }
 
-  // A printout made for the previous location would show the wrong distances, so
-  // it's discarded as soon as the location changes. The preview stays as it is,
-  // because the location only affects the printout.
+  // Remove any generated or pending printout when the builder's inputs change.
   discardPrintout() {
     this.printRequest?.abort();
     this.clearPrintout();
@@ -293,7 +339,10 @@ export default class extends Controller {
     this.lngTarget.value = longitude.toFixed(3);
     this.nearTarget.value = "";
     this.locationStatusTarget.hidden = true;
-    this.showBuilderStep(this.deviceLocationMessage(accuracy));
+    this.showBuilderStep(
+      this.deviceLocationMessage(accuracy),
+      accuracy >= 1000,
+    );
   }
 
   // Laptops estimate their position from nearby Wi-Fi and can be far off. Saying how
@@ -335,7 +384,10 @@ export default class extends Controller {
     const headers = { Accept: "application/json" };
     const query = this.searchTarget.value.trim();
     const sort = this.sortTarget.value;
-    if (!this.hasLatTarget || !this.latTarget.value) {
+    const lat =
+      this.locationBeforeEdit?.lat ??
+      (this.hasLatTarget ? this.latTarget.value : "");
+    if (!lat) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
@@ -348,8 +400,11 @@ export default class extends Controller {
     categories.forEach((key) => body.append("flyer[categories][]", key));
     if (query) body.append("flyer[query]", query);
     if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
-    body.append("flyer[lat]", this.latTarget.value);
-    body.append("flyer[lng]", this.lngTarget.value);
+    body.append("flyer[lat]", lat);
+    body.append(
+      "flyer[lng]",
+      this.locationBeforeEdit?.lng ?? this.lngTarget.value,
+    );
     return {
       method: "POST",
       body,
@@ -402,6 +457,18 @@ export default class extends Controller {
     if (advanced.nextElementSibling !== nextControl) {
       advanced.open = false;
       nextControl.before(advanced);
+    }
+    const distanceDestination = desktop
+      ? this.desktopActionsTarget
+      : this.mobileDistancesTarget;
+    if (this.distanceButtonTarget.parentElement !== distanceDestination)
+      distanceDestination.prepend(this.distanceButtonTarget);
+    const generateDestination = desktop
+      ? this.desktopActionsTarget
+      : this.previewActionsTarget;
+    if (this.generateTarget.parentElement !== generateDestination) {
+      this.printSettingsTarget.open = false;
+      generateDestination.append(this.generateTarget, this.printSettingsTarget);
     }
     this.desktopSearchTarget.hidden = !desktop;
     if (!desktop) this.desktopSortTarget.open = false;
@@ -491,8 +558,12 @@ export default class extends Controller {
   updateFilterControls() {
     const canSortByDistance =
       this.latTarget.value !== "" && this.lngTarget.value !== "";
-    if (!canSortByDistance && this.sortTarget.value === DISTANCE_SORT)
-      this.sortTarget.value = DEFAULT_SORT;
+    if (!canSortByDistance) {
+      if (this.sortTarget.value === DISTANCE_SORT)
+        this.sortTarget.value = DEFAULT_SORT;
+      if (this.draftSortTarget.value === DISTANCE_SORT)
+        this.draftSortTarget.value = DEFAULT_SORT;
+    }
     this.draftSortTarget.querySelector(
       `option[value="${DISTANCE_SORT}"]`,
     ).disabled = !canSortByDistance;
@@ -562,17 +633,89 @@ export default class extends Controller {
   }
 
   setLoading() {
+    this.previewReady = false;
+    this.selectAllTarget.disabled = true;
+    this.deselectAllTarget.disabled = true;
+    this.resourceSelectionTargets.forEach((input) => {
+      input.disabled = true;
+    });
     this.statusTarget.textContent = "Updating…";
     this.cardsTarget.setAttribute("aria-busy", "true");
     this.generateTarget.disabled = true;
   }
 
   render(categories) {
+    this.previewCategories = categories;
+    this.previewReady = true;
+    this.renderCards();
+  }
+
+  matchingResources() {
+    return new Map(
+      this.previewCategories.flatMap(({ resources }) =>
+        resources.map((resource) => [String(resource.id), resource]),
+      ),
+    );
+  }
+
+  toggleResource({ target }) {
+    if (!this.previewReady) return;
+    const resource = this.matchingResources().get(target.value);
+    if (!resource) return;
+    this.setResourceSelected(resource, target.checked);
+    this.updateResourceSelection();
+  }
+
+  // Bulk actions affect only matching results, preserving choices outside the
+  // current search and category filters. A shared resource is selected once.
+  selectResources({ params: { selected } }) {
+    if (!this.previewReady) return;
+    this.matchingResources().forEach((resource) =>
+      this.setResourceSelected(resource, selected),
+    );
+    this.updateResourceSelection();
+  }
+
+  setResourceSelected(resource, selected) {
+    const id = String(resource.id);
+    if (selected) this.excludedResources.delete(id);
+    else this.excludedResources.set(id, resource.title);
+  }
+
+  updateResourceSelection() {
+    if (this.generating) {
+      this.revision += 1;
+      this.generating = false;
+      this.generateLabelTarget.textContent = "Generate printout";
+    }
+    this.discardPrintout();
+    this.updateSelectionControls();
+  }
+
+  updateSelectionControls() {
+    const resources = this.matchingResources();
+    const included = [...resources.keys()].filter(
+      (id) => !this.excludedResources.has(id),
+    ).length;
+    // Update in place so keyboard focus stays on the checkbox the person changed.
+    this.resourceSelectionTargets.forEach((input) => {
+      input.checked = !this.excludedResources.has(input.value);
+      input.disabled = !this.previewReady;
+    });
+    this.countTarget.textContent = `${included} ${included === 1 ? "resource" : "resources"} included`;
+    this.selectAllTarget.disabled =
+      !this.previewReady || included === resources.size;
+    this.deselectAllTarget.disabled = !this.previewReady || included === 0;
+    this.hasResults = included > 0;
+    this.generateTarget.disabled =
+      !this.previewReady || !this.hasResults || this.generating;
+  }
+
+  renderCards() {
     const fragment = document.createDocumentFragment();
-    const ids = new Set();
-    let total = 0;
-    categories.forEach((category) => {
-      if (category.resources.length === 0) return;
+    this.previewCategories.forEach((category) => {
+      const resources = category.resources;
+      if (resources.length === 0) return;
       const section = document.createElement("section");
       section.className = "mt-4 first:mt-0 sm:mt-7";
       const heading = document.createElement("h3");
@@ -582,21 +725,19 @@ export default class extends Controller {
       const count = document.createElement("span");
       count.className =
         "ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm";
-      count.textContent = `${category.resources.length} ${category.resources.length === 1 ? "card" : "cards"}`;
+      count.textContent = `${resources.length} ${resources.length === 1 ? "card" : "cards"}`;
       heading.append(count);
       section.append(heading);
       const grid = document.createElement("div");
       grid.className =
         "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
-      category.resources.forEach((resource) => {
-        ids.add(resource.id);
-        total += 1;
+      resources.forEach((resource) => {
         grid.append(this.card(resource));
       });
       section.append(grid);
       fragment.append(section);
     });
-    if (total === 0) {
+    if (this.matchingResources().size === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className =
@@ -611,21 +752,45 @@ export default class extends Controller {
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
-    this.hasResults = total > 0;
+    this.updateSelectionControls();
     this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
-    this.generateTarget.disabled = !this.hasResults || this.generating;
   }
 
   card(resource) {
     const article = document.createElement("article");
     article.className =
-      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
+      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 has-[input:not(:checked)]:bg-stone-50/60 has-[input:not(:checked)]:text-stone-600 sm:border-stone-300 sm:bg-white sm:has-[input:not(:checked)]:bg-white/60 lg:last:odd:col-span-2";
+    const header = document.createElement("header");
+    header.className =
+      "flex items-start gap-2 px-3 py-1 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:has-[input:not(:checked)]:bg-stone-100/60";
     const title = document.createElement("h4");
     title.className =
-      "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
+      "min-w-0 flex-1 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
     title.textContent = resource.title;
+    const selection = document.createElement("label");
+    selection.className =
+      "flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-sage-50";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = String(resource.id);
+    checkbox.checked = !this.excludedResources.has(String(resource.id));
+    checkbox.className =
+      "size-4 cursor-pointer accent-sage-600 focus-visible:outline-sage-600";
+    checkbox.setAttribute(
+      "aria-label",
+      `Include ${resource.title} in printout`,
+    );
+    checkbox.setAttribute("data-flyer-builder-target", "resourceSelection");
+    checkbox.setAttribute(
+      "data-action",
+      "change->flyer-builder#toggleResource",
+    );
+    const selectionLabel = document.createElement("span");
+    selectionLabel.className = "sr-only";
+    selectionLabel.textContent = `Include ${resource.title} in printout`;
+    selection.append(checkbox, selectionLabel);
+    header.append(title, selection);
     const details = document.createElement("dl");
     details.className =
       "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";
@@ -643,7 +808,7 @@ export default class extends Controller {
       row.append(label, value);
       details.append(row);
     });
-    article.append(title, details);
+    article.append(header, details);
     return article;
   }
 
@@ -667,6 +832,10 @@ export default class extends Controller {
         tab.document.title = "Preparing printout";
         tab.document.body.textContent = "Preparing your printout…";
       }
+      const body = new FormData(this.formTarget);
+      for (const id of this.excludedResources.keys()) {
+        body.append("flyer[excluded_resource_ids][]", id);
+      }
       const response = await fetch(this.formTarget.action, {
         method: "POST",
         headers: {
@@ -675,7 +844,7 @@ export default class extends Controller {
             document.querySelector('meta[name="csrf-token"]')?.content || "",
         },
         credentials: "same-origin",
-        body: new FormData(this.formTarget),
+        body,
         signal,
       });
       if (

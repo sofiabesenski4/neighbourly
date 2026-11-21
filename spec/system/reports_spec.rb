@@ -8,7 +8,7 @@ RSpec.describe "Reports", type: :system do
   let(:admin) { User.create!(email: "admin@example.com", password: "password123", admin: true) }
   let(:regular_user) { User.create!(email: "user@example.com", password: "password123", admin: false) }
   let(:fake_vector) { Array.new(1536) { rand(-1.0..1.0) } }
-  let(:source) { Source.create!(name: "Test API", url: "https://example.com", source_type: "api") }
+  let(:source) { Source.create!(name: "Test API", url: "https://example.com", source_type: "csv") }
 
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
@@ -108,6 +108,18 @@ RSpec.describe "Reports", type: :system do
         expect(page).to have_content("removed from search results")
         expect(report.reload.status).to eq("valid")
         expect(document.reload.embedding).to be_nil
+      end
+
+      it "names the service the row was read into, and takes it off printouts too" do
+        service = source.services.create!(name: "Test Shelter service", document: document)
+        Report.create!(document: document, user: regular_user, reason: "false information")
+
+        visit reports_path
+        expect(page).to have_link("Test Shelter service", href: service_path(service))
+        click_button "Accept removal"
+
+        expect(page).to have_content("removed from search results and printouts")
+        expect(Service.visible).not_to include(service)
       end
 
       it "marks all pending reports for the same document as valid" do

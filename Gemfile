@@ -1,5 +1,5 @@
 source "https://rubygems.org"
-ruby "4.0.4"
+ruby "4.0.9"
 
 # Bundle edge Rails instead: gem "rails", github: "rails/rails", branch: "main"
 gem "rails", "~> 8.1.4", ">= 8.1.4.1"
@@ -49,7 +49,7 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   # Debugging
-  gem "pry", "~> 0.16.0"
+  gem "pry", "~> 0.16.1"
   gem "pry-rails"
 
   # HTTP stubbing for tests
@@ -82,7 +82,7 @@ gem "pundit", "~> 2.5"
 
 gem "rspec-rails", "~> 8.0"
 
-gem "tailwindcss-rails", "~> 4.4"
+gem "tailwindcss-rails", "~> 4.7"
 
 gem "ruby_llm", "~> 2.1"
 

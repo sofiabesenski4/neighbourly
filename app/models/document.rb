@@ -5,7 +5,9 @@ class Document < ApplicationRecord
   has_many :reports, dependent: :destroy
   has_and_belongs_to_many :categories, -> { order(:name) }
   # Saved with the resource, so an import or form edit writes both together.
-  has_one :address, dependent: :destroy, autosave: true
+  has_one :address, as: :addressable, dependent: :destroy, autosave: true
+  # The service read from this row. It outlives the row, unlinked.
+  has_one :service, dependent: :nullify
 
   has_neighbors :embedding
 
@@ -29,12 +31,15 @@ class Document < ApplicationRecord
     self.categories = Category.where(name: normalized_names)
   end
 
-  # Sets the address from what a source or the resource form gives. Blank
-  # values clear a field. Coordinates are only replaced when given, so a lookup
-  # already made for the same address is kept. Nothing is created for a
-  # resource that has no address details at all.
-  def assign_address(street_address: nil, city: nil, phone: nil, lat: nil, lng: nil)
-    details = {street_address: street_address.presence, city: city.presence, phone: phone.presence}
+  # Sets the address from what a source or the resource form gives. Only the
+  # parts given change, and a blank value clears its part, so the resource
+  # form, which has no province or country, keeps those as an import set them.
+  # Coordinates are only replaced when given, so a lookup already made for the
+  # same address is kept. Nothing is created for a resource that has no address
+  # details at all.
+  def assign_address(lat: nil, lng: nil, **details)
+    details.assert_valid_keys(:street_address, :city, :province, :postal_code, :country, :phone)
+    details = details.transform_values(&:presence)
     return if address.nil? && details.values.none? && lat.blank? && lng.blank?
 
     (address || build_address).assign_attributes(details.merge({lat: lat, lng: lng}.compact_blank))
