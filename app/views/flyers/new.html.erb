@@ -1,10 +1,16 @@
 <% content_for :title, "Printout" %>
+<% if action_name == "from_questionnaire" %>
+  <% content_for :head do %>
+    <meta name="turbo-cache-control" content="no-cache">
+  <% end %>
+<% end %>
 <% category_tree = CategoryTree.new %>
 
 <div data-controller="flyer-builder"
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
      data-flyer-builder-locate-url-value="<%= locate_flyers_path(format: :json) %>"
      data-flyer-builder-summary-labels-value="<%= ResourceCard::SUMMARY_LABELS.to_json %>"
+     data-flyer-builder-from-questionnaire-value="<%= @from_questionnaire == true %>"
      data-action="turbo:before-cache@document->flyer-builder#beforeCache resize@window->flyer-builder#layoutChanged">
   <header class="mb-3 pt-3 sm:mb-7 sm:pt-0">
     <h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Build your resource guide</h1>
@@ -29,6 +35,7 @@
         JavaScript, both show as one long form, which still works. %>
     <section class="mb-5 max-w-2xl rounded-xl border border-stone-200 bg-white p-4 sm:mb-8 sm:p-6"
              aria-labelledby="flyer-location-heading"
+             <% if @from_questionnaire %> hidden <% end %>
              data-flyer-builder-target="locationStep">
       <h2 id="flyer-location-heading" tabindex="-1" class="font-semibold text-xl text-stone-900"
           data-flyer-builder-target="locationHeading">Where should we measure distances from?</h2>

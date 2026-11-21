@@ -2,6 +2,7 @@ class FlyersController < ApplicationController
   # The printout opens in its own tab rather than in a frame on this page, so this
   # screen keeps the app-wide policy that blocks all embedded content.
 
+  before_action :prevent_preview_caching, only: [:from_questionnaire, :preview], if: -> { request.post? }
   before_action :reject_malformed_selection
 
   # Flyers are open to anonymous users so outreach workers and neighbours can
@@ -30,6 +31,21 @@ class FlyersController < ApplicationController
     return if @flyer.valid?
 
     render :new, status: :unprocessable_content
+  end
+
+  def from_questionnaire
+    @flyer = Flyer.new(flyer_params.slice(:categories, :query, :sort, :lat, :lng).merge(detail_level: "summary"))
+    unless @flyer.valid?
+      render :new, status: :unprocessable_content
+      return
+    end
+
+    if (point = @flyer.coordinates)
+      @flyer.lat = point.lat
+      @flyer.lng = point.lng
+    end
+    @from_questionnaire = true
+    render :new
   end
 
   def preview
@@ -141,6 +157,10 @@ class FlyersController < ApplicationController
   end
 
   private
+
+  def prevent_preview_caching
+    response.set_header("Cache-Control", "no-store")
+  end
 
   # Landmarks like "Central Library" and shorthand like "Douglas & Yates" don't get a
   # trustworthy match from the geocoder, so this shows the forms that do work.

@@ -41,6 +41,41 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
   end
 
+  it "goes directly from the questionnaire submission to its filtered preview" do
+    source = Source.find_by!(name: "Local")
+    source.services.create!(name: "Delta meals", categories: [food])
+    source.services.create!(name: "Alpha clinic", categories: [health])
+    visit root_path
+    page.execute_script(<<~JS, from_questionnaire_flyers_path, food.id.to_s)
+      const [path, category] = arguments;
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = path;
+      form.dataset.turbo = "false";
+      const answers = {
+        "authenticity_token": document.querySelector('meta[name="csrf-token"]')?.content || "",
+        "flyer[categories][]": category,
+        "flyer[query]": "Alpha"
+      };
+      for (const [name, value] of Object.entries(answers)) {
+        const field = document.createElement("input");
+        field.type = "hidden";
+        field.name = name;
+        field.value = value;
+        form.append(field);
+      }
+      document.body.append(form);
+      form.requestSubmit();
+    JS
+
+    expect(page).to have_current_path(from_questionnaire_flyers_path, ignore_query: false)
+    expect(page).to have_no_button("Skip distances")
+    expect(page).to have_field("Search resources", with: "Alpha")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(page).to have_css("article h4", count: 1)
+    expect(find("article", text: "Alpha meals")).to have_checked_field("Include")
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)

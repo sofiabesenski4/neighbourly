@@ -90,6 +90,34 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
+  describe "POST /printout/from-questionnaire" do
+    it "opens the printout with the submitted filters and rounds the supplied location" do
+      post from_questionnaire_flyers_path, params: {flyer: {
+        categories: [food.id.to_s], query: "hot meals", lat: "48.42739", lng: "-123.35819", sort: "distance"
+      }}
+
+      expect(response).to have_http_status(:ok)
+      expect(response.headers["Cache-Control"]).to eq("no-store")
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('meta[name="turbo-cache-control"]')["content"]).to eq("no-cache")
+      expect(document.at_css('[data-controller="flyer-builder"]')["data-flyer-builder-from-questionnaire-value"]).to eq("true")
+      expect(document.at_css('input[name="flyer[categories][]"][checked]')["value"]).to eq(food.id.to_s)
+      expect(document.at_css('input[name="flyer[query]"]')["value"]).to eq("hot meals")
+      expect(document.at_css('input[name="flyer[lat]"]')["value"]).to eq("48.427")
+      expect(document.at_css('input[name="flyer[lng]"]')["value"]).to eq("-123.358")
+      expect(document.at_css('input[name="flyer[sort]"]')["value"]).to eq("distance")
+    end
+
+    it "shows validation errors when the questionnaire supplies an unknown category" do
+      post from_questionnaire_flyers_path, params: {flyer: {categories: ["unknown"]}}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.headers["Cache-Control"]).to eq("no-store")
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[role="alert"]').text).to include("Categories include unknown options")
+    end
+  end
+
   describe "POST /printout" do
     it "prints only the selected services that still match the preview filters" do
       source = Source.create!(name: "Local guide", source_type: "csv")
@@ -185,6 +213,7 @@ RSpec.describe "Flyers", type: :request do
 
       post preview_flyers_path(format: :json), params: filters
       expect(response).to have_http_status(:ok)
+      expect(response.headers["Cache-Control"]).to eq("no-store")
       names = response.parsed_body.fetch("categories").flat_map { |section| section.fetch("resources").pluck("title") }
       expect(names).to eq(["Zebra meals", "Alpha meals", "Aardvark meals"])
 

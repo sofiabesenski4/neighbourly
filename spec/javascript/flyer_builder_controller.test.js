@@ -305,6 +305,28 @@ test("reloads the preview after a choice, so its distances match", () => {
   assert.deepEqual(events, ["refreshed"]);
 });
 
+test("keeps questionnaire filters in the preview request body without a location", () => {
+  const previousDocument = globalThis.document;
+  const controller = locationController();
+  controller.fromQuestionnaireValue = true;
+  controller.searchTarget = { value: "meals" };
+  controller.sortTarget = { value: "default" };
+  const url = new URL("https://neighbourly.example/printout/preview.json");
+
+  try {
+    globalThis.document = { querySelector: () => null };
+    const options = controller.previewRequestOptions(["17"], url);
+
+    assert.equal(options.method, "POST");
+    assert.equal(url.search, "");
+    assert.deepEqual(options.body.getAll("flyer[categories][]"), ["17"]);
+    assert.equal(options.body.get("flyer[query]"), "meals");
+    assert.equal(options.body.has("flyer[lat]"), false);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("stays on the first screen with the server's message when a place isn't found", async () => {
   const controller = locationController();
   controller.nearTarget.value = "Central Library";

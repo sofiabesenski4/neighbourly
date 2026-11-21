@@ -52,6 +52,7 @@ export default class extends Controller {
     previewUrl: String,
     locateUrl: String,
     summaryLabels: Array,
+    fromQuestionnaire: Boolean,
   };
 
   connect() {
@@ -60,21 +61,27 @@ export default class extends Controller {
     this.generating = false;
     this.excludedServiceIds = new Set();
     this.locationRequest = 0;
-    // Browsers can restore a page's old field values, but not which screen it was on.
-    // Starting clean on the first screen means a location is never used invisibly.
-    this.forgetLocationChoice();
+    if (!this.fromQuestionnaireValue) this.forgetLocationChoice();
     const supported = Boolean(navigator.geolocation);
     this.useLocationTarget.hidden = !supported;
     this.locationNoteTarget.hidden = !supported;
     this.confirmPlaceButtonTarget.hidden = false;
     this.skipLocationTarget.hidden = false;
-    this.showLocationStep();
-    // The guide loads behind the first screen, so it's ready when the person moves on.
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
-    this.updateFilterControls();
-    this.refresh();
+    if (this.fromQuestionnaireValue) {
+      this.showBuilderStep(
+        this.latTarget.value
+          ? "Distances from the location you provided."
+          : "Distances won't be shown on your printout.",
+      );
+    } else {
+      this.showLocationStep();
+      // Load the guide behind the location screen so it's ready when the person continues.
+      this.updateFilterControls();
+      this.refresh();
+    }
   }
 
   disconnect() {
@@ -292,16 +299,14 @@ export default class extends Controller {
     this.locationStatusTarget.hidden = false;
   }
 
-  // With a location chosen, the preview needs it to show the same distances as the
-  // printout. It goes in a POST body rather than the URL, because web server logs
-  // record URLs, and this may be someone's home. Categories have to go in the body with
-  // it: Rails doesn't combine a `flyer` from the URL with one from the body, it keeps
-  // only the URL's, which would lose the location.
+  // Keep questionnaire answers and locations in the POST body so they stay out
+  // of URLs. Rails takes the complete flyer input from either the URL or the body.
   previewRequestOptions(categories, url) {
     const headers = { Accept: "application/json" };
     const query = this.searchTarget.value.trim();
     const sort = this.sortTarget.value;
-    if (!this.hasLatTarget || !this.latTarget.value) {
+    const hasLocation = this.hasLatTarget && this.latTarget.value;
+    if (!this.fromQuestionnaireValue && !hasLocation) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
@@ -314,8 +319,10 @@ export default class extends Controller {
     categories.forEach((key) => body.append("flyer[categories][]", key));
     if (query) body.append("flyer[query]", query);
     if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
-    body.append("flyer[lat]", this.latTarget.value);
-    body.append("flyer[lng]", this.lngTarget.value);
+    if (hasLocation) {
+      body.append("flyer[lat]", this.latTarget.value);
+      body.append("flyer[lng]", this.lngTarget.value);
+    }
     return {
       method: "POST",
       body,
