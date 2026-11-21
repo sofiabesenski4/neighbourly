@@ -461,7 +461,7 @@ test("clearing every category requests and renders the complete guide", async ()
   }
 });
 
-test("rendered resource cards use Tailwind utility classes", () => {
+test("resource cards separate visible contacts from the details disclosure", () => {
   const previousDocument = globalThis.document;
 
   try {
@@ -476,9 +476,15 @@ test("rendered resource cards use Tailwind utility classes", () => {
     };
 
     const controller = Object.create(FlyerBuilderController.prototype);
+    Object.defineProperty(controller, "summaryLabelsValue", {
+      value: ["Phone"],
+    });
     const article = controller.card({
       title: "Food bank",
-      fields: [{ label: "Hours", value: "Monday" }],
+      fields: [
+        { label: "Phone", value: "250-555-0100" },
+        { label: "Hours", value: "Monday" },
+      ],
     });
 
     assert.match(article.className, /\bborder\b/);
@@ -487,6 +493,17 @@ test("rendered resource cards use Tailwind utility classes", () => {
     assert.match(
       article.children[1].children[0].children[1].className,
       /\bwhitespace-pre-line\b/,
+    );
+    assert.equal(
+      article.children[1].children[0].children[1].textContent,
+      "250-555-0100",
+    );
+    const disclosure = article.children[2];
+    assert.equal(disclosure.tagName, "details");
+    assert.equal(disclosure.children[0].textContent, "See details");
+    assert.equal(
+      disclosure.children[1].children[0].children[1].textContent,
+      "Monday",
     );
     assert.doesNotMatch(article.className, /\bflyer-card\b/);
   } finally {

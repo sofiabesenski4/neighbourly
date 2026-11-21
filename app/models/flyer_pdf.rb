@@ -23,10 +23,11 @@ class FlyerPdf
   end
   Measure = Data.define(:height, :header_height, :row_heights)
 
-  def initialize(sections:, origin: nil, printed_at: Time.current)
+  def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed")
     @sections = sections
     @origin = origin
     @printed_at = printed_at
+    @detail_level = detail_level
     @pdf = Prawn::Document.new(page_size: "LETTER", margin: MARGIN, compress: true)
     fonts = Rails.root.join("app/assets/fonts/dejavu")
     @pdf.font_families.update("ResourceSans" => {
@@ -91,7 +92,8 @@ class FlyerPdf
   def build_entry(service, number)
     card = ResourceCard.new(service, origin: @origin)
     title = clean(card.title)
-    rows = card.fields.map { |field|
+    fields = (@detail_level == "summary") ? card.summary_fields : card.fields
+    rows = fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
        size: ["Last updated", "Information source"].include?(field[:label]) ? SECONDARY_SIZE : BODY_SIZE}
     }
@@ -124,7 +126,7 @@ class FlyerPdf
     @pdf.start_new_page if @started
     @started = true
     @pdf.text("Greater Victoria resource guide", size: 23, style: :bold)
-    if first_page && @origin
+    if first_page && @origin && @detail_level == "detailed"
       @pdf.move_down(4)
       @pdf.text(origin_note, size: SECONDARY_SIZE)
     end

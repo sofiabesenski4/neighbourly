@@ -47,7 +47,11 @@ export default class extends Controller {
     "locationSummary",
     "subtitle",
   ];
-  static values = { previewUrl: String, locateUrl: String };
+  static values = {
+    previewUrl: String,
+    locateUrl: String,
+    summaryLabels: Array,
+  };
 
   connect() {
     this.revision = (this.revision || 0) + 1;
@@ -547,10 +551,42 @@ export default class extends Controller {
     title.className =
       "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
     title.textContent = resource.title;
-    const details = document.createElement("dl");
-    details.className =
-      "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";
-    resource.fields.forEach((field) => {
+    const summaryFields = resource.fields.filter((field) =>
+      this.summaryLabelsValue.includes(field.label),
+    );
+    const detailFields = resource.fields.filter(
+      (field) => !this.summaryLabelsValue.includes(field.label),
+    );
+    article.append(title);
+    if (summaryFields.length) {
+      const summary = this.fieldList(summaryFields);
+      summary.className += " px-3 pt-2 sm:px-4";
+      article.append(summary);
+    }
+
+    const disclosure = document.createElement("details");
+    disclosure.className = "px-3 pb-2 sm:px-4";
+    const toggle = document.createElement("summary");
+    toggle.className =
+      "min-h-11 cursor-pointer py-3 text-sm font-medium text-sage-700 focus-visible:outline-sage-600";
+    toggle.textContent = "See details";
+    disclosure.append(toggle);
+    if (detailFields.length) {
+      disclosure.append(this.fieldList(detailFields));
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-stone-600";
+      empty.textContent = "No additional details available.";
+      disclosure.append(empty);
+    }
+    article.append(disclosure);
+    return article;
+  }
+
+  fieldList(fields) {
+    const list = document.createElement("dl");
+    list.className = "grid gap-1 text-sm";
+    fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "[overflow-wrap:anywhere]";
       const label = document.createElement("dt");
@@ -560,10 +596,9 @@ export default class extends Controller {
       value.className = "m-0 inline whitespace-pre-line";
       value.textContent = field.value;
       row.append(label, value);
-      details.append(row);
+      list.append(row);
     });
-    article.append(title, details);
-    return article;
+    return list;
   }
 
   async generate(event) {

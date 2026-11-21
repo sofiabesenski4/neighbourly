@@ -4,10 +4,11 @@
 <div data-controller="flyer-builder"
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
      data-flyer-builder-locate-url-value="<%= locate_flyers_path(format: :json) %>"
+     data-flyer-builder-summary-labels-value="<%= ResourceCard::SUMMARY_LABELS.to_json %>"
      data-action="turbo:before-cache@document->flyer-builder#beforeCache resize@window->flyer-builder#layoutChanged">
   <header class="mb-3 pt-3 sm:mb-7 sm:pt-0">
     <h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Build your resource guide</h1>
-    <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="subtitle">Print a guide with addresses, hours, and contacts.</p>
+    <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="subtitle">Print a contact list with names, addresses, and ways to get in touch.</p>
   </header>
 
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
@@ -160,6 +161,10 @@
         </div>
 
         <div class="sm:col-span-2 sm:row-start-2 sm:mt-6">
+          <label class="mb-3 flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-stone-700">
+            <%= form.check_box :detail_level, {checked: @flyer.detail_level == "detailed", class: "size-4 accent-sage-600", data: {action: "flyer-builder#discardPrintout"}}, "detailed", "summary" %>
+            Include extra details in printout
+          </label>
           <div class="mb-5 rounded-lg bg-red-50 px-4 py-3 text-red-700" data-flyer-builder-target="previewError" role="alert" hidden>
             <p data-flyer-builder-target="previewErrorMessage"></p>
             <button type="button" class="mt-2 min-h-11 cursor-pointer font-medium underline" data-action="flyer-builder#refresh">Try again</button>

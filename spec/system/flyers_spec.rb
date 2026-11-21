@@ -11,7 +11,7 @@ RSpec.describe "Flyers", type: :system do
   end
 
   it "lets a visitor choose categories and request a flyer from the home page" do
-    expect(FlyerGenerator).to receive(:call).with(categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s), origin: nil).and_return(nil)
+    expect(FlyerGenerator).to receive(:call).with(categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s), origin: nil, detail_level: "summary").and_return(nil)
 
     visit root_path
     click_link "Create printout"
@@ -24,7 +24,7 @@ RSpec.describe "Flyers", type: :system do
   end
 
   it "lets a visitor print the complete guide without selecting filters" do
-    expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all-resources")
+    expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "summary").and_return("%PDF-all-resources")
 
     visit new_flyer_path
     expect(page).not_to have_checked_field("Meals")
@@ -44,6 +44,7 @@ RSpec.describe "Flyers", type: :system do
 
     visit new_flyer_path
     fill_in "Enter a place", with: "Douglas St and Yates St"
+    check "Include extra details in printout"
     click_button "Generate printout"
 
     text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")

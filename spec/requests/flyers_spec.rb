@@ -76,8 +76,23 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "prints only the contact fields in a summary printout" do
+      source = Source.create!(name: "Local guide", source_type: "csv")
+      source.services.create!(name: "Community meals", phone: "250-555-0100",
+        hours: "Mondays at noon", description: "Free hot meals",
+        address_attributes: {street_address: "123 Example Street", city: "Victoria"},
+        additional_details: {notes: "Ask for the volunteer coordinator"})
+
+      post flyers_path, params: {flyer: {detail_level: "summary"}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      expect(text).to include("Community meals", "250-555-0100", "123 Example Street")
+      expect(text).not_to include("Mondays at noon", "Free hot meals", "volunteer coordinator")
+    end
+
     it "hands the selected categories to the generator" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil).and_return(nil)
+      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil, detail_level: "detailed").and_return(nil)
 
       post flyers_path, params: {flyer: {categories: ["", food.id.to_s, harm_reduction.id.to_s]}}
 
@@ -138,7 +153,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when nothing is selected" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return("%PDF-all")
 
       post flyers_path, params: {flyer: {categories: [""]}}
 
@@ -147,7 +162,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when no flyer params are sent" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return("%PDF-all")
 
       post flyers_path
 
@@ -234,7 +249,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "explains when the complete guide has no available resources" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return(nil)
 
       post flyers_path, headers: {"Accept" => "application/pdf"}
 
@@ -243,7 +258,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "shows the same complete-guide message after a standard form submission" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return(nil)
 
       post flyers_path, params: {flyer: {categories: [""]}}
       expect(response).to redirect_to(new_flyer_path)

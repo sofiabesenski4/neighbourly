@@ -2,6 +2,8 @@
 # Missing values remove the complete field, including its label. These values
 # are never supplemented with model-generated information.
 class ResourceCard
+  SUMMARY_LABELS = ["Address", "City", "Phone", "Email", "Website"].freeze
+
   # Assumes about 5 km/h, a common estimate for walking. Many people using these
   # guides may be slower, which is why the printout calls this an estimate.
   WALKING_MINUTES_PER_KM = 12
@@ -53,6 +55,10 @@ class ResourceCard
 
   def as_json(*)
     {id: service.id, title: title, fields: fields}
+  end
+
+  def summary_fields
+    fields.select { |field| SUMMARY_LABELS.include?(field[:label]) }
   end
 
   def distance_km

@@ -284,7 +284,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit_builder
 
     title = find("h1", text: "Build your resource guide")
-    expect(page).to have_text("Print a guide with addresses, hours, and contacts.")
+    expect(page).to have_text("Print a contact list with names, addresses, and ways to get in touch.")
     expect(title.evaluate_script("getComputedStyle(this.closest('header')).position")).to eq("static")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
@@ -437,6 +437,10 @@ RSpec.describe "Live resource guide builder", type: :system do
       capture_printout
     end
 
+    def open_alpha_details
+      find("article", text: "Alpha meals").find("summary", text: "See details").click
+    end
+
     def continue_with_place(place)
       fill_in "Enter a place", with: place
       click_button "Continue"
@@ -490,7 +494,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       expect(page).to have_css("article h4", text: "Alpha meals")
       expect(page).to have_field("Meals", type: "checkbox")
-      expect(page).to have_text("Print a guide with addresses, hours, and contacts.")
+      expect(page).to have_text("Print a contact list with names, addresses, and ways to get in touch.")
       expect(page).to have_no_button("Use my location")
       expect(page).to have_no_field("Enter a place")
     end
@@ -517,10 +521,13 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
       expect(page).to have_text("1 resource included")
+      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
+      check "Include extra details in printout"
       click_button "Generate printout"
 
       expect(page).to have_link("Open printout", href: /\Ablob:/)
@@ -573,6 +580,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_text("We can't check 919 Pandora Ave right now")
+      check "Include extra details in printout"
       click_button "Generate printout"
 
       expect(page).to have_link("Open printout", href: /\Ablob:/)
@@ -611,6 +619,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       visit_location_screen
       continue_with_place("919 Pandora Ave")
+      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.41, lng: -123.36))
@@ -618,6 +627,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("535 Ellice St")
 
       expect(page).to have_text("Distances from: 535 Ellice St.")
+      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+2\.2 km/)
     end
 
@@ -635,6 +645,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       JAVASCRIPT
 
       continue_with_place("919 Pandora Ave")
+      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       urls = page.evaluate_script("window.previewUrls")
@@ -693,10 +704,12 @@ RSpec.describe "Live resource guide builder", type: :system do
         click_button "Use my location"
 
         expect(page).to have_text("Distances from your location (accurate to about 50 m).")
+        open_alpha_details
         expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
 
+        check "Include extra details in printout"
         click_button "Generate printout"
         expect(page).to have_link("Open printout", href: /\Ablob:/)
         expect(printed_text).to include("Distances are from your location", "Distance: 1.1 km")

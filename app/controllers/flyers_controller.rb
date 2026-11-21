@@ -26,7 +26,7 @@ class FlyersController < ApplicationController
     only: :preview, if: -> { request.format.json? }
 
   def new
-    @flyer = Flyer.new(flyer_params)
+    @flyer = Flyer.new({detail_level: "summary"}.merge(flyer_params.to_h.symbolize_keys))
     return if @flyer.valid?
 
     render :new, status: :unprocessable_content
@@ -108,7 +108,7 @@ class FlyersController < ApplicationController
       return
     end
 
-    pdf = FlyerGenerator.call(**@flyer.filters, origin: origin)
+    pdf = FlyerGenerator.call(**@flyer.filters, origin: origin, detail_level: @flyer.detail_level)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
@@ -173,10 +173,10 @@ class FlyersController < ApplicationController
 
     input = params[:flyer]
     supported = input.is_a?(ActionController::Parameters)
-    unexpected = supported ? input.keys - %w[categories query sort near lat lng] : []
+    unexpected = supported ? input.keys - %w[categories query sort near lat lng detail_level] : []
     categories = input[:categories] if supported
     valid_categories = categories.nil? || (categories.is_a?(Array) && categories.all?(String))
-    invalid_fields = supported ? %w[query sort near lat lng].select { |field| input.key?(field) && !input[field].is_a?(String) } : []
+    invalid_fields = supported ? %w[query sort near lat lng detail_level].select { |field| input.key?(field) && !input[field].is_a?(String) } : []
     return if supported && unexpected.empty? && valid_categories && invalid_fields.empty?
 
     @flyer = Flyer.new
@@ -196,6 +196,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, :detail_level, categories: []) : {}
   end
 end
