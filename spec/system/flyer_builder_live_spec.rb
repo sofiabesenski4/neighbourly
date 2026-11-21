@@ -95,7 +95,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit_builder
 
     expect(page).to have_checked_field("Include Alpha meals in printout")
-    click_button "Deselect all"
+    click_button "Clear selection"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
     check "Include Alpha meals in printout", match: :first
     expect(all(:checkbox, "Include Alpha meals in printout").all?(&:checked?)).to be true
@@ -119,7 +119,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit_builder
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
-    click_button "Deselect all"
+    click_button "Clear selection"
 
     expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
     expect(page).to have_button("Generate printout", disabled: true)
@@ -135,7 +135,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     page.current_window.resize_to(320, 740)
     visit_builder
     expect(page).to have_css("#flyer-preview-heading", exact_text: "3 resources included")
-    click_button "Deselect all"
+    click_button "Clear selection"
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_css("article", count: 3)
     expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be true
