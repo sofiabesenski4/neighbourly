@@ -58,7 +58,7 @@ export default class extends Controller {
     nodes.forEach((node) => {
       const fragment = document.createDocumentFragment();
       let offset = 0;
-      for (const match of node.data.matchAll(/\[ref:(\d+)\]/g)) {
+      for (const match of node.data.matchAll(/\[ref:(s?\d+)\]/g)) {
         fragment.append(
           document.createTextNode(node.data.slice(offset, match.index)),
         );

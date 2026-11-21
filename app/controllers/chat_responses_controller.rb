@@ -50,7 +50,7 @@ class ChatResponsesController < ApplicationController
     latest_response = @chat.latest_response
     boundary = Integer(params[:after_response_id], exception: false).to_i.clamp(0, latest_response&.id || 0)
     responses = @chat.chat_responses.where(id: boundary..).includes(:user_message,
-      assistant_message: [:ruby_llm_usages, :ruby_llm_tool_calls, {rag_documents: :source}]).order(:id).to_a
+      assistant_message: [:ruby_llm_usages, :ruby_llm_tool_calls, {rag_documents: [:source, :service]}, {rag_services: [:source, :document]}]).order(:id).to_a
     response.set_header("Cache-Control", "no-store")
     response.set_header("X-Chat-Response-Boundary", latest_response&.id.to_i.to_s)
     respond_to do |format|

@@ -145,17 +145,28 @@ RSpec.describe ContentPipeline::Ingester do
         expect(doc.embedding).not_to be_nil
       end
 
-      it "queues enrichment for each new row, whether uploaded or fetched from a URL" do
+      it "queues enrichment for each new row's service, whether uploaded or fetched from a URL" do
         source.update!(url: "https://example.com/centres.csv")
         allow_any_instance_of(ContentPipeline::Fetcher).to receive(:call).and_return(csv)
 
-        expect { ingester.call }.to have_enqueued_job(EnrichDocumentJob).exactly(2).times
+        expect { ingester.call }.to have_enqueued_job(EnrichServiceJob).exactly(2).times
+        expect(source.services).to all(be_awaiting_enrichment)
+      end
+
+      it "queues enrichment for unchanged rows once the source starts using AI" do
+        source.update!(enrich_documents: false)
+        ingester.ingest(csv)
+        source.update!(enrich_documents: true)
+
+        expect { described_class.new(source).ingest(csv) }.to have_enqueued_job(EnrichServiceJob).exactly(2).times
+        expect(source.services).to all(be_awaiting_enrichment)
       end
 
       it "queues no enrichment when the source did not opt in" do
         source.update!(enrich_documents: false)
 
-        expect { ingester.ingest(csv) }.not_to have_enqueued_job(EnrichDocumentJob)
+        expect { ingester.ingest(csv) }.not_to have_enqueued_job(EnrichServiceJob)
+        expect(source.services).to all(have_attributes(enrichment_requested: false))
       end
 
       it "still queues enrichment for rows saved before a later row fails" do
@@ -167,16 +178,16 @@ RSpec.describe ContentPipeline::Ingester do
         end
 
         expect { ingester.ingest(csv) }.to raise_error(ActiveRecord::RecordNotSaved)
-        expect(EnrichDocumentJob).to have_been_enqueued.with(source.documents.find_by!(title: "Harbour Meals"))
+        expect(EnrichServiceJob).to have_been_enqueued.with(source.documents.find_by!(title: "Harbour Meals").service)
       end
 
-      it "queues enrichment only for rows this ingestion wrote" do
+      it "queues enrichment only for services this ingestion wrote that are still waiting" do
         ingester.ingest(csv)
-        source.documents.find_by!(title: "Harbour Meals").update!(enriched_at: Time.current)
-        stale = source.documents.create!(content: "Name: Gone", external_id: "gone", metadata: {"Name" => "Gone"})
+        source.documents.find_by!(title: "Harbour Meals").service.update!(enriched_at: Time.current)
+        stale = source.services.create!(name: "Gone", enrichment_requested: true)
 
-        expect { described_class.new(source).ingest(csv) }.to have_enqueued_job(EnrichDocumentJob).exactly(:once)
-        expect(EnrichDocumentJob).not_to have_been_enqueued.with(stale)
+        expect { described_class.new(source).ingest(csv) }.to have_enqueued_job(EnrichServiceJob).exactly(:once)
+        expect(EnrichServiceJob).not_to have_been_enqueued.with(stale)
       end
 
       it "does not duplicate documents when the same file is ingested again" do
@@ -185,68 +196,88 @@ RSpec.describe ContentPipeline::Ingester do
         expect { ingester.ingest(csv) }.not_to change(Document, :count)
       end
 
-      context "when a row was already enriched" do
+      # Enrichment fills in services now, so rows keep what their file said.
+      it "never rewrites a row with a summary" do
+        ingester.ingest(csv)
+
+        expect(source.documents.find_by!(title: "Harbour Meals").content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
+      end
+
+      context "when a row's service was already enriched" do
         let(:csv) { "id,Name,Address\n1,Harbour Meals,100 Harbour St\n" }
         let(:document) { source.documents.find_by!(external_id: "1") }
+        let(:service) { document.service }
 
         before do
           ingester.ingest(csv)
-          document.update!(title: "Harbour Community Meals", content: "Free lunches.", enriched_at: Time.current)
+          service.update!(enriched_description: "Free lunches.", enriched_at: Time.current, hours: "Noon")
         end
 
         it "keeps the enrichment when the row is unchanged" do
-          expect { described_class.new(source).ingest(csv) }.not_to(change { document.reload.attributes })
+          expect { described_class.new(source).ingest(csv) }.not_to(change { service.reload.attributes })
         end
 
         it "keeps the enrichment when the only difference is coordinates from geocoding" do
           document.update_columns(metadata: document.metadata.merge("lat" => 48.43, "lng" => -123.37))
 
-          expect { described_class.new(source).ingest(csv) }.not_to have_enqueued_job(EnrichDocumentJob)
-          expect(document.reload).to have_attributes(
-            content: "Free lunches.", enriched_at: be_present, metadata: hash_including("lat" => 48.43, "lng" => -123.37)
-          )
+          expect { described_class.new(source).ingest(csv) }.not_to have_enqueued_job(EnrichServiceJob)
+          expect(service.reload).to have_attributes(enriched_description: "Free lunches.", enriched_at: be_present)
         end
 
         context "when the file supplies its own coordinates" do
           let(:csv) { "id,Name,Address,lat,lng\n1,Harbour Meals,100 Harbour St,48.43,-123.37\n" }
 
-          it "rewrites the row when those coordinates change" do
+          it "sets the service again when those coordinates change" do
             described_class.new(source).ingest(csv.sub("48.43", "48.50"))
 
-            expect(document.reload).to have_attributes(enriched_at: nil, metadata: hash_including("lat" => "48.50"))
+            expect(service.reload).to have_attributes(enriched_at: nil, enriched_description: nil)
+            expect(document.reload.metadata).to include("lat" => "48.50")
           end
         end
 
         it "clears enrichment that lands while a changed row is being replaced" do
-          document.update!(enriched_at: nil)
           allow(source.documents).to receive(:find_or_initialize_by).and_wrap_original do |original, **attributes|
-            original.call(**attributes).tap do |loaded|
-              Document.where(id: loaded.id).update_all(enriched_at: Time.current, content: "Summary of the old row.")
+            original.call(**attributes).tap do
+              Service.where(id: service.id).update_all(enriched_at: Time.current, enriched_description: "Summary of the old row.")
             end
           end
 
           described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St"))
 
-          expect(document.reload).to have_attributes(
-            content: "id: 1\nName: Harbour Meals\nAddress: 200 Harbour St", enriched_at: nil
-          )
+          expect(service.reload).to have_attributes(enriched_at: nil, enriched_description: nil, embedding: nil)
         end
 
-        it "sets the address again from a changed row, clearing what enrichment filled in" do
-          document.address.update_columns(city: "Victoria", lat: 48.43, lng: -123.37)
+        it "clears enrichment that lands after the importer read the service" do
+          service.update_columns(enriched_at: nil, enriched_description: nil)
+          allow_any_instance_of(Document).to receive(:save_with_category_names!).and_wrap_original do |original, *arguments|
+            original.call(*arguments).tap do
+              original.receiver.service
+              Service.where(id: service.id).update_all(enriched_at: Time.current, enriched_description: "Summary of the old row.")
+            end
+          end
 
-          expect { described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St")) }
-            .not_to have_enqueued_job(GeocodeAddressJob)
-
-          expect(document.reload.address).to have_attributes(street_address: "200 Harbour St", city: nil, coordinates: nil)
-        end
-
-        it "rewrites the row and clears enrichment when the row changed" do
           described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St"))
 
-          expect(document.reload).to have_attributes(
-            title: "Harbour Meals", content: "id: 1\nName: Harbour Meals\nAddress: 200 Harbour St", enriched_at: nil
-          )
+          expect(service.reload).to have_attributes(enriched_at: nil, enriched_description: nil)
+        end
+
+        it "sets the service's address again from a changed row, and waits for enrichment to look it up" do
+          service.address.update_columns(city: "Victoria", lat: 48.43, lng: -123.37)
+
+          # Only the row's own address is looked up now. The service's waits.
+          expect { described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St")) }
+            .to have_enqueued_job(GeocodeAddressJob).exactly(:once)
+
+          expect(service.reload.address).to have_attributes(street_address: "200 Harbour St", city: nil, coordinates: nil)
+          expect(service).to be_awaiting_enrichment
+        end
+
+        it "rewrites the row and clears what enrichment gave its service when the row changed" do
+          expect { described_class.new(source).ingest(csv.sub("100 Harbour St", "200 Harbour St")) }
+            .to have_enqueued_job(EnrichServiceJob).with(service)
+
+          expect(document.reload).to have_attributes(title: "Harbour Meals", content: "id: 1\nName: Harbour Meals\nAddress: 200 Harbour St")
+          expect(service.reload).to have_attributes(hours: nil, enriched_at: nil, enriched_description: nil)
         end
       end
 
@@ -256,6 +287,24 @@ RSpec.describe ContentPipeline::Ingester do
             "1,Harbour Meals,Harbourside Society,100 Harbour St,250-555-0101,All ages\n" \
             "2,Night Shelter,harbourside  SOCIETY,22 North Rd,,19+\n" \
             "3,Bike Repair,,5 Cook St,,\n"
+        end
+
+        context "when a row has no name column" do
+          let(:csv) { "id,Address,Ages\n1,100 Harbour St,19+\n" }
+
+          it "leaves the service for enrichment to name when the source asks for it" do
+            source.update!(enrich_documents: true)
+
+            expect { ingester.ingest(csv) }.to have_enqueued_job(EnrichServiceJob)
+            expect(Service.sole).to have_attributes(name: nil, display_name: "Unnamed service", enrichment_requested: true)
+          end
+
+          it "names the service by the row's first value when nothing will enrich it" do
+            source.update!(enrich_documents: false)
+            ingester.ingest(csv)
+
+            expect(Service.sole.name).to eq("1")
+          end
         end
 
         it "saves a service for each row, linked to its document" do

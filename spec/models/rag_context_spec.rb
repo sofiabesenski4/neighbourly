@@ -148,6 +148,80 @@ RSpec.describe RagContext do
       end
     end
 
+    # Enrichment embeds a service's AI description. Chat finds it by that.
+    context "when a service was enriched" do
+      let!(:added) do
+        Source.form_entry_source.services.create!(name: "Breakfast Club", phone: "250-555-0199",
+          enriched_description: "Breakfast Club serves free breakfast to anyone on weekdays.", embedding: fake_vector)
+      end
+
+      it "finds a service added on the site, which has no row, and cites it as a service" do
+        result = rag_context.augment("Where can I get breakfast?")
+
+        expect(result.services).to eq([added])
+        expect(result.documents).to be_empty
+        expect(result.instructions).to include("[ref:s#{added.id}] Breakfast Club (Source: Form Entries)",
+          "Summary: Breakfast Club serves free breakfast", "Phone: 250-555-0199")
+      end
+
+      it "gives an imported service once, as the service, not again as its row" do
+        row = source.documents.create!(title: "Lunch row", content: "Lunch", embedding: fake_vector)
+        lunch = source.services.create!(name: "Harbour Lunch", document: row, enriched_description: "Lunches.", embedding: fake_vector)
+
+        result = rag_context.augment("lunch?")
+
+        expect(result.services).to contain_exactly(added, lunch)
+        expect(result.documents).to be_empty
+        expect(result.instructions).not_to include("[ref:#{row.id}]")
+      end
+
+      it "finds a service whose enrichment lands between the two searches, once" do
+        row = source.documents.create!(title: "Supper row", content: "Supper", embedding: fake_vector)
+        supper = source.services.create!(name: "Harbour Supper", document: row)
+        searches = 0
+        enrich_before_second_search = lambda do |original|
+          searches += 1
+          supper.update_columns(enriched_description: "Suppers.", embedding: fake_vector) if searches == 2
+          original.call
+        end
+        allow(Service).to receive(:visible).and_wrap_original(&enrich_before_second_search)
+        allow(Document).to receive(:with_embeddings).and_wrap_original(&enrich_before_second_search)
+
+        result = rag_context.augment("supper?")
+
+        expect(result.services).to include(supper)
+        expect(result.documents).not_to include(row)
+      end
+
+      it "still finds a row whose service hasn't been enriched yet" do
+        row = source.documents.create!(title: "Dinner row", content: "Dinner", embedding: fake_vector)
+        source.services.create!(name: "Harbour Dinner", document: row)
+
+        expect(rag_context.augment("dinner?").documents).to eq([row])
+      end
+
+      it "leaves out closed services and ones a moderator removed" do
+        added.update!(closed: true)
+        row = source.documents.create!(title: "Removed row", content: "Removed", embedding: nil)
+        row.reports.create!(reason: "out of date", status: "valid")
+        source.services.create!(name: "Removed", document: row, enriched_description: "Gone.", embedding: fake_vector)
+
+        expect(rag_context.augment("anything?").services).to be_empty
+      end
+
+      it "gives at most the limit, closest first, across services and rows" do
+        far = Array.new(1536, 0.0).tap { |v| v[1] = 1.0 }
+        3.times { |n| source.documents.create!(title: "Far #{n}", content: "Far", embedding: far) }
+        source.documents.create!(title: "Close", content: "Close", embedding: fake_vector)
+
+        result = rag_context.augment("breakfast")
+
+        expect(result.services + result.documents).to have_attributes(size: 3)
+        expect(result.services).to eq([added])
+        expect(result.documents.first.title).to eq("Close")
+      end
+    end
+
     context "when no documents exist at all" do
       it "still limits answers to the reference documents" do
         result = rag_context.augment("Hello")

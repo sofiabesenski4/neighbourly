@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_21_004559) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -272,8 +272,17 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
     t.check_constraint "status::text = ANY (ARRAY['pending'::character varying::text, 'succeeded'::character varying::text, 'failed'::character varying::text, 'cancelled'::character varying::text])"
   end
 
+  create_table "service_messages", force: :cascade do |t|
+    t.bigint "service_id", null: false
+    t.bigint "message_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["message_id"], name: "index_service_messages_on_message_id"
+    t.index ["service_id"], name: "index_service_messages_on_service_id"
+  end
+
   create_table "services", force: :cascade do |t|
-    t.string "name", null: false
+    t.string "name"
     t.text "description"
     t.string "hours"
     t.string "phone"
@@ -289,6 +298,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
     t.datetime "confirmed_at"
     t.string "confirmation_method"
     t.bigint "confirmed_by_id"
+    t.boolean "enrichment_requested", default: false, null: false
+    t.datetime "enriched_at"
+    t.text "enriched_description"
+    t.vector "embedding", limit: 1536
     t.index ["confirmed_by_id"], name: "index_services_on_confirmed_by_id"
     t.index ["document_id"], name: "index_services_on_document_id", unique: true
     t.index ["organization_id"], name: "index_services_on_organization_id"
@@ -491,6 +504,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
   add_foreign_key "organizations", "sources", on_delete: :nullify
   add_foreign_key "reports", "documents"
   add_foreign_key "reports", "users"
+  add_foreign_key "service_messages", "messages", on_delete: :cascade
+  add_foreign_key "service_messages", "services", on_delete: :cascade
   add_foreign_key "services", "documents", on_delete: :nullify
   add_foreign_key "services", "organizations", on_delete: :nullify
   add_foreign_key "services", "sources", on_delete: :cascade

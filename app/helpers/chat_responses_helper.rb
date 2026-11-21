@@ -7,6 +7,7 @@ module ChatResponsesHelper
   def message_sync_enrichment(message)
     return "" unless message.role == "assistant"
 
-    [message.rag_documents.map(&:id).sort.join(","), message.ruby_llm_usages.map(&:id).sort.join(",")].join(":")
+    [message.rag_documents.map(&:id).sort.join(","), message.rag_services.map(&:id).sort.join(","),
+      message.ruby_llm_usages.map(&:id).sort.join(",")].join(":")
   end
 end

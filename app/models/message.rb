@@ -1,8 +1,10 @@
 class Message < ApplicationRecord
   acts_as_message
   has_many_attached :attachments
-  has_many :document_messages, dependent: :destroy
+  has_many :document_messages, -> { order(:id) }, dependent: :destroy
   has_many :rag_documents, through: :document_messages, source: :document
+  has_many :service_messages, -> { order(:id) }, dependent: :destroy
+  has_many :rag_services, through: :service_messages, source: :service
 
   CONVERSATION_ROLES = %w[user assistant].freeze
 

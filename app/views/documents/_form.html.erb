@@ -87,6 +87,15 @@
     <%= form.text_area :notes, value: @document.metadata&.dig("notes") || params.dig(:document, :notes), placeholder: "Any other relevant information...", rows: 3, class: "admin-input" %>
   </div>
 
+  <% enrich = params.dig(:document, :enrich) ? params.dig(:document, :enrich) == "1" : @document.new_record? %>
+  <div class="space-y-1">
+    <%= form.label :enrich, class: "flex min-h-11 cursor-pointer items-center gap-3" do %>
+      <%= form.check_box :enrich, { checked: enrich, class: "admin-checkbox", aria: { describedby: "document_enrich_hint" } }, "1", "0" %>
+      <span class="text-sm font-medium text-stone-800">Fill in what's left blank with AI after saving</span>
+    <% end %>
+    <p id="document_enrich_hint" class="ml-7 text-xs leading-5 text-stone-500">It only adds details the resource's service doesn't have, and writes the description chat searches.</p>
+  </div>
+
   <div class="flex flex-wrap items-center gap-3 border-t border-stone-100 pt-6">
     <%= form.submit button_text, data: { submit_spinner_target: "button" }, class: "admin-button-primary" %>
     <%= link_to "Cancel", cancel_path, class: "admin-button-secondary" %>
