@@ -41,6 +41,261 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
   end
 
+  # Capture the PDF blob before the page opens it, so assertions read the actual
+  # generated document without fetching a blob URL through the site's CSP.
+  def capture_printout
+    page.execute_script <<~JAVASCRIPT
+      const createObjectURL = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = (blob) => {
+        window.capturedPrintout = blob;
+        return createObjectURL(blob);
+      };
+    JAVASCRIPT
+  end
+
+  def printed_text
+    data_url = page.evaluate_async_script(<<~JAVASCRIPT)
+      const done = arguments[0];
+      const reader = new FileReader();
+      reader.onload = () => done(reader.result);
+      reader.readAsDataURL(window.capturedPrintout);
+    JAVASCRIPT
+    pdf = data_url.split(",", 2).last.unpack1("m")
+    PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
+  end
+
+  it "unchecks all copies of a resource, keeps its cards visible, and excludes it when printing" do
+    resource = Service.find_by!(name: "Alpha meals")
+    resource.categories << health
+    visit_builder
+    expect(page).to have_css("article h4", text: "Alpha meals", count: 2)
+
+    all(:checkbox, "Include Alpha meals in printout").first.uncheck
+
+    expect(page).to have_css("article h4", text: "Alpha meals", count: 2)
+    expect(page).to have_no_checked_field("Include Alpha meals in printout")
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    page.execute_script(<<~JS)
+      window.open = () => null;
+      const fetchPrintout = window.fetch;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.printoutExclusions = options.body.getAll("flyer[excluded_resource_ids][]");
+        }
+        return fetchPrintout(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(page.evaluate_script("window.printoutExclusions")).to eq([resource.id.to_s])
+  end
+
+  it "keeps checkbox choices across category and search changes and scopes bulk actions to matching resources" do
+    Service.find_by!(name: "Alpha meals").categories << health
+    visit_builder
+
+    expect(page).to have_checked_field("Include Alpha meals in printout")
+    click_button "Clear selection"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
+    check "Include Alpha meals in printout", match: :first
+    expect(all(:checkbox, "Include Alpha meals in printout").all?(&:checked?)).to be true
+    check "Health Care"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_unchecked_field("Include Beta clinic in printout")
+    fill_in "Search resources", with: "Beta"
+    expect(page).to have_no_field("Include Alpha meals in printout")
+    click_button "Select all"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    fill_in "Search resources", with: ""
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    uncheck "Health Care"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    expect(page).to have_unchecked_field("Include Gamma noticeboard in printout")
+  end
+
+  it "lets an admin reselect a resource and re-enable printing after deselecting all matches" do
+    admin = User.create!(email: "printout-admin@example.com", password: "password123", admin: true)
+    login_as(admin, scope: :user)
+    visit_builder
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    click_button "Clear selection"
+
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
+    expect(page).to have_button("Generate printout", disabled: true)
+    check "Include Alpha meals in printout"
+
+    expect(page).to have_css("article h4", text: "Alpha meals")
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_button("Generate printout", disabled: false)
+    expect(page).to have_checked_field("Include Alpha meals in printout")
+  end
+
+  it "prints only the chosen resource after deselecting all on mobile" do
+    page.current_window.resize_to(320, 740)
+    visit_builder
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "3 resources included")
+    click_button "Clear selection"
+    expect(page).to have_button("Generate printout", disabled: true)
+    expect(page).to have_css("article", count: 3)
+    expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be true
+    selection = find(:checkbox, "Include Beta clinic in printout")
+    expect(selection.find(:xpath, "..").evaluate_script("this.getBoundingClientRect().width")).to be >= 44
+    expect(selection.find(:xpath, "..").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+    selection.send_keys(:space)
+    expect(selection).to be_checked
+    expect(page.evaluate_script("document.activeElement.getAttribute('aria-label')")).to eq("Include Beta clinic in printout")
+    capture_printout
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(printed_text).to include("Beta clinic")
+    expect(printed_text).not_to include("Alpha meals", "Gamma noticeboard")
+    click_button "Select all"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "3 resources included")
+    expect(page).to have_no_link("Open printout")
+    expect(page).to have_button("Generate printout", disabled: false)
+  ensure
+    page.current_window.resize_to(1280, 900)
+  end
+
+  it "shows the default print settings and lets people change the available controls" do
+    visit_builder
+    expect(page).to have_no_field("Text size")
+
+    settings = find('summary[aria-label="Print settings"]')
+    expect(settings).to have_css("svg[aria-hidden='true']")
+    expect(settings.text).to be_empty
+    expect(settings.evaluate_script(<<~JS)).to be(true)
+      this.getBoundingClientRect().left >=
+        this.closest("details").previousElementSibling.getBoundingClientRect().right
+    JS
+    settings.click
+
+    within_fieldset("Include map") do
+      expect(page).to have_checked_field("Yes")
+      choose "No"
+      expect(page).to have_checked_field("No")
+    end
+    within_fieldset("Colour map") do
+      expect(page).to have_checked_field("No", disabled: true)
+    end
+    within_fieldset("Include map") { choose "Yes" }
+    within_fieldset("Colour map") do
+      expect(page).to have_checked_field("No")
+      choose "Yes"
+      expect(page).to have_checked_field("Yes")
+    end
+    within_fieldset("Colour resource cards") do
+      expect(page).to have_checked_field("No")
+      choose "Yes"
+      expect(page).to have_checked_field("Yes")
+    end
+    expect(find_field("Text size").value).to eq("15.5")
+    expect(page).to have_no_field("Notes")
+
+    settings.click
+    expect(page).to have_no_field("Text size")
+    settings.click
+    expect(page).to have_field("Text size")
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_field("Text size")
+  end
+
+  it "shows resource detail filters between Categories and Sort and applies them to the preview" do
+    Service.find_by!(name: "Alpha meals").update!(
+      additional_details: {"age range" => {"min" => 18}, "eligibility" => "Local residents"}
+    )
+    visit_builder
+    expect(page).to have_css("article dt", text: "Services:")
+    expect(page).to have_css("article dt", text: "Ages served:")
+    expect(page).to have_css("article dt", text: "Eligibility:")
+    advanced = find('summary[title="Advanced filtering"]')
+    expect(advanced).to have_css("svg[aria-hidden='true']")
+    expect(advanced.find(:xpath, "../preceding-sibling::*[1]")).to have_text("Categories")
+    expect(advanced.find(:xpath, "../following-sibling::*[1]")).to have_css('summary[aria-label="Sort resources"]')
+    advanced.click
+
+    within_fieldset("Resource details") do
+      ["Service", "Address", "Distance and walking time", "Phone", "Ages served and eligibility", "Notes", "Intake"].each do |label|
+        expect(page).to have_checked_field(label)
+      end
+      uncheck "Service"
+      uncheck "Ages served and eligibility"
+      expect(page).to have_checked_field("Address")
+    end
+    expect(page).to have_no_css("article dt", text: "Services:")
+    expect(page).to have_no_css("article dt", text: "Ages served:")
+    expect(page).to have_no_css("article dt", text: "Eligibility:")
+    expect(page).to have_css("article h4", text: "Alpha meals")
+
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_field("Service")
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    expect(page).to have_no_css("article dt", text: "Services:")
+
+    advanced.click
+    within_fieldset("Resource details") do
+      check "Service"
+      check "Ages served and eligibility"
+    end
+    expect(page).to have_css("article dt", text: "Services:")
+    expect(page).to have_css("article dt", text: "Ages served:")
+    expect(page).to have_css("article dt", text: "Eligibility:")
+  end
+
+  it "keeps the same resource detail choices available in the mobile toolbar" do
+    visit_builder
+    find('summary[title="Advanced filtering"]').click
+    within_fieldset("Resource details") { uncheck "Service" }
+
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    within('[data-flyer-builder-target="toolbar"]') do
+      find('summary[title="Advanced filtering"]').click
+      within_fieldset("Resource details") { expect(page).to have_unchecked_field("Service") }
+    end
+    expect(page).to have_no_css("article dt", text: "Services:")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
+  it "keeps the map and text size choices through a preview update and sends them when generating" do
+    visit_builder
+    find('summary[aria-label="Print settings"]').click
+    within_fieldset("Include map") { choose "No" }
+    slider = find('input[aria-label="Text size slider"]')
+    slider.send_keys(:home)
+    expect(page).to have_field("Text size", with: "8")
+    slider.send_keys(:right)
+    expect(page).to have_field("Text size", with: "8.5")
+    slider.send_keys(:end)
+    expect(page).to have_field("Text size", with: "25")
+    fill_in "Text size", with: "21.5"
+    expect(slider.value).to eq("21.5")
+    expect(slider["aria-valuetext"]).to eq("21.5 pixels")
+    find('summary[aria-label="Print settings"]').click
+    check "Meals"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+
+    page.execute_script(<<~JS)
+      window.open = () => null;
+      const request = window.fetch;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.submittedSettings = {
+            map: options.body.get("print_settings[include_map]"),
+            size: options.body.get("print_settings[text_size]"),
+          };
+        }
+        return request(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(page.evaluate_script("window.submittedSettings")).to eq({"map" => "no", "size" => "21.5"})
+  end
+
   it "opens the generated PDF in a new tab with one click" do
     visit_builder
     expect(page).to have_button("Generate printout", disabled: false)
@@ -170,7 +425,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be > 0
     panel.execute_script("window.scrollTo(0, window.scrollY + this.getBoundingClientRect().top + 50)")
     expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be_within(1).of(0)
-    expect(find("[data-flyer-builder-target='locationSummaryRow']").evaluate_script("this.getBoundingClientRect().bottom")).to be < 0
+    expect(find("h1", text: "Build your resource guide").evaluate_script("this.getBoundingClientRect().bottom")).to be < 0
   ensure
     page.current_window.resize_to(1280, 900)
   end
@@ -405,32 +660,6 @@ RSpec.describe "Live resource guide builder", type: :system do
       Service.find_by!(name: "Alpha meals").create_address!(lat: 48.43, lng: -123.36)
     end
 
-    # Keeps a copy of the PDF as the page turns it into a link. Fetching the link
-    # afterwards isn't possible, because the site's security policy blocks that, as
-    # it should: the page only ever opens the PDF in a new tab.
-    def capture_printout
-      page.execute_script <<~JAVASCRIPT
-        const createObjectURL = URL.createObjectURL.bind(URL);
-        URL.createObjectURL = (blob) => {
-          window.capturedPrintout = blob;
-          return createObjectURL(blob);
-        };
-      JAVASCRIPT
-    end
-
-    # Reads the PDF the browser actually received. Whitespace is squeezed because
-    # lines wrap wherever the page width falls.
-    def printed_text
-      data_url = page.evaluate_async_script(<<~JAVASCRIPT)
-        const done = arguments[0];
-        const reader = new FileReader();
-        reader.onload = () => done(reader.result);
-        reader.readAsDataURL(window.capturedPrintout);
-      JAVASCRIPT
-      pdf = data_url.split(",", 2).last.unpack1("m")
-      PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
-    end
-
     def visit_location_screen
       visit new_flyer_path
       expect(page).to have_button("Skip distances")
@@ -458,6 +687,10 @@ RSpec.describe "Live resource guide builder", type: :system do
       page.current_window.resize_to(1280, 900)
       visit_location_screen
       continue_with_place("919 Pandora Ave")
+      within(find("h1", text: "Build your resource guide").ancestor("header")) do
+        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("Generate printout")
+      end
       find("summary[aria-label='Sort resources']").hover
       click_button "Distance"
       expect(page).to have_css("article:nth-child(2) h4", text: "Alpha meals")
@@ -465,21 +698,26 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
         width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
+      expect(page).to have_no_text("Guide preview")
+      expect(page).to have_no_button("Edit distances")
       find("button[aria-label='Filters (active)']").click
       within("#flyer-filters") do
         expect(page).to have_select("Sort by", selected: "Distance")
         expect(page).to have_css("option[value='distance']:not([disabled])", visible: :all)
-        find("button[aria-label='Close filters']").click
+        check "Meals"
+        click_button "Edit distances"
       end
 
-      click_button "Change"
-      click_button "Skip distances"
-      expect(page).to have_css("h3", text: "Meals")
-      find("button[aria-label='Filters']").click
+      within("#flyer-distances") { click_button "Skip distances" }
       within("#flyer-filters") do
+        expect(page).to have_button("Add distances")
+        expect(page).to have_checked_field("Meals")
         expect(page).to have_select("Sort by", selected: "Category")
         expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
+        click_button "Apply filters"
       end
+      expect(page).to have_text("1 resource included")
+      expect(page).to have_css("h3", text: "Meals")
     ensure
       page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
     end
@@ -498,7 +736,8 @@ RSpec.describe "Live resource guide builder", type: :system do
     it "prints no distances after skipping" do
       visit_location_screen
       click_button "Skip distances"
-      expect(page).to have_text("Distances won't be shown")
+      expect(page).to have_button("Add distances")
+      expect(page).to have_no_text("Distances won't be shown")
       expect(page).to have_css("article h4", text: "Alpha meals")
       expect(page).to have_no_css("article", text: "Distance:")
 
@@ -516,10 +755,15 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       continue_with_place("919 Pandora Ave")
 
-      expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      expect(page).to have_button("Edit distances")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
       expect(page).to have_text("1 resource included")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
+      find('summary[title="Advanced filtering"]').click
+      within_fieldset("Resource details") { uncheck "Distance and walking time" }
+      expect(page).to have_no_css("article", text: "Distance:")
+      within_fieldset("Resource details") { check "Distance and walking time" }
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       click_button "Generate printout"
 
@@ -533,7 +777,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       find_field("Enter a place").send_keys("919 Pandora Ave", :return)
 
-      expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      expect(page).to have_button("Edit distances")
       expect(page).to have_no_link("Open printout")
       expect(page).to have_current_path(new_flyer_path)
     end
@@ -553,7 +797,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_no_css("[data-flyer-builder-target='placeError']")
       click_button "Continue"
 
-      expect(page).to have_text("Distances from: 919 Pandora Ave.")
+      expect(page).to have_button("Edit distances")
     end
 
     it "asks for a place when the box is empty" do
@@ -580,9 +824,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(printed_text).not_to include("Distance:")
     end
 
-    # A printout made for the old location has the wrong distances. Categories aren't
-    # affected, because the location only changes the printout.
-    it "goes back with Change, discarding the printout and keeping the categories" do
+    it "opens distance settings, discards the printout, and keeps the categories" do
       allow(Geocoder).to receive(:locate).and_return(point)
 
       visit_location_screen
@@ -592,32 +834,45 @@ RSpec.describe "Live resource guide builder", type: :system do
       click_button "Generate printout"
       expect(page).to have_link("Open printout", href: /\Ablob:/)
 
-      click_button "Change"
+      click_button "Edit distances"
 
-      expect(page).to have_text("Where should we measure distances from?")
-      expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
+      within("dialog#flyer-distances[open]") do
+        expect(page).to have_text("Distances from: 919 Pandora Ave.")
+        expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
+      end
       expect(page).to have_no_link("Open printout")
 
       click_button "Skip distances"
 
+      expect(page).to have_button("Add distances")
       expect(page).to have_checked_field("Meals")
       expect(page).to have_text("1 resource included")
       expect(page).to have_no_css("article", text: "Distance:")
       expect(page).to have_button("Generate printout", disabled: false)
     end
 
-    it "updates the preview's distances when the location changes" do
+    it "adds distances from the builder and keeps the applied place if editing is cancelled" do
       allow(Geocoder).to receive(:locate).and_return(point)
 
       visit_location_screen
+      click_button "Skip distances"
+      click_button "Add distances"
       continue_with_place("919 Pandora Ave")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
+      click_button "Edit distances"
+      fill_in "Enter a place", with: "535 Ellice St"
+      find_field("Enter a place").send_keys(:escape)
+      expect(page).to have_no_css("dialog#flyer-distances[open]")
+      expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
+      expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Edit distances")
+
       allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.41, lng: -123.36))
-      click_button "Change"
+      click_button "Edit distances"
+      expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
       continue_with_place("535 Ellice St")
 
-      expect(page).to have_text("Distances from: 535 Ellice St.")
+      expect(page).to have_button("Edit distances")
       expect(page).to have_css("article", text: /Distance:\s+2\.2 km/)
     end
 
@@ -642,7 +897,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(urls.join).not_to match(/48\.42|123\.36|Pandora/)
     end
 
-    it "cancels a printout still being prepared when Change is pressed" do
+    it "cancels a printout still being prepared when distance settings are opened" do
       allow(Geocoder).to receive(:locate).and_return(point)
 
       visit_location_screen
@@ -655,7 +910,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       end
       printout = window_opened_by { click_button "Generate printout" }
       expect(page).to have_button("Preparing printout…", disabled: true)
-      click_button "Change"
+      click_button "Edit distances"
       click_button "Skip distances"
 
       expect(page).to have_button("Generate printout", disabled: false)
@@ -692,7 +947,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
         click_button "Use my location"
 
-        expect(page).to have_text("Distances from your location (accurate to about 50 m).")
+        expect(page).to have_button("Edit distances")
         expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
@@ -711,7 +966,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         click_button "Use my location"
 
         expect(page).to have_text("may be off by about 3 km")
-        expect(page).to have_button("Change")
+        expect(page).to have_button("Edit distances")
       end
 
       it "stays on this screen and offers typing a place when location access is turned off" do
@@ -726,27 +981,28 @@ RSpec.describe "Live resource guide builder", type: :system do
         expect(page).to have_no_button("Generate printout")
 
         continue_with_place("919 Pandora Ave")
-        expect(page).to have_text("Distances from: 919 Pandora Ave.")
+        expect(page).to have_button("Edit distances")
       end
 
-      it "replaces a typed place, and is replaced by one after using Change" do
+      it "switches between a typed place and the device position in distance settings" do
         allow(Geocoder).to receive(:locate).and_return(point)
         visit_location_screen
         set_location_permission("granted")
         set_device_position(latitude: 48.42, longitude: -123.36)
 
         continue_with_place("919 Pandora Ave")
-        expect(page).to have_text("Distances from: 919 Pandora Ave.")
-        click_button "Change"
+        expect(page).to have_button("Edit distances")
+        click_button "Edit distances"
         click_button "Use my location"
 
-        expect(page).to have_text("Distances from your location")
+        expect(page).to have_button("Edit distances")
         expect(find_field("Enter a place", visible: :all).value).to eq("")
 
-        click_button "Change"
+        click_button "Edit distances"
+        expect(page).to have_text("Distances from your location")
         continue_with_place("535 Ellice St")
 
-        expect(page).to have_text("Distances from: 535 Ellice St.")
+        expect(page).to have_button("Edit distances")
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.42")
       end
     end

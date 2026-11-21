@@ -213,6 +213,18 @@ RSpec.describe FlyerPdf do
     expect(text).to include("Resource name:", "END_OF_RESOURCE_NAME", "Saved notes")
   end
 
+  it "keeps every word of an oversized card at the largest text size" do
+    words = (1..1200).map { |i| "detail#{i.to_s.rjust(4, "0")}" }
+    section = CategorySearch::Section.new(category: Category.new(name: "Food"),
+      resources: [resource(notes: words.join(" "), intake_info: "Walk in")])
+    bytes = described_class.new(sections: [section], include_map: false, text_size_px: 25).render
+    reader = PDF::Reader.new(StringIO.new(bytes))
+
+    expect(reader.page_count).to be > 1
+    expect(reader.pages.map(&:text).join("\n").scan(/detail\d{4}/)).to eq(words)
+    expect(reader.pages.last.text).to include("Intake:", "Walk in")
+  end
+
   it "does not label the first appearance of a new category as continued" do
     sections = [
       CategorySearch::Section.new(category: Category.new(name: "Food"),

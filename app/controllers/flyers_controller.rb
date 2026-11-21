@@ -94,7 +94,7 @@ class FlyersController < ApplicationController
   end
 
   def create
-    @flyer = Flyer.new(flyer_params)
+    @flyer = Flyer.new(flyer_params.to_h.merge(print_settings))
 
     unless @flyer.valid?
       render_invalid_flyer
@@ -108,12 +108,14 @@ class FlyersController < ApplicationController
       return
     end
 
-    pdf = FlyerGenerator.call(**@flyer.filters, origin: origin)
+    pdf = FlyerGenerator.call(**@flyer.filters, **@flyer.pdf_options, origin: origin)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
     else
-      message = if @flyer.query.present?
+      message = if @flyer.excluded_resource_ids.any?
+        "No selected resources are available to print."
+      elsif @flyer.query.present?
         "No resources match your search."
       elsif @flyer.categories.empty?
         "No resources are available to print."
@@ -173,11 +175,12 @@ class FlyersController < ApplicationController
 
     input = params[:flyer]
     supported = input.is_a?(ActionController::Parameters)
-    unexpected = supported ? input.keys - %w[categories query sort near lat lng] : []
-    categories = input[:categories] if supported
-    valid_categories = categories.nil? || (categories.is_a?(Array) && categories.all?(String))
+    unexpected = supported ? input.keys - %w[categories query sort near lat lng excluded_resource_ids] : []
+    invalid_lists = supported ? %w[categories excluded_resource_ids].select { |field|
+      input.key?(field) && !(input[field].is_a?(Array) && input[field].all?(String))
+    } : [:categories]
     invalid_fields = supported ? %w[query sort near lat lng].select { |field| input.key?(field) && !input[field].is_a?(String) } : []
-    return if supported && unexpected.empty? && valid_categories && invalid_fields.empty?
+    return if supported && unexpected.empty? && invalid_lists.empty? && invalid_fields.empty?
 
     @flyer = Flyer.new
     if unexpected.any?
@@ -185,7 +188,7 @@ class FlyersController < ApplicationController
     elsif invalid_fields.any?
       invalid_fields.each { |field| @flyer.errors.add(field, "must be text") }
     else
-      @flyer.errors.add(:categories, "must be provided as a list")
+      invalid_lists.each { |field| @flyer.errors.add(field, "must be provided as a list") }
     end
     if request.format.json? || request.format.pdf?
       render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
@@ -196,6 +199,20 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: [], excluded_resource_ids: []) : {}
+  end
+
+  def print_settings
+    return {} unless params.key?(:print_settings)
+
+    settings = params[:print_settings]
+    return {include_map: nil} unless settings.is_a?(ActionController::Parameters)
+
+    %i[include_map text_size].each_with_object({}) do |key, options|
+      next unless settings.key?(key)
+
+      value = settings[key]
+      options[key] = value.is_a?(String) ? value : ""
+    end.tap { |options| options[:details] = settings[:details] if settings.key?(:details) }
   end
 end
