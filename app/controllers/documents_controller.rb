@@ -77,7 +77,7 @@ class DocumentsController < ApplicationController
   def document_params
     params.require(:document).permit(
       :title, :description, :city, :address, :phone, :email,
-      :website, :hours, :age_min, :age_max, :gender, :notes, :organization_id, category_ids: []
+      :website, :hours, :age_min, :age_max, :gender, :notes, :organization_id, :enrich, category_ids: []
     )
   end
 
@@ -92,8 +92,11 @@ class DocumentsController < ApplicationController
         @document.errors.merge!(service.errors)
         raise ActiveRecord::Rollback
       end
+      @service = service
       true
     end
+    # Queued once both are saved, so the job always finds the service.
+    EnrichServiceJob.perform_later(@service) if saved && @service.awaiting_enrichment?
     saved || false
   end
 
@@ -112,6 +115,8 @@ class DocumentsController < ApplicationController
     location = {street_address: p[:address].presence, city: p[:city].presence}
     (service.address || service.build_address).assign_attributes(location) if service.address || location.values.any?
     service.categories = @document.categories
+    # Like the services form, this can ask AI to fill in what was left blank.
+    service.request_enrichment if p[:enrich] == "1"
     service
   end
 

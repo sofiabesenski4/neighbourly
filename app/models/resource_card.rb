@@ -1,6 +1,7 @@
 # The allowlist of a service's saved information used by both HTML and PDF cards.
-# Missing values remove the complete field, including its label. These values
-# are never supplemented with model-generated information.
+# Missing values remove the complete field, including its label. Enrichment
+# may have filled blanks from the service's own details, but the card adds
+# nothing of its own, and never shows the AI description.
 class ResourceCard
   # Assumes about 5 km/h, a common estimate for walking. Many people using these
   # guides may be slower, which is why the printout calls this an estimate.

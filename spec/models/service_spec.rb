@@ -62,6 +62,56 @@ RSpec.describe Service, type: :model do
     end
   end
 
+  describe "waiting for enrichment" do
+    it "may have no name yet, since enrichment names it" do
+      waiting = source.services.create!(enrichment_requested: true)
+
+      expect(waiting).to be_awaiting_enrichment
+      expect(waiting.display_name).to eq("Unnamed service")
+      expect { waiting.update!(enriched_at: Time.current) }.to raise_error(ActiveRecord::RecordInvalid, /Name can't be blank/)
+    end
+
+    it "waits again when someone asks for it again" do
+      listing = service(enrichment_requested: true, enriched_at: 1.day.ago)
+
+      listing.request_enrichment
+
+      expect(listing).to be_awaiting_enrichment
+    end
+
+    it "forgets its AI description once a detail it describes changes" do
+      [{hours: "Daily"}, {organization: Organization.create!(name: "Our Place")},
+        {address_attributes: {street_address: "2 Main St"}}, {categories: [Category.create!(name: "Meals")]}].each do |change|
+        listing = service(enriched_at: 1.day.ago, enriched_description: "Lunch daily.", embedding: Array.new(1536, 0.1))
+
+        listing.update!(change)
+
+        expect(listing.reload).to have_attributes(enriched_description: nil, embedding: nil)
+      end
+    end
+
+    it "keeps its AI description when enrichment writes it, or nothing it describes changes" do
+      listing = service(enriched_description: "Lunch daily.")
+      listing.update!(closed: true)
+      expect(listing.reload.enriched_description).to eq("Lunch daily.")
+
+      listing.update!(hours: "Daily", enriched_description: "Lunch every day.", enriched_at: Time.current)
+      expect(listing.reload.enriched_description).to eq("Lunch every day.")
+    end
+
+    it "stops using its old AI description while waiting for a new one" do
+      listing = service(enrichment_requested: true, enriched_at: 1.day.ago, enriched_description: "Lunch daily.")
+
+      listing.request_enrichment
+
+      expect(listing.enriched_description).to be_nil
+    end
+
+    it "isn't waiting when nobody asked" do
+      expect(service).not_to be_awaiting_enrichment
+    end
+  end
+
   it "needs a name and a source" do
     service = Service.new
 
@@ -145,11 +195,8 @@ RSpec.describe Service, type: :model do
       expect(created.reload.address.street_address).to be_nil
     end
 
-    it "waits for enrichment while its row is waiting" do
-      source.update!(enrich_documents: true)
-      document = source.documents.create!(title: "Row 1", content: "Name: Community lunch")
-
-      expect { service(document: document, address_attributes: {street_address: "919 Pandora Ave"}) }
+    it "waits for enrichment while the service is waiting for it" do
+      expect { service(enrichment_requested: true, address_attributes: {street_address: "919 Pandora Ave"}) }
         .not_to have_enqueued_job(GeocodeAddressJob)
     end
 

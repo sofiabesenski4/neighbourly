@@ -24,7 +24,7 @@
               <p class="font-medium text-stone-900"><%= report.document.title.presence || "Untitled" %></p>
               <%= link_to report.document.source.name, source_path(report.document.source), class: "admin-link text-xs" %>
               <% if report.document.service %>
-                <p class="text-xs text-stone-600">Service: <%= link_to report.document.service.name, report.document.service, class: "admin-link" %></p>
+                <p class="text-xs text-stone-600">Service: <%= link_to report.document.service.display_name, report.document.service, class: "admin-link" %></p>
               <% end %>
             </td>
             <td><%= report.user&.email || "Anonymous" %></td>

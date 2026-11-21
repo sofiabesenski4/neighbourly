@@ -28,8 +28,10 @@ class ServicesController < ApplicationController
     # resource added through the resource form.
     @service = Source.form_entry_source.services.build(service_params)
     @service.organization_id = current_user.organization_id unless current_user.admin?
+    @service.request_enrichment if enrich?
     if @service.save
-      redirect_to @service, notice: "Service '#{@service.name}' was created."
+      enrich_later
+      redirect_to @service, notice: "Service '#{@service.display_name}' was created."
     else
       render :new, status: :unprocessable_entity
     end
@@ -41,8 +43,11 @@ class ServicesController < ApplicationController
 
   def update
     authorize @service
-    if @service.update(service_params)
-      redirect_to @service, notice: "Service '#{@service.name}' was updated."
+    @service.assign_attributes(service_params)
+    @service.request_enrichment if enrich?
+    if @service.save
+      enrich_later
+      redirect_to @service, notice: "Service '#{@service.display_name}' was updated."
     else
       render :edit, status: :unprocessable_entity
     end
@@ -54,7 +59,7 @@ class ServicesController < ApplicationController
     how = params[:confirmation_method]
     if Service::CONFIRMATION_METHODS.key?(how)
       @service.confirm!(by: current_user, method: how)
-      redirect_to @service, notice: "Service '#{@service.name}' was confirmed #{Service::CONFIRMATION_METHODS[how]}."
+      redirect_to @service, notice: "Service '#{@service.display_name}' was confirmed #{Service::CONFIRMATION_METHODS[how]}."
     else
       redirect_to @service, alert: "Choose how you confirmed the details."
     end
@@ -63,10 +68,20 @@ class ServicesController < ApplicationController
   def destroy
     authorize @service
     @service.destroy!
-    redirect_to services_path, notice: "Service '#{@service.name}' was deleted.", status: :see_other
+    redirect_to services_path, notice: "Service '#{@service.display_name}' was deleted.", status: :see_other
   end
 
   private
+
+  # Whoever adds or edits a service can ask AI to fill in what they left
+  # blank, the same as a source with AI summaries turned on.
+  def enrich?
+    params.dig(:service, :enrich) == "1"
+  end
+
+  def enrich_later
+    EnrichServiceJob.perform_later(@service) if @service.awaiting_enrichment?
+  end
 
   def set_service
     @service = Service.find(params[:id])

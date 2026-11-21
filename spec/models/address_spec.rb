@@ -90,8 +90,15 @@ RSpec.describe Address, type: :model do
   context "when the source enriches its rows" do
     let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true) }
 
-    it "waits for enrichment before looking up the address" do
-      expect { resource(street_address: "919 Pandora Ave", city: "Victoria") }.not_to have_enqueued_job(GeocodeAddressJob)
+    # Enrichment fills in services, not rows, so a row's address is final.
+    it "looks up a row's address straight away" do
+      expect { resource(street_address: "919 Pandora Ave", city: "Victoria") }.to have_enqueued_job(GeocodeAddressJob)
+    end
+
+    it "waits for enrichment before looking up a service's address" do
+      expect {
+        source.services.create!(name: "Lunch", enrichment_requested: true, address_attributes: {street_address: "919 Pandora Ave"})
+      }.not_to have_enqueued_job(GeocodeAddressJob)
     end
   end
 end

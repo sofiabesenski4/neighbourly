@@ -1,146 +1,187 @@
 module ContentPipeline
-  # Reads a CSV document's metadata with an LLM, then gives the document a
-  # title, a plain-language summary and the categories it fits. The summary
-  # sits above the row's "Header: value" lines, so the chatbot can match a
-  # question asked in everyday words and still quote exact details.
+  # Asks a model to fill in what a service left blank, using only the
+  # service's own details: its fields, address, organization and additional
+  # details, which for an import hold every column of the row. What the
+  # service already says always wins, so the model can't overwrite a source's
+  # facts or a person's edits. Its name is filled only when it has none.
+  #
+  # Facts with no field of their own, like who is eligible or how to get in,
+  # go in additional details under a fixed set of names that printouts read.
+  #
+  # It also writes enriched_description, a plain-language description of the
+  # service, and embeds it. That is how chat finds the service, including one
+  # added on the site with no imported row.
   class Enricher
     class InvalidResponse < StandardError; end
 
     MAX_SUMMARY_LENGTH = 2_000
 
+    # The details enrichment may add, each with the names a source might
+    # already use for it. A service that has any of those keeps its own.
+    DETAILS = {
+      "eligibility" => ["eligibility", "gender"],
+      "ages" => ["ages", "age", "age range"],
+      "languages" => ["languages", "language", "language services"],
+      "intake" => ["intake", "intake info"],
+      "cost" => ["cost", "fee", "fees", "price"]
+    }.freeze
+
+    ADDRESS_FIELDS = %i[street_address city province postal_code].freeze
+    TEXT_FIELDS = %i[hours phone email].freeze
+
     INSTRUCTIONS = <<~TEXT
-      You describe one row from a spreadsheet of community resources. A chatbot searches these descriptions to point people to local services.
-      Use only facts in the row. Never guess hours, eligibility, locations or contact details.
-      title: the name of the service or place, in a few words.
-      summary: two to four plain sentences on what is offered, who it is for, and where and when, as far as the row says.
+      You fill in the gaps in one community service's details. People use them to find help, on printouts and in a chatbot.
+      Use only facts in the given details. Never guess names, hours, eligibility, locations or contact details. Leave a field empty when the details don't say.
+      name: the name of the service, in a few words.
+      summary: two to four plain sentences describing the service by name: what is offered, who it is for, and where and when. Base it mostly on the service's own description, adding what its other details, organization and additional details say.
       categories: every category from the given list that the service clearly fits, spelled exactly as listed. Leave it empty if none fit.
-      address: the street address where people go, such as "919 Pandora Ave", or a corner such as "Douglas St and Yates St", exactly as the row gives it. Leave it empty if the row has no street address.
-      city: the city or town of that address. Leave it empty if the row does not say.
-      phone: the phone number to call, exactly as the row gives it. Leave it empty if the row has none.
-      organization: the name of the organization that runs the service, exactly as the row gives it. Leave it empty if the row does not say.
+      street_address: where people go, such as "919 Pandora Ave", or a corner such as "Douglas St and Yates St", exactly as given.
+      city, province, postal_code: of that address, exactly as given.
+      hours: when it is open, exactly as given.
+      phone: the phone number to call, exactly as given.
+      email: the email address to write to.
+      website: the service's web address.
+      organization: the name of the organization that runs the service.
+      eligibility: who can use it, such as "Women and children" or "Youth in care".
+      ages: the ages it serves, such as "19+" or "12-18".
+      languages: the languages it is offered in.
+      intake: how to get the service, such as "Walk in" or "Referral from a social worker".
+      cost: what it costs, such as "Free".
     TEXT
 
-    def initialize(document, model: nil)
-      @document = document
+    def initialize(service, model: nil)
+      @service = service
       @model = model || ENV["ENRICHMENT_MODEL"].presence || RubyLLM.config.default_model
     end
 
-    # Returns false without saving when the row changed or was enriched by
-    # another run while the model was answering. Either way this summary is
-    # stale or redundant.
+    # Returns false without saving when the service changed while the model
+    # was answering, such as a re-import or someone's edit. The answer fits
+    # the old details, so a fresh run is queued for the new ones.
     def enrich!
-      metadata = @document.metadata
-      enriched_at = @document.enriched_at
-      result = describe(metadata)
-      content = [result[:summary], Parsers::Csv.render_fields(metadata)].join("\n\n")
+      asked = facts(@service)
+      result = describe(asked)
       # Embedded here rather than on save, so a rate limit or outage raises
       # its own error and the job retries it.
-      embedding = Embedder.embed(content)
+      embedding = Embedder.embed(result[:summary])
 
-      queued_by_save = false
-      service_queued_by_save = false
-      service = nil
-      saved = @document.with_lock do
-        # Rows geocoded before addresses had their own table may gain
-        # coordinates in metadata meanwhile. Those do not change the row, so
-        # the summary still fits it.
-        if Document.same_row?(@document.metadata, metadata) && @document.enriched_at == enriched_at
-          @document.title = result[:title] if result[:title]
-          @document.content = content
-          # Moderation takes the same lock to remove a resource, so a removal
-          # accepted while the model was answering is seen here. The resource
-          # keeps its summary but stays out of search.
-          @document.embedding = @document.removal_accepted? ? nil : embedding
-          # Marked changed even if equal to the old vector, so saving does not
-          # embed the content a second time.
-          @document.embedding_will_change!
-          fill_in_address(result[:address])
-          # A moved address queues its own lookup when this save commits.
-          queued_by_save = @document.address.present? && (@document.address.street_address_changed? || @document.address.city_changed?)
-          @document.enriched_at = Time.current
-          @document.save_with_category_names!(result[:categories])
-          # Loaded under the lock, so an import rewriting the row can't be
-          # overwritten with an older copy. An admin may have deleted the
-          # row's service, so there may be none.
-          service = @document.service
-          if service
-            fill_in_service(service, result)
-            service_queued_by_save = service.address.present? && (service.address.street_address_changed? || service.address.city_changed?)
-            service.save!
-          end
-          true
-        else
-          false
-        end
+      address_queued_by_save = false
+      saved = @service.with_lock do
+        # Locking reloads the service, so this sees any change made meanwhile.
+        next false unless @service.awaiting_enrichment? && facts(@service) == asked
+
+        fill_in(result)
+        @service.enriched_description = result[:summary]
+        @service.embedding = embedding
+        address = @service.address
+        address_queued_by_save = address.present? && (address.street_address_changed? || address.city_changed?)
+        @service.enriched_at = Time.current
+        @service.save!
+        true
       end
 
-      # The row waited for enrichment before its lookup. Its address may have
-      # come from its columns, unchanged by this save, so queue the lookup here.
-      @document.address&.locate_later if saved && !queued_by_save
-      # The service read from this row waited for the same reason.
-      service&.address&.locate_later if saved && !service_queued_by_save
+      if saved
+        # The address waited for enrichment before its lookup. It may not have
+        # moved, so queue the lookup here when saving didn't.
+        @service.address&.locate_later unless address_queued_by_save
+      elsif @service.awaiting_enrichment?
+        EnrichServiceJob.perform_later(@service)
+      end
       saved
+    rescue ActiveRecord::RecordNotFound
+      # The service was deleted while the model was answering.
+      false
     end
 
     private
 
-    # The row's own columns come first. The model only fills in what they
-    # left blank, so a summary can't move a resource the file placed.
+    # What the model is told, and what must still hold when its answer lands.
+    def facts(service)
+      address = service.address&.attributes&.slice("street_address", "city", "province", "postal_code", "country")
+      {
+        name: service.name,
+        description: service.description,
+        hours: service.hours,
+        phone: service.phone,
+        email: service.email,
+        website: service.website,
+        address: address&.compact,
+        organization: service.organization&.name,
+        categories: service.category_names,
+        additional_details: service.additional_details
+      }.compact_blank
+    end
+
+    # Blank fields only. The organization is linked only when there is none,
+    # and categories only when the service has none. The description stays as
+    # its source or a person wrote it.
+    def fill_in(result)
+      # A nameless import falls back to its row's title, its first value. A
+      # service added on the site has no row, so a reply that doesn't name it
+      # can't be used, and the job asks again.
+      @service.name ||= result[:name] || @service.document&.title
+      raise InvalidResponse, "The model returned no name." if @service.name.nil?
+
+      TEXT_FIELDS.each { |field| @service[field] = result[field] if @service[field].blank? && result[field] }
+      @service.website ||= web_address(result[:website])
+      fill_in_address(result.slice(*ADDRESS_FIELDS).compact)
+      @service.organization ||= Organization.for_name(result[:organization], source: @service.source)
+      @service.categories = Category.where(name: result[:categories]) if @service.categories.empty? && result[:categories].any?
+      fill_in_details(result[:details])
+    end
+
+    # Filling in a blank city or province doesn't move the address, so
+    # coordinates it already has, such as from its import, are kept.
     def fill_in_address(found)
-      current = @document.address
-      blanks = found.select { |field, value| value && (current.nil? || current.public_send(field).blank?) }
+      address = @service.address
+      blanks = found.select { |field, _value| address.nil? || address.public_send(field).blank? }
       return if blanks.empty?
 
-      (current || @document.build_address).assign_attributes(blanks)
+      (address || @service.build_address).assign_attributes(blanks)
+      return unless address&.coordinates
+
+      address.lat_will_change!
+      address.lng_will_change!
     end
 
-    # The row's own columns come first here too. The model's answer only fills
-    # in what they left blank, and only links an organization when the row
-    # named none.
-    def fill_in_service(service, result)
-      service.name = result[:title] if result[:title]
-      service.description ||= result[:summary]
-      service.phone ||= result[:address][:phone]
-      found = result[:address].slice(:street_address, :city).compact
-      address = service.address
-      blanks = found.select { |field, _value| address.nil? || address.public_send(field).blank? }
-      (address || service.build_address).assign_attributes(blanks) if blanks.any?
-      service.organization ||= Organization.for_name(result[:organization], source: @document.source)
-      service.categories = @document.categories
+    def fill_in_details(found)
+      present = @service.additional_details
+        .reject { |_key, value| value.blank? && value != false }
+        .keys.map { |key| Parsers::Csv.header_key(key.to_s) }
+      added = found.reject { |key, value| value.nil? || DETAILS.fetch(key).intersect?(present) }
+      @service.additional_details = @service.additional_details.merge(added) if added.any?
     end
 
-    def describe(metadata)
+    # A model may give a bare domain like "example.org". Only something that
+    # is, or becomes with https://, a whole web address is kept.
+    def web_address(value)
+      return if value.nil?
+
+      candidate = value.match?(%r{\Ahttps?://}i) ? value : "https://#{value}"
+      candidate if ApplicationRecord.web_address?(candidate)
+    end
+
+    def describe(asked)
       categories = Category.order(:name).pluck(:name)
       response = RubyLLM.chat(model: @model)
         .with_instructions(INSTRUCTIONS)
         .with_schema(schema(categories))
-        .ask(prompt(metadata, categories))
+        .ask("Categories: #{categories.to_json}\nService: #{asked.to_json}")
 
       parse(response.content, categories)
     end
 
-    def prompt(metadata, categories)
-      "Categories: #{categories.to_json}\nRow: #{metadata.compact.to_json}"
-    end
+    TEXT_PROPERTIES = (%w[name summary street_address city province postal_code hours phone email website organization] + DETAILS.keys).freeze
 
     def schema(categories)
       category = {type: "string"}
       category[:enum] = categories if categories.any?
 
       {
-        name: "document_enrichment",
+        name: "service_enrichment",
         schema: {
           type: "object",
-          properties: {
-            title: {type: "string"},
-            summary: {type: "string"},
-            categories: {type: "array", items: category},
-            address: {type: "string"},
-            city: {type: "string"},
-            phone: {type: "string"},
-            organization: {type: "string"}
-          },
-          required: %w[title summary categories address city phone organization],
+          properties: TEXT_PROPERTIES.index_with { {type: "string"} }.merge("categories" => {type: "array", items: category}),
+          required: TEXT_PROPERTIES + ["categories"],
           additionalProperties: false
         }
       }
@@ -153,15 +194,15 @@ module ContentPipeline
       summary = data["summary"].is_a?(String) ? data["summary"].strip : ""
       raise InvalidResponse, "The model returned no summary." if summary.blank?
 
-      title = text_in(data["title"])
       by_name = categories.index_by(&:downcase)
       {
-        title: title&.truncate(Parsers::Csv::MAX_TITLE_LENGTH),
-        address: {street_address: text_in(data["address"]), city: text_in(data["city"]), phone: text_in(data["phone"])},
+        name: text_in(data["name"])&.truncate(Parsers::Csv::MAX_TITLE_LENGTH),
         summary: summary.truncate(MAX_SUMMARY_LENGTH),
+        categories: Array(data["categories"]).filter_map { |name| by_name[name.to_s.strip.downcase] }.uniq,
         organization: text_in(data["organization"]),
-        categories: Array(data["categories"]).filter_map { |name| by_name[name.to_s.strip.downcase] }.uniq
-      }
+        website: text_in(data["website"]),
+        details: DETAILS.keys.index_with { |key| text_in(data[key]) }
+      }.merge((ADDRESS_FIELDS + TEXT_FIELDS).index_with { |field| text_in(data[field.to_s]) })
     end
 
     def text_in(value)

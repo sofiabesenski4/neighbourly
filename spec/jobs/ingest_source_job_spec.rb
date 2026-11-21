@@ -16,22 +16,22 @@ RSpec.describe IngestSourceJob do
     expect { described_class.perform_now(source) }.to change(source.documents, :count).by(2)
   end
 
-  it "queues enrichment for each row not yet enriched" do
+  it "queues enrichment for each row's service not yet enriched" do
     described_class.perform_now(source)
 
-    expect(EnrichDocumentJob).to have_been_enqueued.exactly(2).times
-    source.documents.each { |document| expect(EnrichDocumentJob).to have_been_enqueued.with(document) }
+    expect(EnrichServiceJob).to have_been_enqueued.exactly(2).times
+    source.services.each { |service| expect(EnrichServiceJob).to have_been_enqueued.with(service) }
   end
 
-  it "does not queue enrichment again for rows already enriched" do
+  it "does not queue enrichment again for services already enriched" do
     described_class.perform_now(source)
-    source.documents.update_all(enriched_at: Time.current)
+    source.services.update_all(enriched_at: Time.current)
     source.update!(upload_content: csv, ingestion_status: :pending)
     clear_enqueued_jobs
 
     described_class.perform_now(source)
 
-    expect(EnrichDocumentJob).not_to have_been_enqueued
+    expect(EnrichServiceJob).not_to have_been_enqueued
   end
 
   it "does not queue enrichment when the source did not opt in" do
@@ -40,7 +40,7 @@ RSpec.describe IngestSourceJob do
     described_class.perform_now(source)
 
     expect(source.documents.count).to eq(2)
-    expect(EnrichDocumentJob).not_to have_been_enqueued
+    expect(EnrichServiceJob).not_to have_been_enqueued
   end
 
   it "does not queue enrichment for sources other than CSV" do
@@ -50,7 +50,7 @@ RSpec.describe IngestSourceJob do
     described_class.perform_now(html_source)
 
     expect(html_source.documents).to exist
-    expect(EnrichDocumentJob).not_to have_been_enqueued
+    expect(EnrichServiceJob).not_to have_been_enqueued
   end
 
   it "marks the source succeeded and drops the stored upload" do

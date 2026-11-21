@@ -75,7 +75,7 @@ module ContentPipeline
           fields = row_fields(headers, row.fields)
           next if fields.values.all?(&:nil?)
 
-          title_header, title = title_for(fields)
+          title_header, title, named = title_for(fields)
           id_header, external_id = external_id_for(fields)
           organization_header, organization = first_match(fields, ORGANIZATION_HEADERS)
           address, address_headers = address_for(fields)
@@ -86,7 +86,9 @@ module ContentPipeline
             categories: [],
             metadata: fields,
             address: address,
-            service: service_for(fields, title, used: [title_header, id_header, organization_header, *address_headers]),
+            # A service is only named from a name or title column. Without
+            # one, the row's first value is no name, so enrichment names it.
+            service: service_for(fields, (title if named), used: [(title_header if named), id_header, organization_header, *address_headers]),
             organization: organization && {name: organization}
           }
         end
@@ -142,14 +144,17 @@ module ContentPipeline
         name
       end
 
-      # The column the title came from and the title. "Organization Name" is
-      # who runs the service, not its name, so it is never the title.
+      # The column the title came from, the title, and whether that column
+      # names the row. A row with no name or title column takes its first
+      # value as the title. "Organization Name" is who runs the service, not
+      # its name, so it is never the title.
       def title_for(fields)
         header, value = fields.find do |name, text|
           name.match?(TITLE_HEADER) && text.present? && !ORGANIZATION_HEADERS.include?(self.class.header_key(name))
         end
-        header, value = fields.find { |_name, text| text.present? } if header.nil?
-        [header, value.truncate(MAX_TITLE_LENGTH)]
+        named = header.present?
+        header, value = fields.find { |_name, text| text.present? } unless named
+        [header, value.truncate(MAX_TITLE_LENGTH), named]
       end
 
       # The service's fields from the columns that match them, and every other
