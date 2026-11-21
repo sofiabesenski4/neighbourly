@@ -23,7 +23,6 @@ export default class extends Controller {
     "cards",
     "count",
     "resourceSelection",
-    "resourceStatus",
     "selectAll",
     "deselectAll",
     "status",
@@ -558,9 +557,6 @@ export default class extends Controller {
       input.checked = !this.excludedResources.has(input.value);
       input.disabled = !this.previewReady;
     });
-    this.resourceStatusTargets.forEach((status) => {
-      status.hidden = !this.excludedResources.has(status.dataset.resourceId);
-    });
     this.countTarget.textContent = `${included} ${included === 1 ? "resource" : "resources"} included`;
     this.selectAllTarget.disabled =
       !this.previewReady || included === resources.size;
@@ -619,20 +615,14 @@ export default class extends Controller {
   card(resource) {
     const article = document.createElement("article");
     article.className =
-      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
+      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 has-[input:not(:checked)]:bg-stone-50/60 has-[input:not(:checked)]:text-stone-600 sm:border-stone-300 sm:bg-white sm:has-[input:not(:checked)]:bg-white/60 lg:last:odd:col-span-2";
     const header = document.createElement("header");
     header.className =
-      "flex items-start gap-2 px-3 py-1 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4";
+      "flex items-start gap-2 px-3 py-1 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:has-[input:not(:checked)]:bg-stone-100/60";
     const title = document.createElement("h4");
     title.className =
       "min-w-0 flex-1 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
     title.textContent = resource.title;
-    const status = document.createElement("span");
-    status.className = "self-center text-xs text-stone-600";
-    status.textContent = "Not included";
-    status.dataset.resourceId = String(resource.id);
-    status.setAttribute("data-flyer-builder-target", "resourceStatus");
-    status.hidden = !this.excludedResources.has(String(resource.id));
     const selection = document.createElement("label");
     selection.className =
       "flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-sage-50";
@@ -655,7 +645,7 @@ export default class extends Controller {
     selectionLabel.className = "sr-only";
     selectionLabel.textContent = `Include ${resource.title} in printout`;
     selection.append(checkbox, selectionLabel);
-    header.append(title, status, selection);
+    header.append(title, selection);
     const details = document.createElement("dl");
     details.className =
       "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";

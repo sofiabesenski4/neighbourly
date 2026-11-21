@@ -538,7 +538,6 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.generating = false;
     controller.excludedResources = new Map();
     controller.resourceSelectionTargets = [];
-    controller.resourceStatusTargets = [];
     controller.selectAllTarget = {};
     controller.deselectAllTarget = {};
 
@@ -652,9 +651,6 @@ function resourceSelectionController() {
   controller.resourceSelectionTargets = [1, 2, 1].map((id) => ({
     value: String(id),
   }));
-  controller.resourceStatusTargets = [1, 2, 1].map((id) => ({
-    dataset: { resourceId: String(id) },
-  }));
   controller.countTarget = {};
   controller.selectAllTarget = {};
   controller.deselectAllTarget = {};
@@ -681,10 +677,6 @@ test("bulk selection changes only matching resources and counts category duplica
   controller.toggleResource({ target: { value: "1", checked: true } });
   assert.deepEqual(
     controller.resourceSelectionTargets.map((input) => input.checked),
-    [true, false, true],
-  );
-  assert.deepEqual(
-    controller.resourceStatusTargets.map((status) => status.hidden),
     [true, false, true],
   );
   assert.equal(controller.countTarget.textContent, "1 resource included");
