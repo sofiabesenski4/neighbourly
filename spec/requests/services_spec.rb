@@ -75,11 +75,49 @@ RSpec.describe "Services", type: :request do
       expect(created.address).to have_attributes(street_address: "919 Pandora Ave", state: "BC", addressable: created)
     end
 
-    it "shows the form again when the name is missing" do
-      post services_path, params: {service: {name: ""}}
+    it "shows the form again when the name is missing and AI won't fill it in" do
+      post services_path, params: {service: {name: "", enrich: "0"}}
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.body).to include("Name can&#39;t be blank")
+    end
+
+    it "offers to fill in blanks with AI, checked for a new service" do
+      get new_service_path
+
+      expect(Nokogiri::HTML(response.body).at_css("input[type=checkbox][name='service[enrich]']")["checked"]).to eq("checked")
+    end
+
+    it "asks AI to fill in what a new service left blank, its name included" do
+      expect { post services_path, params: {service: {name: "", description: "Free breakfasts", enrich: "1"}} }
+        .to have_enqueued_job(EnrichServiceJob)
+
+      created = Service.last
+      expect(created).to have_attributes(name: nil, enrichment_requested: true)
+      expect(EnrichServiceJob).to have_been_enqueued.with(created)
+      follow_redirect!
+      expect(response.body).to include("Unnamed service", "Waiting for AI to fill in what&#39;s blank")
+    end
+
+    it "asks AI to fill in an edited service's blanks again" do
+      service.update!(enrichment_requested: true, enriched_at: 1.day.ago, enriched_description: "Old.")
+
+      expect { patch service_path(service), params: {service: {hours: "Daily", enrich: "1"}} }
+        .to have_enqueued_job(EnrichServiceJob).with(service)
+      expect(service.reload).to be_awaiting_enrichment
+    end
+
+    it "queues nothing when AI isn't asked" do
+      expect { patch service_path(service), params: {service: {hours: "Daily", enrich: "0"}} }
+        .not_to have_enqueued_job(EnrichServiceJob)
+    end
+
+    it "shows the AI description" do
+      service.update!(enriched_description: "Community lunch serves hot meals.")
+
+      get service_path(service)
+
+      expect(response.body).to include("AI description", "Community lunch serves hot meals.")
     end
 
     it "shows a service and where it came from" do

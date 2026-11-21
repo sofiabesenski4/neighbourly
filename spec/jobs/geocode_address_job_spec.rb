@@ -47,6 +47,18 @@ RSpec.describe GeocodeAddressJob, type: :job do
     expect(Geocoder).to have_received(:locate).once
   end
 
+  it "leaves a service waiting for enrichment to look itself up once it is filled in" do
+    allow(Geocoder).to receive(:locate).and_return(point)
+    saved = address(street_address: "919 Pandora Ave")
+    service = source.services.create!(name: "Resource", document: saved.addressable, enrichment_requested: true,
+      address_attributes: {street_address: "919 Pandora Ave"})
+
+    described_class.perform_now(saved)
+
+    expect(saved.reload.coordinates).to eq(point)
+    expect(service.reload.coordinates).to be_nil
+  end
+
   it "leaves a service at a different address alone" do
     allow(Geocoder).to receive(:locate).and_return(point)
     saved = address(street_address: "919 Pandora Ave", city: "Victoria")

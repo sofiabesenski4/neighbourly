@@ -15,14 +15,14 @@ RSpec.describe "Sources", type: :system do
   before do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(fake_vector)
 
-    # CSV rows are enriched after ingestion. Reply with a summary of the row.
+    # A CSV row's service is enriched after ingestion. Reply with a description of it.
     chat = instance_double(RubyLLM::Chat)
     allow(RubyLLM).to receive(:chat).and_return(chat)
     allow(chat).to receive_messages(with_instructions: chat, with_schema: chat)
     allow(chat).to receive(:ask) do |prompt|
-      name = JSON.parse(prompt[/^Row: (.*)$/, 1])["Name"]
-      instance_double(RubyLLM::Message, content: {title: name, summary: "#{name} is a local service.", categories: [],
-                                                  address: "", city: "Victoria", phone: ""}.to_json)
+      name = JSON.parse(prompt[/^Service: (.*)$/, 1])["name"]
+      instance_double(RubyLLM::Message, content: {name: name, summary: "#{name} is a local service.", categories: [],
+                                                  street_address: "", city: "Victoria", phone: ""}.to_json)
     end
     # Rows with an address are looked up once ingested.
     allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.37))
@@ -180,7 +180,7 @@ RSpec.describe "Sources", type: :system do
 
         fill_in "Source name", with: "Drop-in Centres"
         select "CSV (spreadsheet rows)", from: "Data type"
-        check "Summarize and categorize rows with AI (CSV only)"
+        check "Fill in each row's service with AI (CSV only)"
 
         file = create_temp_file("centres.csv", "Name,Address\nHarbour Meals,100 Harbour St\nNorthside Shelter,22 North Rd\n")
         attach_file "Upload file", file.path
@@ -192,16 +192,19 @@ RSpec.describe "Sources", type: :system do
         expect(Source.last).to be_csv
         document = Document.find_by!(title: "Harbour Meals")
         expect(document.metadata).to include("Address" => "100 Harbour St")
-        expect(document.content).to eq("Harbour Meals is a local service.\n\nName: Harbour Meals\nAddress: 100 Harbour St")
-        expect(document.enriched_at).to be_present
-        # The street comes from the file, the city from the summary, and the lookup ran after both.
-        expect(document.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
+        # The row stays as uploaded. Enrichment fills in its service.
+        expect(document.content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
+        service = document.service
+        expect(service).to have_attributes(enriched_description: "Harbour Meals is a local service.", enriched_at: be_present,
+          confirmed_by: admin, confirmation_method: "upload", confirmed_at: service.enriched_at)
+        # The street comes from the file, the city from enrichment, and the lookup ran after both.
+        expect(service.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
         expect(Geocoder).to have_received(:locate).with("100 Harbour St, Victoria, BC")
-        expect(document.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.37))
+        expect(service.coordinates).to eq(GeoPoint.new(lat: 48.42, lng: -123.37))
         expect(page).to have_content("AI summaries")
       end
 
-      it "keeps rows as uploaded when AI summaries are not chosen" do
+      it "leaves services as uploaded when AI summaries are not chosen" do
         visit new_source_path
 
         fill_in "Source name", with: "Drop-in Centres"
@@ -212,8 +215,8 @@ RSpec.describe "Sources", type: :system do
 
         document = Document.find_by!(title: "Harbour Meals")
         expect(document.content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
-        expect(document.enriched_at).to be_nil
-        expect(document.service).to have_attributes(confirmed_by: admin, confirmation_method: "upload")
+        expect(document.service).to have_attributes(enrichment_requested: false, enriched_description: nil,
+          confirmed_by: admin, confirmation_method: "upload")
         expect(RubyLLM).not_to have_received(:chat)
         expect(page).not_to have_content("AI summaries")
       end

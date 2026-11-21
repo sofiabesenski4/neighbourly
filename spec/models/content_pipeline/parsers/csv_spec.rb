@@ -188,6 +188,16 @@ RSpec.describe ContentPipeline::Parsers::Csv do
         expect(chunk[:service][:additional_details]).to eq("Ages" => "All ages")
       end
 
+      # The row's first value is a stand-in title, not a name, so enrichment
+      # names the service. It stays in the details unless another field used it.
+      it "leaves the service unnamed when the row has no name or title column" do
+        chunk = parser.parse("ID,Ages,Notes\n7,19+,Bring ID\n").first
+
+        expect(chunk[:title]).to eq("7")
+        expect(chunk[:service][:name]).to be_nil
+        expect(parser.parse("Ages,Notes\n19+,Bring ID\n").first[:service][:additional_details]).to eq("Ages" => "19+", "Notes" => "Bring ID")
+      end
+
       it "puts every phone column on the service's phone, rather than in additional details" do
         chunk = parser.parse("Name,Phone,Phone Number,Telephone\nHarbour Meals,111,222,111\n").first
 

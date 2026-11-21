@@ -55,8 +55,8 @@ RSpec.describe "resources rake tasks" do
   end
 
   it "leaves addresses waiting for enrichment to fill in" do
-    source.update!(source_type: "csv", url: nil, enrich_documents: true)
-    existing_address(street_address: "919 Pandora Ave")
+    service = source.services.create!(name: "Lunch", enrichment_requested: true)
+    Address.insert!({addressable_type: "Service", addressable_id: service.id, street_address: "919 Pandora Ave"})
 
     expect {
       expect { run_task }.not_to have_enqueued_job(GeocodeAddressJob)

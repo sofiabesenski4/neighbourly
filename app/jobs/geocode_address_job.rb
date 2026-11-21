@@ -37,8 +37,10 @@ class GeocodeAddressJob < ApplicationJob
 
     # A resource's address and its service usually hold the same address, and
     # each queues a lookup. The answer goes to both, so the second job finds
-    # coordinates and skips its call.
-    [address, *address.location_twins].each { |record| save_point(record, query, point) }
+    # coordinates and skips its call. A service waiting for enrichment is left
+    # out, since enrichment may still fill in its address and look it up then.
+    twins = address.location_twins.reject(&:awaiting_enrichment?)
+    [address, *twins].each { |record| save_point(record, query, point) }
   end
 
   private

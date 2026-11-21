@@ -21,7 +21,7 @@
       <% services.each do |service| %>
         <tr>
           <td class="min-w-48">
-            <%= link_to service.name, service, class: "admin-link font-medium" %>
+            <%= link_to service.display_name, service, class: "admin-link font-medium" %>
             <% if service.closed? %>
               <span class="admin-badge ml-1 bg-stone-100 text-stone-600">CLOSED</span>
             <% end %>
@@ -40,7 +40,7 @@
             <% end %>
           </td>
           <td class="whitespace-nowrap"><time datetime="<%= service.updated_at.iso8601 %>"><%= service.updated_at.strftime("%b %d, %Y") %></time></td>
-          <td class="text-right"><%= link_to "Edit", edit_service_path(service), class: "admin-button-secondary", aria: { label: "Edit #{service.name}" } %></td>
+          <td class="text-right"><%= link_to "Edit", edit_service_path(service), class: "admin-button-secondary", aria: { label: "Edit #{service.display_name}" } %></td>
         </tr>
       <% end %>
     </tbody>
