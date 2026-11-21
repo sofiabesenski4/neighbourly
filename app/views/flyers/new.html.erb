@@ -1,5 +1,5 @@
 <% content_for :title, "Printout" %>
-<% categories = Flyer.available_categories %>
+<% category_tree = CategoryTree.new %>
 
 <div data-controller="flyer-builder"
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
@@ -80,7 +80,7 @@
               data-action="flyer-builder#changeLocation">Change</button>
     </p>
 
-    <%= render "mobile_filters", form: form, categories: categories %>
+    <%= render "mobile_filters", form: form, category_tree: category_tree %>
 
     <div class="grid grid-cols-1 gap-5 items-start sm:grid-cols-[240px_minmax(0,1fr)] lg:gap-7">
       <aside class="rounded-xl border border-stone-200 bg-white px-4 py-5 sm:sticky sm:top-0 sm:flex sm:h-dvh sm:flex-col"
@@ -117,16 +117,12 @@
         </div>
         <fieldset class="min-w-0 sm:flex sm:min-h-0 sm:flex-1 sm:flex-col">
           <legend class="sr-only">Categories</legend>
-          <p class="mt-1 mb-4 shrink-0 text-sm text-stone-600">No selection shows all available resources.</p>
+          <p class="mt-1 mb-4 shrink-0 text-sm text-stone-600">
+            No selection shows all available resources. Selecting a group includes its subcategories.
+          </p>
           <div role="region" aria-label="Category list" tabindex="0"
-               class="grid max-h-[min(26rem,55dvh)] grid-cols-2 gap-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] focus-visible:outline-sage-600 sm:block sm:min-h-0 sm:max-h-none sm:flex-1 sm:space-y-1">
-            <%= form.collection_check_boxes :categories, categories, :first, :last do |option| %>
-              <%= option.label class: "flex h-full min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] p-2.5 text-sm text-stone-800 hover:bg-sage-50 has-checked:bg-sage-100 sm:h-auto sm:text-base" do %>
-                <%= option.check_box class: "h-4 w-4 shrink-0 rounded border-stone-400 text-sage-600 accent-sage-600 focus:ring-sage-500",
-                      data: { flyer_builder_target: "category", action: "change->flyer-builder#filter" } %>
-                <span><%= option.text %></span>
-              <% end %>
-            <% end %>
+               class="max-h-[min(26rem,55dvh)] overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] focus-visible:outline-sage-600 sm:min-h-0 sm:max-h-none sm:flex-1">
+            <%= render "category_options", tree: category_tree, parent: nil, draft: false %>
           </div>
         </fieldset>
         <button type="button" class="mt-2 min-h-11 shrink-0 text-left text-sm font-medium text-sage-700 underline" hidden

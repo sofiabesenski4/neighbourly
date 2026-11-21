@@ -44,6 +44,22 @@ RSpec.describe CategorySearch do
     expect(section.resources).to eq([listing])
   end
 
+  it "includes descendants of a selected category and narrows to a selected child" do
+    food = Category.create!(name: "Food")
+    groceries = Category.create!(name: "Groceries", parent: food)
+    pantry = Category.create!(name: "Pantry", parent: groceries)
+    meals.update!(parent: food)
+    meal_program = resource("Meal program", [meals])
+    pantry_program = resource("Pantry program", [pantry])
+    resource("Shelter", [shelters])
+
+    parent_sections = described_class.call(categories: [food.id.to_s, groceries.id.to_s])
+    child_sections = described_class.call(categories: [groceries.id.to_s])
+
+    expect(parent_sections.flat_map(&:resources)).to match_array([meal_program, pantry_program])
+    expect(child_sections.flat_map(&:resources)).to eq([pantry_program])
+  end
+
   it "matches searchable card fields and sorts resources once across categories" do
     alpha = resource("Alpha pantry", [meals, shelters], description: "Hot meals")
     zebra = resource("Zebra program", [shelters], description: "Hot meals")

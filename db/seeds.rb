@@ -31,6 +31,13 @@ category_names.each do |name|
   Category.find_or_create_by!(name: name)
 end
 
+YAML.safe_load_file(Rails.root.join("db/category_groups.yml")).each do |parent_name, child_names|
+  parent = Category.find_or_create_by!(name: parent_name)
+  Category.where(name: child_names, parent_id: nil).find_each do |child|
+    child.update!(parent: parent)
+  end
+end
+
 # Real resource listings to develop against. Not loaded in other environments,
 # which get their resources from ingested sources.
 load Rails.root.join("db/seeds/greater_victoria_resources.rb") if Rails.env.development?

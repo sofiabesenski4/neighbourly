@@ -75,6 +75,21 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
+  it "nests child categories under their parent in both filter controls" do
+    parent = Category.create!(name: "Food and meals")
+    food.update!(parent: parent)
+
+    get new_flyer_path, params: {flyer: {categories: [food.id.to_s]}}
+
+    document = Nokogiri::HTML(response.body)
+    %w[category draftCategory].each do |target|
+      parent_input = document.at_css("input[data-flyer-builder-target='#{target}'][value='#{parent.id}']")
+      child_input = parent_input.ancestors("li").first.at_css("ul input[value='#{food.id}']")
+      expect(child_input["data-flyer-builder-target"]).to eq(target)
+      expect(child_input.key?("checked")).to eq(target == "category")
+    end
+  end
+
   describe "POST /printout" do
     it "prints only the selected services that still match the preview filters" do
       source = Source.create!(name: "Local guide", source_type: "csv")
