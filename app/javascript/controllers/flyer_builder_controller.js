@@ -7,6 +7,7 @@ export default class extends Controller {
   static targets = [
     "form",
     "category",
+    "organization",
     "toolbar",
     "sidebar",
     "desktopSearch",
@@ -18,6 +19,7 @@ export default class extends Controller {
     "filterButton",
     "filterDialog",
     "draftCategory",
+    "draftOrganization",
     "draftSort",
     "clearSearchOrder",
     "cards",
@@ -299,6 +301,9 @@ export default class extends Controller {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
+      this.selectedOrganizations().forEach((key) =>
+        url.searchParams.append("flyer[organizations][]", key),
+      );
       if (query) url.searchParams.set("flyer[query]", query);
       if (sort !== DEFAULT_SORT) url.searchParams.set("flyer[sort]", sort);
       return { headers };
@@ -306,6 +311,9 @@ export default class extends Controller {
 
     const body = new FormData();
     categories.forEach((key) => body.append("flyer[categories][]", key));
+    this.selectedOrganizations().forEach((key) =>
+      body.append("flyer[organizations][]", key),
+    );
     if (query) body.append("flyer[query]", query);
     if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
     body.append("flyer[lat]", this.latTarget.value);
@@ -332,6 +340,10 @@ export default class extends Controller {
     const selected = new Set(this.selectedCategories());
     this.draftCategoryTargets.forEach((input) => {
       input.checked = selected.has(input.value);
+    });
+    const organizations = new Set(this.selectedOrganizations());
+    this.draftOrganizationTargets.forEach((input) => {
+      input.checked = organizations.has(input.value);
     });
     this.draftSortTarget.value = this.sortTarget.value;
     this.filterDialogTarget.hidden = false;
@@ -386,6 +398,7 @@ export default class extends Controller {
 
   resetDraft() {
     this.draftCategoryTargets.forEach((input) => (input.checked = false));
+    this.draftOrganizationTargets.forEach((input) => (input.checked = false));
     this.draftSortTarget.value = DEFAULT_SORT;
   }
 
@@ -397,6 +410,14 @@ export default class extends Controller {
     );
     this.categoryTargets.forEach((input) => {
       input.checked = selected.has(input.value);
+    });
+    const organizations = new Set(
+      this.draftOrganizationTargets
+        .filter((input) => input.checked)
+        .map((input) => input.value),
+    );
+    this.organizationTargets.forEach((input) => {
+      input.checked = organizations.has(input.value);
     });
     this.sortTarget.value = this.draftSortTarget.value;
     this.closeFilters();
@@ -431,7 +452,10 @@ export default class extends Controller {
         String(order === this.sortTarget.value),
       );
     });
-    const filtersActive = customOrder || this.selectedCategories().length > 0;
+    const filtersActive =
+      customOrder ||
+      this.selectedCategories().length > 0 ||
+      this.selectedOrganizations().length > 0;
     this.filterButtonTarget.dataset.active = String(filtersActive);
     this.filterButtonTarget.setAttribute(
       "aria-label",
@@ -482,6 +506,12 @@ export default class extends Controller {
       .map((input) => input.value);
   }
 
+  selectedOrganizations() {
+    return this.organizationTargets
+      .filter((input) => input.checked)
+      .map((input) => input.value);
+  }
+
   setLoading() {
     this.statusTarget.textContent = "Updating…";
     this.cardsTarget.setAttribute("aria-busy", "true");
@@ -524,6 +554,8 @@ export default class extends Controller {
         "rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600";
       if (this.searchTarget.value.trim()) {
         empty.textContent = "No resources match your search.";
+      } else if (this.selectedOrganizations().length) {
+        empty.textContent = "No resources match the selected organizations.";
       } else if (this.selectedCategories().length) {
         empty.textContent = "No resources match the selected categories.";
       } else {

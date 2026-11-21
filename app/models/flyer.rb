@@ -12,6 +12,7 @@ class Flyer
   QUERY_LIMIT = 160
 
   attribute :categories, default: -> { [] }
+  attribute :organizations, default: -> { [] }
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
 
@@ -28,6 +29,7 @@ class Flyer
 
   validates :near, length: {maximum: 200}
   validate :categories_are_available
+  validate :organizations_are_available
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
@@ -39,6 +41,16 @@ class Flyer
   end
 
   def categories=(value)
+    super(Array(value).compact_blank.map(&:to_s).uniq)
+  end
+
+  # Organizations offering at least one service a printout could list, by ID
+  # as a string, like available_categories.
+  def self.available_organizations
+    Organization.where(id: Service.visible.select(:organization_id)).alphabetical.pluck(:id, :name).to_h.transform_keys(&:to_s)
+  end
+
+  def organizations=(value)
     super(Array(value).compact_blank.map(&:to_s).uniq)
   end
 
@@ -73,6 +85,7 @@ class Flyer
 
   def filters
     {categories: categories}.tap do |filters|
+      filters[:organizations] = organizations if organizations.any?
       filters[:query] = query if query.present?
       filters[:sort] = sort if sort != DEFAULT_SORT
     end
@@ -85,6 +98,12 @@ class Flyer
     return if coordinates
 
     errors.add(:base, "We couldn't read your device's location. Try again, or type a nearby place.")
+  end
+
+  def organizations_are_available
+    if (unknown = organizations - self.class.available_organizations.keys).any?
+      errors.add(:organizations, "include unknown options: #{unknown.join(", ")}")
+    end
   end
 
   def categories_are_available

@@ -18,6 +18,16 @@
       <dd class="mt-2"><span class="admin-badge <%= @user.admin? ? "bg-sage-100 text-sage-800" : "bg-stone-100 text-stone-700" %>"><%= @user.admin? ? "Admin" : "User" %></span></dd>
     </div>
     <div>
+      <dt class="text-sm font-medium text-stone-500">Member of</dt>
+      <dd class="mt-1 text-sm text-stone-900">
+        <% if @user.organization %>
+          <%= link_to @user.organization.name, @user.organization, class: "admin-link" %>
+        <% else %>
+          No organization
+        <% end %>
+      </dd>
+    </div>
+    <div>
       <dt class="text-sm font-medium text-stone-500">Total Chats</dt>
       <dd class="mt-1 text-sm text-stone-900"><%= @user.chats.count %></dd>
     </div>

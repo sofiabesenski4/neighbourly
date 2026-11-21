@@ -115,6 +115,8 @@ class FlyersController < ApplicationController
     else
       message = if @flyer.query.present?
         "No resources match your search."
+      elsif @flyer.organizations.any?
+        "No resources from those organizations match. Try another selection."
       elsif @flyer.categories.empty?
         "No resources are available to print."
       else
@@ -173,11 +175,12 @@ class FlyersController < ApplicationController
 
     input = params[:flyer]
     supported = input.is_a?(ActionController::Parameters)
-    unexpected = supported ? input.keys - %w[categories query sort near lat lng] : []
-    categories = input[:categories] if supported
-    valid_categories = categories.nil? || (categories.is_a?(Array) && categories.all?(String))
+    unexpected = supported ? input.keys - %w[categories organizations query sort near lat lng] : []
+    invalid_lists = supported ? %w[categories organizations].select { |field|
+      input.key?(field) && !(input[field].is_a?(Array) && input[field].all?(String))
+    } : ["categories"]
     invalid_fields = supported ? %w[query sort near lat lng].select { |field| input.key?(field) && !input[field].is_a?(String) } : []
-    return if supported && unexpected.empty? && valid_categories && invalid_fields.empty?
+    return if supported && unexpected.empty? && invalid_lists.empty? && invalid_fields.empty?
 
     @flyer = Flyer.new
     if unexpected.any?
@@ -185,7 +188,7 @@ class FlyersController < ApplicationController
     elsif invalid_fields.any?
       invalid_fields.each { |field| @flyer.errors.add(field, "must be text") }
     else
-      @flyer.errors.add(:categories, "must be provided as a list")
+      invalid_lists.each { |field| @flyer.errors.add(field, "must be provided as a list") }
     end
     if request.format.json? || request.format.pdf?
       render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
@@ -196,6 +199,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: [], organizations: []) : {}
   end
 end

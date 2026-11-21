@@ -266,6 +266,7 @@ test("sends a chosen location to the preview in the request body", async () => {
   controller.previewErrorTarget = { hidden: true };
   controller.setLoading = () => {};
   controller.selectedCategories = () => ["17"];
+  controller.selectedOrganizations = () => ["5"];
   controller.searchTarget = { value: "meal" };
   controller.sortTarget = { value: "desc" };
   controller.render = () => {};
@@ -286,6 +287,7 @@ test("sends a chosen location to the preview in the request body", async () => {
         // Nothing in the URL: Rails would let a `flyer` there replace the body's.
         assert.equal(url.search, "");
         assert.deepEqual(options.body.getAll("flyer[categories][]"), ["17"]);
+        assert.deepEqual(options.body.getAll("flyer[organizations][]"), ["5"]);
         assert.equal(options.body.get("flyer[query]"), "meal");
         assert.equal(options.body.get("flyer[sort]"), "desc");
       },
@@ -417,6 +419,7 @@ test("clearing every category requests and renders the complete guide", async ()
     const requests = [];
     const rendered = [];
     let selected = ["17"];
+    let organizations = [];
 
     globalThis.fetch = async (url) => {
       requests.push(new URL(url));
@@ -435,6 +438,7 @@ test("clearing every category requests and renders the complete guide", async ()
     controller.setLoading = () => {};
     controller.selectedCategories = () => selected;
     controller.render = (categories) => rendered.push(categories);
+    controller.selectedOrganizations = () => organizations;
 
     await controller.refresh();
     selected = [];
@@ -455,6 +459,13 @@ test("clearing every category requests and renders the complete guide", async ()
     await controller.refresh();
     assert.equal(requests[2].searchParams.get("flyer[query]"), "free meals");
     assert.equal(requests[2].searchParams.get("flyer[sort]"), "desc");
+
+    organizations = ["5", "9"];
+    await controller.refresh();
+    assert.deepEqual(
+      requests[3].searchParams.getAll("flyer[organizations][]"),
+      ["5", "9"],
+    );
   } finally {
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;
@@ -529,6 +540,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.generateTarget = {};
     controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
+    controller.selectedOrganizations = () => [];
     controller.generating = false;
 
     controller.render([
@@ -611,6 +623,7 @@ test("a delayed preview response cannot replace a newer selection", async () => 
     controller.setLoading = () => {};
     controller.selectedCategories = () => selected;
     controller.render = (categories) => rendered.push(categories);
+    controller.selectedOrganizations = () => [];
 
     const oldRequest = controller.refresh();
     selected = ["23"];

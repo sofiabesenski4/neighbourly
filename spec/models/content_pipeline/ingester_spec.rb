@@ -294,6 +294,49 @@ RSpec.describe ContentPipeline::Ingester do
           expect(service.address).to have_attributes(street_address: "200 Harbour St", city: nil, coordinates: nil)
         end
 
+        # A member renames their organization, and someone else later adds one
+        # under the old name. The member's service must stay with them.
+        it "keeps a service with its renamed organization when another now has the old name" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+          renamed = service.organization
+          renamed.update!(name: "Harbourside Community Society")
+          Organization.create!(name: "Harbourside Society")
+
+          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
+
+          expect(service.reload).to have_attributes(phone: "250-555-0199", organization: renamed)
+        end
+
+        it "gives a new row naming the old name to the renamed organization its source already uses" do
+          ingester.ingest(csv)
+          renamed = source.documents.find_by!(external_id: "1").service.organization
+          renamed.update!(name: "Harbourside Community Society")
+          other = Organization.create!(name: "Harbourside Society")
+
+          described_class.new(source).ingest(csv + "4,Breakfast Club,Harbourside Society,9 Wharf St,,\n")
+
+          expect(source.documents.find_by!(external_id: "4").service.organization).to eq(renamed)
+          expect(Organization.for_name("Harbourside Society")).to eq(other)
+        end
+
+        # Nobody has checked what a changed row now says.
+        it "clears a service's confirmation when a detail it vouched for changes, and keeps it otherwise" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+          service.confirm!(by: User.create!(email: "checker@example.com", password: "password123"), method: "phone")
+
+          described_class.new(source).ingest(csv)
+          expect(service.reload.confirmation_method).to eq("phone")
+
+          # The row reads differently, but names the same organization and details.
+          described_class.new(source).ingest(csv.sub("Meals,Harbourside Society", "Meals,harbourside  SOCIETY"))
+          expect(service.reload.confirmation_method).to eq("phone")
+
+          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
+          expect(service.reload).to have_attributes(confirmed_at: nil, confirmed_by: nil, confirmation_method: nil)
+        end
+
         it "keeps a service's coordinates when its row changes elsewhere" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
