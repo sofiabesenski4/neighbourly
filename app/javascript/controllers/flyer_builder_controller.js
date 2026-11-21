@@ -21,6 +21,7 @@ export default class extends Controller {
     "draftSort",
     "clearSearchOrder",
     "cards",
+    "includeResource",
     "count",
     "status",
     "generate",
@@ -57,6 +58,7 @@ export default class extends Controller {
     this.revision = (this.revision || 0) + 1;
     this.hasResults = false;
     this.generating = false;
+    this.excludedServiceIds = new Set();
     this.locationRequest = 0;
     // Browsers can restore a page's old field values, but not which screen it was on.
     // Starting clean on the first screen means a location is never used invisibly.
@@ -495,7 +497,6 @@ export default class extends Controller {
   render(categories) {
     const fragment = document.createDocumentFragment();
     const ids = new Set();
-    let total = 0;
     categories.forEach((category) => {
       if (category.resources.length === 0) return;
       const section = document.createElement("section");
@@ -514,14 +515,13 @@ export default class extends Controller {
       grid.className =
         "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
       category.resources.forEach((resource) => {
-        ids.add(resource.id);
-        total += 1;
+        ids.add(String(resource.id));
         grid.append(this.card(resource));
       });
       section.append(grid);
       fragment.append(section);
     });
-    if (total === 0) {
+    if (ids.size === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className =
@@ -536,11 +536,38 @@ export default class extends Controller {
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
-    this.hasResults = total > 0;
+    this.resourceIds = ids;
     this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
-    this.generateTarget.disabled = !this.hasResults || this.generating;
+    this.updateIncludedResources();
+  }
+
+  selectedServiceIds() {
+    return [...this.resourceIds].filter(
+      (id) => !this.excludedServiceIds.has(id),
+    );
+  }
+
+  toggleResource(event) {
+    const { value, checked } = event.currentTarget;
+    if (checked) this.excludedServiceIds.delete(value);
+    else this.excludedServiceIds.add(value);
+    this.includeResourceTargets.forEach((input) => {
+      if (input.value === value) input.checked = checked;
+    });
+    this.discardPrintout();
+    this.updateIncludedResources();
+  }
+
+  updateIncludedResources() {
+    const count = this.selectedServiceIds().length;
+    this.countTarget.textContent = `${count} ${count === 1 ? "resource" : "resources"} included`;
+    this.hasResults = count > 0;
+    this.generateTarget.disabled =
+      !this.hasResults ||
+      this.generating ||
+      this.cardsTarget.getAttribute("aria-busy") === "true" ||
+      !this.previewErrorTarget.hidden;
   }
 
   card(resource) {
@@ -549,15 +576,34 @@ export default class extends Controller {
       "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
     const title = document.createElement("h4");
     title.className =
-      "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
+      "min-w-0 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
     title.textContent = resource.title;
+    const header = document.createElement("header");
+    header.className =
+      "flex items-center justify-between gap-2 px-3 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4";
+    const inclusion = document.createElement("label");
+    inclusion.className =
+      "flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 text-sm";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = String(resource.id);
+    checkbox.checked = !this.excludedServiceIds.has(checkbox.value);
+    checkbox.className = "size-4 accent-sage-700";
+    checkbox.setAttribute(
+      "aria-label",
+      `Include ${resource.title} in printout`,
+    );
+    checkbox.dataset.flyerBuilderTarget = "includeResource";
+    checkbox.dataset.action = "change->flyer-builder#toggleResource";
+    inclusion.append(checkbox, "Include");
+    header.append(title, inclusion);
     const summaryFields = resource.fields.filter((field) =>
       this.summaryLabelsValue.includes(field.label),
     );
     const detailFields = resource.fields.filter(
       (field) => !this.summaryLabelsValue.includes(field.label),
     );
-    article.append(title);
+    article.append(header);
     if (summaryFields.length) {
       const summary = this.fieldList(summaryFields);
       summary.className += " px-3 pt-2 sm:px-4";
@@ -612,6 +658,10 @@ export default class extends Controller {
     this.generateLabelTarget.textContent = "Preparing printout…";
     this.printRequest = new AbortController();
     const { signal } = this.printRequest;
+    const body = new FormData(this.formTarget);
+    this.selectedServiceIds().forEach((id) =>
+      body.append("flyer[service_ids][]", id),
+    );
     // Open from the click, before the asynchronous PDF request can lose user activation.
     const tab = window.open("about:blank", "_blank");
     this.pendingPrintoutTab = tab;
@@ -629,7 +679,7 @@ export default class extends Controller {
             document.querySelector('meta[name="csrf-token"]')?.content || "",
         },
         credentials: "same-origin",
-        body: new FormData(this.formTarget),
+        body,
         signal,
       });
       if (
@@ -663,14 +713,14 @@ export default class extends Controller {
         this.pdfLinkTarget.focus();
       }
     } catch (error) {
-      if (error.name === "AbortError" || revision !== this.revision) return;
+      if (signal.aborted || revision !== this.revision) return;
       this.printErrorTarget.textContent = error.message;
       this.printErrorTarget.hidden = false;
     } finally {
       if (this.pendingPrintoutTab === tab) this.closePreparingTab();
       if (revision === this.revision) {
         this.generating = false;
-        this.generateTarget.disabled = !this.hasResults;
+        this.updateIncludedResources();
         this.generateLabelTarget.textContent = "Generate printout";
       }
     }

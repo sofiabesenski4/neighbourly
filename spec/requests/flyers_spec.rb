@@ -76,6 +76,33 @@ RSpec.describe "Flyers", type: :request do
   end
 
   describe "POST /printout" do
+    it "prints only the selected services that still match the preview filters" do
+      source = Source.create!(name: "Local guide", source_type: "csv")
+      included = source.services.create!(name: "Community meals", categories: [food])
+      source.services.create!(name: "Breakfast hall", categories: [food])
+      outside_filter = source.services.create!(name: "Community clinic", categories: [health])
+      closed = source.services.create!(name: "Closed kitchen", categories: [food], closed: true)
+
+      post flyers_path, params: {flyer: {
+        categories: [food.id.to_s],
+        service_ids: [included.id.to_s, outside_filter.id.to_s, closed.id.to_s]
+      }}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text).to include("Community meals")
+      expect(text).not_to include("Breakfast hall", "Community clinic", "Closed kitchen")
+    end
+
+    it "rejects an explicitly empty or malformed resource selection" do
+      expect(FlyerGenerator).not_to receive(:call)
+
+      [[""], ["12x"], ["9223372036854775808"], "12"].each do |ids|
+        post flyers_path(format: :pdf), params: {flyer: {service_ids: ids}}
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+    end
+
     it "prints only the contact fields in a summary printout" do
       source = Source.create!(name: "Local guide", source_type: "csv")
       source.services.create!(name: "Community meals", phone: "250-555-0100",

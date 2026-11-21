@@ -13,6 +13,7 @@ class Flyer
   DETAIL_LEVELS = %w[summary detailed].freeze
 
   attribute :categories, default: -> { [] }
+  attribute :service_ids
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
   attribute :detail_level, :string, default: "detailed"
@@ -30,6 +31,7 @@ class Flyer
 
   validates :near, length: {maximum: 200}
   validate :categories_are_available
+  validate :service_ids_are_usable
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
@@ -43,6 +45,12 @@ class Flyer
 
   def categories=(value)
     super(Array(value).compact_blank.map(&:to_s).uniq)
+  end
+
+  # A missing list is the standard form submission. An explicit empty list
+  # means the person removed every resource from their printout.
+  def service_ids=(value)
+    super(value.nil? ? nil : Array(value).compact_blank.map(&:to_s).uniq)
   end
 
   def near=(value)
@@ -93,6 +101,16 @@ class Flyer
   def categories_are_available
     if (unknown = categories - self.class.available_categories.keys).any?
       errors.add(:categories, "include unknown options: #{unknown.join(", ")}")
+    end
+  end
+
+  def service_ids_are_usable
+    return if service_ids.nil?
+
+    if service_ids.empty?
+      errors.add(:base, "Choose at least one resource to include in your printout.")
+    elsif service_ids.any? { |id| !id.match?(/\A[1-9][0-9]{0,18}\z/) || id.to_i > 2**63 - 1 }
+      errors.add(:base, "The selected resources could not be read.")
     end
   end
 end

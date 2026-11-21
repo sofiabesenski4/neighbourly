@@ -53,6 +53,35 @@ RSpec.describe "Live resource guide builder", type: :system do
     printout&.close
   end
 
+  it "keeps resource choices across filter changes and sends only the checked cards" do
+    visit_builder
+    find("article", text: "Alpha meals").uncheck("Include")
+    find("article", text: "Gamma noticeboard").uncheck("Include")
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+
+    check "Meals"
+    expect(page).to have_no_css("article h4", text: "Beta clinic")
+    expect(find("article", text: "Alpha meals")).to have_unchecked_field("Include")
+    expect(page).to have_button("Generate printout", disabled: true)
+
+    uncheck "Meals"
+    expect(find("article", text: "Beta clinic")).to have_checked_field("Include")
+    expect(find("article", text: "Gamma noticeboard")).to have_unchecked_field("Include")
+    page.execute_script(<<~JS)
+      const originalFetch = window.fetch;
+      window.open = () => null;
+      window.fetch = (url, options) => {
+        if (options.headers.Accept === "application/pdf") {
+          window.printoutServiceIds = options.body.getAll("flyer[service_ids][]");
+        }
+        return originalFetch(url, options);
+      };
+    JS
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout", href: /\Ablob:/)
+    expect(page.evaluate_script("window.printoutServiceIds")).to eq([Service.find_by!(name: "Beta clinic").id.to_s])
+  end
+
   it "offers the PDF link when the browser blocks the new tab" do
     visit root_path
     page.execute_script("window.flyerNavigationSentinel = true")

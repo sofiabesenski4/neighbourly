@@ -468,7 +468,9 @@ test("resource cards separate visible contacts from the details disclosure", () 
     globalThis.document = {
       createElement: (tagName) => ({
         tagName,
+        dataset: {},
         children: [],
+        setAttribute() {},
         append(...children) {
           this.children.push(...children);
         },
@@ -476,10 +478,12 @@ test("resource cards separate visible contacts from the details disclosure", () 
     };
 
     const controller = Object.create(FlyerBuilderController.prototype);
+    controller.excludedServiceIds = new Set();
     Object.defineProperty(controller, "summaryLabelsValue", {
       value: ["Phone"],
     });
     const article = controller.card({
+      id: 1,
       title: "Food bank",
       fields: [
         { label: "Phone", value: "250-555-0100" },
@@ -517,6 +521,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
   try {
     const createElement = (tagName) => ({
       tagName,
+      dataset: {},
       children: [],
       append(...children) {
         this.children.push(...children);
@@ -527,6 +532,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
         );
       },
       setAttribute() {},
+      getAttribute() {},
     });
 
     globalThis.document = {
@@ -544,6 +550,8 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.countTarget = {};
     controller.statusTarget = {};
     controller.generateTarget = {};
+    controller.previewErrorTarget = { hidden: true };
+    controller.excludedServiceIds = new Set();
     controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
     controller.generating = false;
@@ -569,7 +577,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     assert.match(grid.className, /lg:grid-cols-2/);
     assert.equal(grid.children.length, 4);
     assert.deepEqual(
-      grid.children.map((card) => card.children[0].textContent),
+      grid.children.map((card) => card.children[0].children[0].textContent),
       ["Alpha", "Bravo", "Charlie", "Delta"],
     );
     controller.render([
