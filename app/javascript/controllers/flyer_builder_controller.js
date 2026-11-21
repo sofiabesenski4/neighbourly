@@ -22,9 +22,10 @@ export default class extends Controller {
     "clearSearchOrder",
     "cards",
     "count",
-    "removedResources",
-    "removedSummary",
-    "removedList",
+    "resourceSelection",
+    "resourceStatus",
+    "selectAll",
+    "deselectAll",
     "status",
     "generate",
     "generateLabel",
@@ -58,7 +59,6 @@ export default class extends Controller {
     this.generating = false;
     this.excludedResources = new Map();
     this.previewReady = false;
-    this.renderRemovedResources();
     this.locationRequest = 0;
     // Browsers can restore a page's old field values, but not which screen it was on.
     // Starting clean on the first screen means a location is never used invisibly.
@@ -490,6 +490,11 @@ export default class extends Controller {
 
   setLoading() {
     this.previewReady = false;
+    this.selectAllTarget.disabled = true;
+    this.deselectAllTarget.disabled = true;
+    this.resourceSelectionTargets.forEach((input) => {
+      input.disabled = true;
+    });
     this.statusTarget.textContent = "Updating…";
     this.cardsTarget.setAttribute("aria-busy", "true");
     this.generateTarget.disabled = true;
@@ -501,20 +506,36 @@ export default class extends Controller {
     this.renderCards();
   }
 
-  removeResource(resource) {
-    this.excludedResources.set(String(resource.id), resource.title);
-    this.updateResourceSelection();
-    this.builderHeadingTarget.focus();
+  matchingResources() {
+    return new Map(
+      this.previewCategories.flatMap(({ resources }) =>
+        resources.map((resource) => [String(resource.id), resource]),
+      ),
+    );
   }
 
-  restoreResource(id) {
-    this.excludedResources.delete(id);
+  toggleResource({ target }) {
+    if (!this.previewReady) return;
+    const resource = this.matchingResources().get(target.value);
+    if (!resource) return;
+    this.setResourceSelected(resource, target.checked);
     this.updateResourceSelection();
-    const focusTarget =
-      this.excludedResources.size > 0
-        ? this.removedSummaryTarget
-        : this.builderHeadingTarget;
-    focusTarget.focus();
+  }
+
+  // Bulk actions affect only matching results, preserving choices outside the
+  // current search and category filters. A shared resource is selected once.
+  selectResources({ params: { selected } }) {
+    if (!this.previewReady) return;
+    this.matchingResources().forEach((resource) =>
+      this.setResourceSelected(resource, selected),
+    );
+    this.updateResourceSelection();
+  }
+
+  setResourceSelected(resource, selected) {
+    const id = String(resource.id);
+    if (selected) this.excludedResources.delete(id);
+    else this.excludedResources.set(id, resource.title);
   }
 
   updateResourceSelection() {
@@ -524,41 +545,35 @@ export default class extends Controller {
       this.generateLabelTarget.textContent = "Generate printout";
     }
     this.discardPrintout();
-    if (this.previewReady) this.renderCards();
-    this.renderRemovedResources();
+    this.updateSelectionControls();
   }
 
-  renderRemovedResources() {
-    const count = this.excludedResources.size;
-    this.removedResourcesTarget.hidden = count === 0;
-    if (count === 0) this.removedResourcesTarget.open = false;
-    this.removedSummaryTarget.textContent = `Removed resources (${count})`;
-    const rows = [...this.excludedResources].map(([id, title]) => {
-      const row = document.createElement("li");
-      row.className = "flex items-center justify-between gap-3 py-1 text-sm";
-      const name = document.createElement("span");
-      name.className = "min-w-0 [overflow-wrap:anywhere]";
-      name.textContent = title;
-      const restore = document.createElement("button");
-      restore.type = "button";
-      restore.className =
-        "min-h-11 shrink-0 cursor-pointer rounded-lg px-3 font-semibold hover:bg-red-100 focus-visible:outline-red-700";
-      restore.textContent = "Restore";
-      restore.setAttribute("aria-label", `Restore ${title}`);
-      restore.addEventListener("click", () => this.restoreResource(id));
-      row.append(name, restore);
-      return row;
+  updateSelectionControls() {
+    const resources = this.matchingResources();
+    const included = [...resources.keys()].filter(
+      (id) => !this.excludedResources.has(id),
+    ).length;
+    // Update in place so keyboard focus stays on the checkbox the person changed.
+    this.resourceSelectionTargets.forEach((input) => {
+      input.checked = !this.excludedResources.has(input.value);
+      input.disabled = !this.previewReady;
     });
-    this.removedListTarget.replaceChildren(...rows);
+    this.resourceStatusTargets.forEach((status) => {
+      status.hidden = !this.excludedResources.has(status.dataset.resourceId);
+    });
+    this.countTarget.textContent = `${included} ${included === 1 ? "resource" : "resources"} included`;
+    this.selectAllTarget.disabled =
+      !this.previewReady || included === resources.size;
+    this.deselectAllTarget.disabled = !this.previewReady || included === 0;
+    this.hasResults = included > 0;
+    this.generateTarget.disabled =
+      !this.previewReady || !this.hasResults || this.generating;
   }
 
   renderCards() {
     const fragment = document.createDocumentFragment();
-    const ids = new Set();
     this.previewCategories.forEach((category) => {
-      const resources = category.resources.filter(
-        (resource) => !this.excludedResources.has(String(resource.id)),
-      );
+      const resources = category.resources;
       if (resources.length === 0) return;
       const section = document.createElement("section");
       section.className = "mt-4 first:mt-0 sm:mt-7";
@@ -576,20 +591,17 @@ export default class extends Controller {
       grid.className =
         "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
       resources.forEach((resource) => {
-        ids.add(resource.id);
         grid.append(this.card(resource));
       });
       section.append(grid);
       fragment.append(section);
     });
-    if (ids.size === 0) {
+    if (this.matchingResources().size === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className =
         "rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600";
-      if (this.previewCategories.some(({ resources }) => resources.length)) {
-        empty.textContent = "All matching resources were removed.";
-      } else if (this.searchTarget.value.trim()) {
+      if (this.searchTarget.value.trim()) {
         empty.textContent = "No resources match your search.";
       } else if (this.selectedCategories().length) {
         empty.textContent = "No resources match the selected categories.";
@@ -599,11 +611,9 @@ export default class extends Controller {
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
-    this.hasResults = ids.size > 0;
+    this.updateSelectionControls();
     this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
-    this.generateTarget.disabled = !this.hasResults || this.generating;
   }
 
   card(resource) {
@@ -617,17 +627,35 @@ export default class extends Controller {
     title.className =
       "min-w-0 flex-1 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
     title.textContent = resource.title;
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.setAttribute("aria-label", `Remove ${resource.title}`);
-    remove.title = `Remove ${resource.title} from this printout`;
-    remove.className =
-      "grid size-11 shrink-0 cursor-pointer place-items-center rounded-lg text-stone-600 hover:bg-red-50 hover:text-red-700 focus-visible:outline-red-700";
-    remove.innerHTML = `<svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-      <path d="M3 6h18M8 6V4h8v2m3 0-1 14H6L5 6m5 4v6m4-6v6" />
-    </svg>`;
-    remove.addEventListener("click", () => this.removeResource(resource));
-    header.append(title, remove);
+    const status = document.createElement("span");
+    status.className = "self-center text-xs text-stone-600";
+    status.textContent = "Not included";
+    status.dataset.resourceId = String(resource.id);
+    status.setAttribute("data-flyer-builder-target", "resourceStatus");
+    status.hidden = !this.excludedResources.has(String(resource.id));
+    const selection = document.createElement("label");
+    selection.className =
+      "flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-sage-50";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = String(resource.id);
+    checkbox.checked = !this.excludedResources.has(String(resource.id));
+    checkbox.className =
+      "size-4 cursor-pointer accent-sage-600 focus-visible:outline-sage-600";
+    checkbox.setAttribute(
+      "aria-label",
+      `Include ${resource.title} in printout`,
+    );
+    checkbox.setAttribute("data-flyer-builder-target", "resourceSelection");
+    checkbox.setAttribute(
+      "data-action",
+      "change->flyer-builder#toggleResource",
+    );
+    const selectionLabel = document.createElement("span");
+    selectionLabel.className = "sr-only";
+    selectionLabel.textContent = `Include ${resource.title} in printout`;
+    selection.append(checkbox, selectionLabel);
+    header.append(title, status, selection);
     const details = document.createElement("dl");
     details.className =
       "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";

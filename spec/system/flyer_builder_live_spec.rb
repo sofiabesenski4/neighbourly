@@ -41,15 +41,39 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
   end
 
-  it "removes all copies of a resource, counts it once, and sends its ID when printing" do
+  # Capture the PDF blob before the page opens it, so assertions read the actual
+  # generated document without fetching a blob URL through the site's CSP.
+  def capture_printout
+    page.execute_script <<~JAVASCRIPT
+      const createObjectURL = URL.createObjectURL.bind(URL);
+      URL.createObjectURL = (blob) => {
+        window.capturedPrintout = blob;
+        return createObjectURL(blob);
+      };
+    JAVASCRIPT
+  end
+
+  def printed_text
+    data_url = page.evaluate_async_script(<<~JAVASCRIPT)
+      const done = arguments[0];
+      const reader = new FileReader();
+      reader.onload = () => done(reader.result);
+      reader.readAsDataURL(window.capturedPrintout);
+    JAVASCRIPT
+    pdf = data_url.split(",", 2).last.unpack1("m")
+    PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
+  end
+
+  it "unchecks all copies of a resource, keeps its cards visible, and excludes it when printing" do
     resource = Service.find_by!(name: "Alpha meals")
     resource.categories << health
     visit_builder
     expect(page).to have_css("article h4", text: "Alpha meals", count: 2)
 
-    first(:button, "Remove Alpha meals").click
+    all(:checkbox, "Include Alpha meals in printout").first.uncheck
 
-    expect(page).to have_no_css("article h4", text: "Alpha meals")
+    expect(page).to have_css("article h4", text: "Alpha meals", count: 2)
+    expect(page).to have_no_checked_field("Include Alpha meals in printout")
     expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
     page.execute_script(<<~JS)
       window.open = () => null;
@@ -66,39 +90,72 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page.evaluate_script("window.printoutExclusions")).to eq([resource.id.to_s])
   end
 
-  it "shows each removed resource once in a collapsible list that survives filter changes" do
-    Document.find_by!(title: "Alpha meals").categories << health
+  it "keeps checkbox choices across category and search changes and scopes bulk actions to matching resources" do
+    Service.find_by!(name: "Alpha meals").categories << health
     visit_builder
 
-    expect(page).to have_no_text("Removed resources")
-    first(:button, "Remove Alpha meals").click
-    expect(page).to have_no_text("Alpha meals")
-    find("summary", text: "Removed resources (1)").click
-    expect(page).to have_css("#removed-printout-resources li", text: "Alpha meals", count: 1)
+    expect(page).to have_checked_field("Include Alpha meals in printout")
+    click_button "Deselect all"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
+    check "Include Alpha meals in printout", match: :first
+    expect(all(:checkbox, "Include Alpha meals in printout").all?(&:checked?)).to be true
     check "Health Care"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
-    expect(page).to have_css("#removed-printout-resources li", text: "Alpha meals", count: 1)
-    find("summary", text: "Removed resources (1)").click
-    expect(page).to have_no_text("Alpha meals")
+    expect(page).to have_unchecked_field("Include Beta clinic in printout")
+    fill_in "Search resources", with: "Beta"
+    expect(page).to have_no_field("Include Alpha meals in printout")
+    click_button "Select all"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    fill_in "Search resources", with: ""
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    uncheck "Health Care"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
+    expect(page).to have_unchecked_field("Include Gamma noticeboard in printout")
   end
 
-  it "lets an admin restore a resource and re-enable printing after all matches were removed" do
+  it "lets an admin reselect a resource and re-enable printing after deselecting all matches" do
     admin = User.create!(email: "printout-admin@example.com", password: "password123", admin: true)
     login_as(admin, scope: :user)
     visit_builder
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
-    click_button "Remove Alpha meals"
+    click_button "Deselect all"
 
     expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
     expect(page).to have_button("Generate printout", disabled: true)
-    find("summary", text: "Removed resources (1)").click
-    find('#removed-printout-resources button[aria-label="Restore Alpha meals"]', text: "Restore").click
+    check "Include Alpha meals in printout"
 
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_button("Generate printout", disabled: false)
-    expect(page).to have_no_text("Removed resources")
+    expect(page).to have_checked_field("Include Alpha meals in printout")
+  end
+
+  it "prints only the chosen resource after deselecting all on mobile" do
+    page.current_window.resize_to(320, 740)
+    visit_builder
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "3 resources included")
+    click_button "Deselect all"
+    expect(page).to have_button("Generate printout", disabled: true)
+    expect(page).to have_css("article", count: 3)
+    expect(page.evaluate_script("document.documentElement.scrollWidth <= window.innerWidth")).to be true
+    selection = find(:checkbox, "Include Beta clinic in printout")
+    expect(selection.find(:xpath, "..").evaluate_script("this.getBoundingClientRect().width")).to be >= 44
+    expect(selection.find(:xpath, "..").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+    selection.send_keys(:space)
+    expect(selection).to be_checked
+    expect(page.evaluate_script("document.activeElement.getAttribute('aria-label')")).to eq("Include Beta clinic in printout")
+    capture_printout
+    click_button "Generate printout"
+    expect(page).to have_link("Open printout")
+    expect(printed_text).to include("Beta clinic")
+    expect(printed_text).not_to include("Alpha meals", "Gamma noticeboard")
+    click_button "Select all"
+    expect(page).to have_css("#flyer-preview-heading", exact_text: "3 resources included")
+    expect(page).to have_no_link("Open printout")
+    expect(page).to have_button("Generate printout", disabled: false)
+  ensure
+    page.current_window.resize_to(1280, 900)
   end
 
   it "opens the generated PDF in a new tab with one click" do
@@ -463,32 +520,6 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     before do
       Service.find_by!(name: "Alpha meals").create_address!(lat: 48.43, lng: -123.36)
-    end
-
-    # Keeps a copy of the PDF as the page turns it into a link. Fetching the link
-    # afterwards isn't possible, because the site's security policy blocks that, as
-    # it should: the page only ever opens the PDF in a new tab.
-    def capture_printout
-      page.execute_script <<~JAVASCRIPT
-        const createObjectURL = URL.createObjectURL.bind(URL);
-        URL.createObjectURL = (blob) => {
-          window.capturedPrintout = blob;
-          return createObjectURL(blob);
-        };
-      JAVASCRIPT
-    end
-
-    # Reads the PDF the browser actually received. Whitespace is squeezed because
-    # lines wrap wherever the page width falls.
-    def printed_text
-      data_url = page.evaluate_async_script(<<~JAVASCRIPT)
-        const done = arguments[0];
-        const reader = new FileReader();
-        reader.onload = () => done(reader.result);
-        reader.readAsDataURL(window.capturedPrintout);
-      JAVASCRIPT
-      pdf = data_url.split(",", 2).last.unpack1("m")
-      PDF::Reader.new(StringIO.new(pdf)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
     end
 
     def visit_location_screen

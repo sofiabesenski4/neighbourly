@@ -165,13 +165,15 @@
             <button type="button" class="mt-2 min-h-11 cursor-pointer font-medium underline" data-action="flyer-builder#refresh">Try again</button>
           </div>
 
-          <details class="mb-4 rounded-lg border border-red-200 bg-red-50 text-red-800" hidden
-                   data-flyer-builder-target="removedResources">
-            <summary class="min-h-11 cursor-pointer rounded-lg px-4 py-2.5 text-sm font-semibold focus-visible:outline-red-700"
-                     data-flyer-builder-target="removedSummary">Removed resources</summary>
-            <ul id="removed-printout-resources" class="divide-y divide-red-200 border-t border-red-200 px-4"
-                data-flyer-builder-target="removedList"></ul>
-          </details>
+          <div class="mb-4 rounded-lg border border-stone-200 bg-white px-3 py-2 sm:px-4">
+            <p id="printout-selection-hint" class="text-sm text-stone-600">Check the resources you want to print. Select all and Deselect all apply to the current results.</p>
+            <div class="mt-1 flex flex-wrap gap-x-4" role="group" aria-label="Select resources for printout" aria-describedby="printout-selection-hint">
+              <button type="button" disabled class="min-h-11 cursor-pointer text-sm font-semibold text-sage-700 underline disabled:cursor-not-allowed disabled:text-stone-400 disabled:no-underline"
+                      data-flyer-builder-target="selectAll" data-action="flyer-builder#selectResources" data-flyer-builder-selected-param="true">Select all</button>
+              <button type="button" disabled class="min-h-11 cursor-pointer text-sm font-semibold text-sage-700 underline disabled:cursor-not-allowed disabled:text-stone-400 disabled:no-underline"
+                      data-flyer-builder-target="deselectAll" data-action="flyer-builder#selectResources" data-flyer-builder-selected-param="false">Deselect all</button>
+            </div>
+          </div>
 
           <div data-flyer-builder-target="cards" aria-busy="false">
             <div class="rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600">
