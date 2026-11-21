@@ -14,7 +14,7 @@ RSpec.describe FlyerGenerator do
     time = Time.current
     allow(CategorySearch).to receive(:call).with(categories: ["17"], origin: nil).and_return(sections)
     renderer = instance_double(FlyerPdf, render: "%PDF-real")
-    expect(FlyerPdf).to receive(:new).with(sections: sections, origin: nil, printed_at: time).and_return(renderer)
+    expect(FlyerPdf).to receive(:new).with(sections: sections, origin: nil, printed_at: time, detail_level: "detailed").and_return(renderer)
 
     expect(described_class.call(categories: ["17"], printed_at: time)).to eq("%PDF-real")
   end

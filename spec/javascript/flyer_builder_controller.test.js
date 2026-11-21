@@ -305,6 +305,28 @@ test("reloads the preview after a choice, so its distances match", () => {
   assert.deepEqual(events, ["refreshed"]);
 });
 
+test("keeps questionnaire filters in the preview request body without a location", () => {
+  const previousDocument = globalThis.document;
+  const controller = locationController();
+  controller.fromQuestionnaireValue = true;
+  controller.searchTarget = { value: "meals" };
+  controller.sortTarget = { value: "default" };
+  const url = new URL("https://neighbourly.example/printout/preview.json");
+
+  try {
+    globalThis.document = { querySelector: () => null };
+    const options = controller.previewRequestOptions(["17"], url);
+
+    assert.equal(options.method, "POST");
+    assert.equal(url.search, "");
+    assert.deepEqual(options.body.getAll("flyer[categories][]"), ["17"]);
+    assert.equal(options.body.get("flyer[query]"), "meals");
+    assert.equal(options.body.has("flyer[lat]"), false);
+  } finally {
+    globalThis.document = previousDocument;
+  }
+});
+
 test("stays on the first screen with the server's message when a place isn't found", async () => {
   const controller = locationController();
   controller.nearTarget.value = "Central Library";
@@ -461,14 +483,16 @@ test("clearing every category requests and renders the complete guide", async ()
   }
 });
 
-test("rendered resource cards use Tailwind utility classes", () => {
+test("resource cards separate visible contacts from the details disclosure", () => {
   const previousDocument = globalThis.document;
 
   try {
     globalThis.document = {
       createElement: (tagName) => ({
         tagName,
+        dataset: {},
         children: [],
+        setAttribute() {},
         append(...children) {
           this.children.push(...children);
         },
@@ -476,9 +500,17 @@ test("rendered resource cards use Tailwind utility classes", () => {
     };
 
     const controller = Object.create(FlyerBuilderController.prototype);
+    controller.excludedServiceIds = new Set();
+    Object.defineProperty(controller, "summaryLabelsValue", {
+      value: ["Phone"],
+    });
     const article = controller.card({
+      id: 1,
       title: "Food bank",
-      fields: [{ label: "Hours", value: "Monday" }],
+      fields: [
+        { label: "Phone", value: "250-555-0100" },
+        { label: "Hours", value: "Monday" },
+      ],
     });
 
     assert.match(article.className, /\bborder\b/);
@@ -487,6 +519,17 @@ test("rendered resource cards use Tailwind utility classes", () => {
     assert.match(
       article.children[1].children[0].children[1].className,
       /\bwhitespace-pre-line\b/,
+    );
+    assert.equal(
+      article.children[1].children[0].children[1].textContent,
+      "250-555-0100",
+    );
+    const disclosure = article.children[2];
+    assert.equal(disclosure.tagName, "details");
+    assert.equal(disclosure.children[0].textContent, "See details");
+    assert.equal(
+      disclosure.children[1].children[0].children[1].textContent,
+      "Monday",
     );
     assert.doesNotMatch(article.className, /\bflyer-card\b/);
   } finally {
@@ -500,6 +543,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
   try {
     const createElement = (tagName) => ({
       tagName,
+      dataset: {},
       children: [],
       append(...children) {
         this.children.push(...children);
@@ -510,6 +554,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
         );
       },
       setAttribute() {},
+      getAttribute() {},
     });
 
     globalThis.document = {
@@ -527,6 +572,8 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.countTarget = {};
     controller.statusTarget = {};
     controller.generateTarget = {};
+    controller.previewErrorTarget = { hidden: true };
+    controller.excludedServiceIds = new Set();
     controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
     controller.generating = false;
@@ -552,7 +599,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     assert.match(grid.className, /lg:grid-cols-2/);
     assert.equal(grid.children.length, 4);
     assert.deepEqual(
-      grid.children.map((card) => card.children[0].textContent),
+      grid.children.map((card) => card.children[0].children[0].textContent),
       ["Alpha", "Bravo", "Charlie", "Delta"],
     );
     controller.render([

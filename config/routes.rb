@@ -36,8 +36,9 @@ Rails.application.routes.draw do
   end
   get "printout", to: "flyers#new", as: :new_flyer
   resources :flyers, path: "printout", only: [:create] do
-    # POST is for a preview with a location, which shouldn't appear in a URL.
+    # POST keeps questionnaire answers and locations out of preview URLs.
     match :preview, on: :collection, via: [:get, :post]
+    post :from_questionnaire, on: :collection, path: "from-questionnaire"
     post :locate, on: :collection
   end
   # Keep existing builder and HTML preview bookmarks working.

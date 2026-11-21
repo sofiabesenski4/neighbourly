@@ -10,10 +10,13 @@ class Flyer
   DISTANCE_SORT = "distance"
   SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
   QUERY_LIMIT = 160
+  DETAIL_LEVELS = %w[summary detailed].freeze
 
   attribute :categories, default: -> { [] }
+  attribute :service_ids
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
+  attribute :detail_level, :string, default: "detailed"
 
   # Optional place to measure distances from, as typed. FlyerOrigin looks it up when
   # the printout is generated, not here, because validating also runs for the live
@@ -28,9 +31,11 @@ class Flyer
 
   validates :near, length: {maximum: 200}
   validate :categories_are_available
+  validate :service_ids_are_usable
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
+  validates :detail_level, inclusion: {in: DETAIL_LEVELS}
 
   # Use the same persisted categories as the resource form. String IDs match
   # submitted checkbox values without coercing malformed input into an ID.
@@ -40,6 +45,12 @@ class Flyer
 
   def categories=(value)
     super(Array(value).compact_blank.map(&:to_s).uniq)
+  end
+
+  # A missing list is the standard form submission. An explicit empty list
+  # means the person removed every resource from their printout.
+  def service_ids=(value)
+    super(value.nil? ? nil : Array(value).compact_blank.map(&:to_s).uniq)
   end
 
   def near=(value)
@@ -90,6 +101,16 @@ class Flyer
   def categories_are_available
     if (unknown = categories - self.class.available_categories.keys).any?
       errors.add(:categories, "include unknown options: #{unknown.join(", ")}")
+    end
+  end
+
+  def service_ids_are_usable
+    return if service_ids.nil?
+
+    if service_ids.empty?
+      errors.add(:base, "Choose at least one resource to include in your printout.")
+    elsif service_ids.any? { |id| !id.match?(/\A[1-9][0-9]{0,18}\z/) || id.to_i > 2**63 - 1 }
+      errors.add(:base, "The selected resources could not be read.")
     end
   end
 end
