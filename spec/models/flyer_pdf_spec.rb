@@ -56,14 +56,14 @@ RSpec.describe FlyerPdf do
       expect(text).not_to include("Distance")
     end
 
-    it "only prints the note on the first page" do
+    it "only prints the note on the first resource page" do
       resources = (1..24).map { |number| resource(title: "Resource #{number}", lat: 48.43, lng: -123.36, notes: "Details. " * 60) }
       section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
       reader = PDF::Reader.new(StringIO.new(described_class.new(sections: [section], origin: located).render))
 
-      expect(reader.page_count).to be > 2
-      expect(reader.pages.first.text.gsub(/\s+/, " ")).to include("Distances are from")
-      expect(reader.pages[1].text).not_to include("Distances are from")
+      expect(reader.page_count).to be > 3
+      expect(reader.pages.fetch(1).text.gsub(/\s+/, " ")).to include("Distances are from")
+      expect(reader.pages.fetch(2).text).not_to include("Distances are from")
     end
   end
 
@@ -94,11 +94,13 @@ RSpec.describe FlyerPdf do
     end
   end
 
-  it "ends the guide with a map page" do
+  it "prepends one Start Here cover and keeps the map last" do
     reader = reader_for([resource(lat: 48.4265, lng: -123.3656)])
 
-    expect(reader.pages.last.text).to include("Map", "© OpenMapTiles © OpenStreetMap contributors")
-    expect(reader.pages.first.text).not_to include("OpenStreetMap")
+    expect(reader.page_count).to eq(3)
+    expect(reader.pages.first.raw_content).to match(%r{/I\d+\s+Do})
+    expect(reader.pages.fetch(1).text).to include("Meal program", "Page 2")
+    expect(reader.pages.last.text).to include("Map", "© OpenMapTiles © OpenStreetMap contributors", "Page 3")
   end
 
   it "creates a real readable PDF with the print date and missing fields omitted" do
@@ -117,7 +119,7 @@ RSpec.describe FlyerPdf do
 
   it "keeps the body size and uses full width for a final single card" do
     reader = reader_for([resource(notes: "A short note")])
-    content = reader.pages.first.raw_content
+    content = reader.pages.fetch(1).raw_content
 
     expect(content).to match(/11\.5\s+Tf/)
     widths = content.scan(/[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+[-\d.]+\s+re/).flatten.map(&:to_f)
@@ -140,14 +142,14 @@ RSpec.describe FlyerPdf do
 
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
-    expect(reader.page_count).to eq(2) # the cards, then the map
+    expect(reader.page_count).to eq(3) # the cover, the cards, then the map
     expect(placements.map { |placement| placement[:title] }).to eq(titles)
-    expect(placements.map { |placement| placement[:page] }).to eq([1, 1, 1, 1])
+    expect(placements.map { |placement| placement[:page] }).to eq([2, 2, 2, 2])
     expect(placements[0][:top]).to eq(placements[1][:top])
     expect(placements[2][:top]).to eq(placements[3][:top])
     expect(placements[0][:top]).to be > placements[2][:top]
     expect(placements.map { |placement| placement[:x] }).to eq([0, renderer.instance_variable_get(:@column_width) + described_class::GUTTER] * 2)
-    first_mentions = titles.map { |title| reader.pages.first.text.index(title) }
+    first_mentions = titles.map { |title| reader.pages.fetch(1).text.index(title) }
     expect(first_mentions).to all(be_present)
     expect(first_mentions).to eq(first_mentions.sort)
   end
@@ -167,7 +169,7 @@ RSpec.describe FlyerPdf do
 
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
-    expect(reader.page_count).to be > 2 # more than one page of cards, then the map
+    expect(reader.page_count).to be > 3 # the cover, multiple pages of cards, then the map
     expect(printed_titles).to eq(titles)
     text = reader.pages.map(&:text).join("\n")
     first_mentions = titles.map { |title| text.index(title) }
@@ -200,7 +202,7 @@ RSpec.describe FlyerPdf do
     reader = reader_for([resource(notes: words.join(" "), intake_info: "Walk in")])
     text = reader.pages.map(&:text).join("\n")
 
-    expect(reader.page_count).to be > 2 # more than one page of cards, then the map
+    expect(reader.page_count).to be > 3 # the cover, multiple pages of cards, then the map
     expect(text).to include("continued")
     expect(text.scan(/step\d{5}/)).to eq(words)
     expect(reader.pages[-2].text).to include("Intake:", "Walk in")

@@ -42,17 +42,26 @@ class FlyerPdf
   end
 
   def render
+    render_cover
     new_page
     @sections.each do |section|
       render_section(section) if section.resources.any?
     end
     render_map if entries.any?
     @pdf.number_pages("Printed #{@printed_at.strftime("%Y-%m-%d %H:%M %Z")}  |  Page <page>",
-      at: [0, -16], width: @width, size: 9.5)
+      at: [0, -16], width: @width, size: 9.5, start_count_at: 2, page_filter: ->(page) { page > 1 })
     @pdf.render
   end
 
   private
+
+  def render_cover
+    artwork = Rails.root.join("app/assets/images/printouts/start-here.png")
+    @pdf.canvas do
+      @pdf.image(artwork.to_s, at: [0, @pdf.bounds.top], fit: [@pdf.bounds.width, @pdf.bounds.height])
+    end
+    @pdf.start_new_page
+  end
 
   def clean(value)
     value.to_s.encode("UTF-8", invalid: :replace, undef: :replace)

@@ -156,7 +156,7 @@ RSpec.describe "Flyers", type: :request do
       post flyers_path, params: {flyer: {detail_level: "summary"}}
 
       expect(response).to have_http_status(:ok)
-      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(1).text
       expect(text).to include("Community meals", "250-555-0100", "123 Example Street")
       expect(text).not_to include("Mondays at noon", "Free hot meals", "volunteer coordinator")
     end
@@ -196,8 +196,8 @@ RSpec.describe "Flyers", type: :request do
 
       post flyers_path, params: filters
       expect(response).to have_http_status(:ok)
-      # These cards fit on the first page; the map can repeat names in its legend.
-      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      # These cards fit on the first resource page; the map can repeat names in its legend.
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(1).text
       expect(text.scan(/(?:Zebra|Alpha) meals/)).to eq(names)
       expect(text).not_to include("Other clinic")
     end
@@ -219,7 +219,7 @@ RSpec.describe "Flyers", type: :request do
 
       post flyers_path, params: filters
       expect(response).to have_http_status(:ok)
-      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(1).text
       expect(text.scan(/(?:Zebra|Alpha|Aardvark) meals/)).to eq(names)
     end
 
