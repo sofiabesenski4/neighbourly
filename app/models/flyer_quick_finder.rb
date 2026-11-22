@@ -12,7 +12,6 @@ class FlyerQuickFinder
       PARENT_ROW_HEIGHT + child_count * CHILD_ROW_HEIGHT
     end
   end
-  DEFAULT_URL = "https://github.com/sofiabesenski4/neighbourly".freeze
   INK = "1A1A1A"
   LINK_COLOUR = "263B64"
   GUTTER = 23
@@ -30,10 +29,10 @@ class FlyerQuickFinder
   FOOTER_RULE_Y = 4
   NOTES_FOOTER_GAP = 14
 
-  def initialize(pdf, palette:)
+  def initialize(pdf, palette:, site_url: nil)
     @pdf = pdf
     @width = pdf.bounds.width
-    @url = ENV["NEIGHBOURLY_PUBLIC_URL"].presence || DEFAULT_URL
+    @url = site_url.presence || ENV["NEIGHBOURLY_PUBLIC_URL"].presence
     groups = palette.groups.map { |group| Group.new(group.parent_name, group.colour, group.categories) }
     @columns = build_columns(groups)
   end
@@ -110,6 +109,8 @@ class FlyerQuickFinder
       {text: "Made with Neighbourly. ", styles: [:bold]},
       {text: "Hours and services may change, so call ahead if possible."}
     ], at: [9, top - 14], width: @width - 92, height: 26, size: 9.75)
+    return unless @url
+
     @pdf.formatted_text_box([{text: @url, styles: [:bold], link: @url, color: LINK_COLOUR}],
       at: [9, top - 43], width: @width - 92, height: 26, size: 9.75, overflow: :shrink_to_fit)
     draw_qr(@width - 68, top - 7)

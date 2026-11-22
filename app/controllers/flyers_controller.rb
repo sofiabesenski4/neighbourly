@@ -129,7 +129,7 @@ class FlyersController < ApplicationController
 
     filters = @flyer.filters
     filters[:service_ids] = @flyer.service_ids if @flyer.service_ids
-    pdf = FlyerGenerator.call(**filters, origin: origin, detail_level: @flyer.detail_level)
+    pdf = FlyerGenerator.call(**filters, origin: origin, detail_level: @flyer.detail_level, site_url: root_url)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"

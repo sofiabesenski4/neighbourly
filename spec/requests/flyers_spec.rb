@@ -1,5 +1,6 @@
 require "rails_helper"
 require "pdf/reader"
+require "rqrcode_core"
 
 RSpec.describe "Flyers", type: :request do
   let!(:food) { Category.create!(name: "Meals") }
@@ -164,7 +165,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "hands the selected categories to the generator" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil, detail_level: "detailed").and_return(nil)
+      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: ["", food.id.to_s, harm_reduction.id.to_s]}}
 
@@ -231,7 +232,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when nothing is selected" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return("%PDF-all")
 
       post flyers_path, params: {flyer: {categories: [""]}}
 
@@ -240,7 +241,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when no flyer params are sent" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return("%PDF-all")
 
       post flyers_path
 
@@ -327,7 +328,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "explains when the complete guide has no available resources" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
 
       post flyers_path, headers: {"Accept" => "application/pdf"}
 
@@ -336,7 +337,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "shows the same complete-guide message after a standard form submission" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed").and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: [""]}}
       expect(response).to redirect_to(new_flyer_path)
@@ -749,12 +750,21 @@ RSpec.describe "Flyers", type: :request do
       expect(response.parsed_body["errors"]).to be_present
     end
 
-    it "renders a usable PDF through the existing create action" do
+    it "prints and encodes the homepage URL from the PDF request" do
+      https!
+      host! "guide.example.test:3443"
+      site_url = "https://guide.example.test:3443/"
+      expect(RQRCodeCore::QRCode).to receive(:new).with(site_url, level: :m).and_call_original
+
       post flyers_path, params: {flyer: {categories: [food.id.to_s]}}
 
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("application/pdf")
-      expect(response.body).to start_with("%PDF-")
+      reader = PDF::Reader.new(StringIO.new(response.body))
+      finder = reader.pages.fetch(1)
+      expect(finder.text).to include(site_url)
+      links = finder.attributes.fetch(:Annots).map { |annotation| reader.objects.deref(annotation) }
+      expect(links).to include(a_hash_including(A: a_hash_including(S: :URI, URI: site_url)))
     end
 
     it "records a temporary database outage without exposing details to the front end" do

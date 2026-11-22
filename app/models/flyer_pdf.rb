@@ -46,7 +46,7 @@ class FlyerPdf
     end
   end
 
-  def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed")
+  def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed", site_url: nil)
     @sections = sections.reject { |section| section.resources.empty? }
     @origin = origin
     @printed_at = printed_at
@@ -65,7 +65,7 @@ class FlyerPdf
       .to_h { |service| [key_for(service), service.category_names.presence || ["Other resources"]] }
     grouped_categories = @sections.reject { |section| flat_section?(section) }.map(&:name)
     @category_palette = FlyerCategoryPalette.new(grouped_categories + @flat_categories.values.flatten)
-    @quick_finder = FlyerQuickFinder.new(@pdf, palette: @category_palette)
+    @quick_finder = FlyerQuickFinder.new(@pdf, palette: @category_palette, site_url: site_url)
     @category_pages = Hash.new { |pages, name| pages[name] = [] }
   end
 
