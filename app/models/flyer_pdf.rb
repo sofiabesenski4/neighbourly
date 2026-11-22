@@ -17,8 +17,6 @@ class FlyerPdf
   PAGE_HEADER_HEIGHT = 32
   GOLD = "CB800E"
   INK = "000000"
-  # Darker text shades for the lighter category colours.
-  SECTION_TITLE_COLOURS = {"EE6677" => "B34559", "CCBB44" => "796B16", "66CCEE" => "28738B"}.freeze
   SECTION_TITLE_SIZE = 19
   SECTION_INSET = 16
   SECTION_MIN_HEIGHT = 39
@@ -65,7 +63,8 @@ class FlyerPdf
     @flat_categories = @sections.select { |section| flat_section?(section) }.flat_map(&:resources)
       .to_h { |service| [key_for(service), service.category_names.presence || ["Other resources"]] }
     grouped_categories = @sections.reject { |section| flat_section?(section) }.map(&:name)
-    @quick_finder = FlyerQuickFinder.new(@pdf, categories: (grouped_categories + @flat_categories.values.flatten).uniq)
+    @category_palette = FlyerCategoryPalette.new(grouped_categories + @flat_categories.values.flatten)
+    @quick_finder = FlyerQuickFinder.new(@pdf, palette: @category_palette)
     @category_pages = Hash.new { |pages, name| pages[name] = [] }
   end
 
@@ -212,7 +211,7 @@ class FlyerPdf
     @pdf.stroke_color(accent)
     @pdf.line_width(1.8)
     @pdf.stroke_rounded_rectangle([0, @cursor], @width, height, SECTION_MIN_HEIGHT / 2.0)
-    @pdf.fill_color(SECTION_TITLE_COLOURS.fetch(accent, accent))
+    @pdf.fill_color(accent)
     @pdf.text_box(label, at: [SECTION_INSET, @cursor], width: @width - 2 * SECTION_INSET,
       height: height, size: SECTION_TITLE_SIZE, style: :bold, valign: :center)
     @pdf.fill_color(INK)
@@ -246,7 +245,7 @@ class FlyerPdf
 
   def render_section(section)
     @active_section = section
-    @section_colour = flat_section?(section) ? nil : @quick_finder.colour_for(section.name)
+    @section_colour = flat_section?(section) ? nil : @category_palette.colour_for(section.name)
     remaining = section.resources.map { |service| entry_for(service) }
     continued = false
     heading_pending = true

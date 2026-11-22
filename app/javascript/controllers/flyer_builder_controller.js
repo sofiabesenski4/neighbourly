@@ -7,6 +7,7 @@ export default class extends Controller {
   static targets = [
     "form",
     "category",
+    "categoryMarker",
     "toolbar",
     "sidebar",
     "desktopSearch",
@@ -86,6 +87,10 @@ export default class extends Controller {
 
   disconnect() {
     this.beforeCache();
+  }
+
+  categoryMarkerTargetConnected(marker) {
+    marker.style.backgroundColor = `#${marker.dataset.categoryColour}`;
   }
 
   beforeCache() {
@@ -507,11 +512,17 @@ export default class extends Controller {
     categories.forEach((category) => {
       if (category.resources.length === 0) return;
       const section = document.createElement("section");
-      section.className = "mt-4 first:mt-0 sm:mt-7";
+      section.className = "mt-7 first:mt-0 sm:mt-9";
       const heading = document.createElement("h3");
       heading.className =
-        "mb-1.5 text-sm font-semibold text-sage-700 sm:mb-3 sm:text-lg sm:text-stone-900";
+        "mb-2 text-sm font-semibold text-stone-900 sm:mb-3 sm:text-lg";
       heading.textContent = category.name;
+      if (category.colour) {
+        const colour = `#${category.colour}`;
+        section.className += " flyer-category-group";
+        section.style.setProperty("--flyer-category-colour", colour);
+        heading.style.color = colour;
+      }
       const count = document.createElement("span");
       count.className =
         "ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm";

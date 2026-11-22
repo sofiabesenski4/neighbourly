@@ -146,7 +146,7 @@ RSpec.describe FlyerPdf do
     renderer = described_class.new(sections: sections)
     pdf = renderer.instance_variable_get(:@pdf)
     outlines = Hash.new { |by_radius, radius| by_radius[radius] = [] }
-    palette = FlyerQuickFinder::PALETTE
+    palette = FlyerCategoryPalette::COLOURS
     title_colours = []
     allow(pdf).to receive(:stroke_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
       outlines[radius] << pdf.stroke_color
@@ -160,7 +160,7 @@ RSpec.describe FlyerPdf do
     renderer.render
 
     expected = [palette.first, *palette, palette.first, "000000"]
-    expect(title_colours).to eq(expected.map { |colour| described_class::SECTION_TITLE_COLOURS.fetch(colour, colour) })
+    expect(title_colours).to eq(expected)
     expect(outlines.fetch(described_class::SECTION_MIN_HEIGHT / 2.0)).to eq(expected)
     expect(outlines.fetch(described_class::CARD_RADIUS)).to eq(["000000"] * sections.size)
   end

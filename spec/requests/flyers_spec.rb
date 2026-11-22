@@ -75,7 +75,7 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
-  it "nests child categories under their parent in both filter controls" do
+  it "marks parent categories and nests their children in both filter controls" do
     parent = Category.create!(name: "Food and meals")
     food.update!(parent: parent)
 
@@ -85,6 +85,8 @@ RSpec.describe "Flyers", type: :request do
     %w[category draftCategory].each do |target|
       parent_input = document.at_css("input[data-flyer-builder-target='#{target}'][value='#{parent.id}']")
       child_input = parent_input.ancestors("li").first.at_css("ul input[value='#{food.id}']")
+      expect(parent_input.parent.at_css("[data-category-colour]")["data-category-colour"]).to eq(FlyerCategoryPalette::COLOURS.first)
+      expect(child_input.parent.at_css("[data-category-colour]")).to be_nil
       expect(child_input["data-flyer-builder-target"]).to eq(target)
       expect(child_input.key?("checked")).to eq(target == "category")
     end
@@ -669,11 +671,14 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "returns the same filtered data as JSON for the front-end integration" do
+      Category.create!(name: "Access support")
+      food.update!(parent: Category.create!(name: "Family support"))
       get preview_flyers_path(format: :json), params: {flyer: {categories: [food.id.to_s]}}
 
       expect(response).to have_http_status(:ok)
       category = response.parsed_body.fetch("categories").first
       expect(category["key"]).to eq(food.id.to_s)
+      expect(category.fetch("colour")).to eq(FlyerCategoryPalette::COLOURS.second)
       expect(category["resources"].map { |resource| resource["title"] }).to eq(["Community meal"])
       expect(category["resources"].first["fields"]).to include({"label" => "Notes", "value" => "Call ahead"})
     end

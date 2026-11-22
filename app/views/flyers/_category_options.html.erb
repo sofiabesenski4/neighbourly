@@ -3,7 +3,11 @@
   <ul class="<%= class_names("space-y-1", ("ml-4 border-l border-stone-200 pl-2" if parent)) %>">
     <% categories.each do |category| %>
       <li>
-        <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-stone-800 hover:bg-sage-50 has-checked:bg-sage-100">
+        <label class="relative flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-stone-800 hover:bg-sage-50 has-checked:bg-sage-100">
+          <% unless parent %>
+            <span class="flyer-category-marker" aria-hidden="true"
+                  data-flyer-builder-target="categoryMarker" data-category-colour="<%= palette.colour_for(category.name) %>"></span>
+          <% end %>
           <%= tag.input type: "checkbox", name: ("flyer[categories][]" unless draft),
                 value: category.id, checked: (!draft && @flyer.categories.include?(category.id.to_s)),
                 class: "size-4 shrink-0 accent-sage-600",
@@ -11,7 +15,7 @@
                        action: ("change->flyer-builder#filter" unless draft)} %>
           <span class="[overflow-wrap:anywhere]"><%= category.name %></span>
         </label>
-        <%= render "category_options", tree: tree, parent: category, draft: draft %>
+        <%= render "category_options", tree: tree, palette: palette, parent: category, draft: draft %>
       </li>
     <% end %>
   </ul>

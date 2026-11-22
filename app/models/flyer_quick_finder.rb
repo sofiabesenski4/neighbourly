@@ -12,7 +12,6 @@ class FlyerQuickFinder
       PARENT_ROW_HEIGHT + child_count * CHILD_ROW_HEIGHT
     end
   end
-  PALETTE = %w[4477AA EE6677 228833 CCBB44 66CCEE AA3377].freeze
   DEFAULT_URL = "https://github.com/sofiabesenski4/neighbourly".freeze
   INK = "1A1A1A"
   LINK_COLOUR = "263B64"
@@ -31,19 +30,12 @@ class FlyerQuickFinder
   FOOTER_RULE_Y = 4
   NOTES_FOOTER_GAP = 14
 
-  def initialize(pdf, categories:)
+  def initialize(pdf, palette:)
     @pdf = pdf
     @width = pdf.bounds.width
     @url = ENV["NEIGHBOURLY_PUBLIC_URL"].presence || DEFAULT_URL
-    groups = category_groups(categories)
-    @category_colours = groups.each_with_object({}) do |group, colours|
-      group.categories.each { |name| colours[name] = group.colour }
-    end
+    groups = palette.groups.map { |group| Group.new(group.parent_name, group.colour, group.categories) }
     @columns = build_columns(groups)
-  end
-
-  def colour_for(category_name)
-    @category_colours.fetch(category_name)
   end
 
   def page_count
@@ -63,24 +55,6 @@ class FlyerQuickFinder
   end
 
   private
-
-  def category_groups(categories)
-    tree = CategoryTree.new
-    remaining = categories.to_set
-    colours = PALETTE.cycle
-    groups = tree.children_of.filter_map do |root|
-      colour = colours.next
-      names = branch_names(tree, root).select { |name| remaining.delete?(name) }
-      next if names.empty?
-
-      Group.new(root.name, colour, names)
-    end
-    groups + remaining.sort.map { |name| Group.new(name, colours.next, [name]) }
-  end
-
-  def branch_names(tree, category)
-    [category.name] + tree.children_of(category).flat_map { |child| branch_names(tree, child) }
-  end
 
   def build_columns(groups)
     midpoint = (groups.size + 1) / 2

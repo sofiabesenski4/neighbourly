@@ -544,6 +544,11 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     const createElement = (tagName) => ({
       tagName,
       dataset: {},
+      style: {
+        setProperty(name, value) {
+          this[name] = value;
+        },
+      },
       children: [],
       append(...children) {
         this.children.push(...children);
@@ -582,6 +587,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
       { name: "Empty category", resources: [] },
       {
         name: "Food",
+        colour: "896109",
         resources: ["Alpha", "Bravo", "Charlie", "Delta"].map(
           (title, index) => ({ id: index + 1, title, fields: [] }),
         ),
@@ -589,12 +595,13 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     ]);
 
     assert.equal(controller.cardsTarget.children.length, 1);
-    assert.equal(
-      controller.cardsTarget.children[0].children[0].textContent,
-      "Food",
-    );
+    const [category] = controller.cardsTarget.children;
+    const [heading, grid] = category.children;
+    assert.equal(heading.textContent, "Food");
+    assert.match(category.className, /flyer-category-group/);
+    assert.equal(category.style["--flyer-category-colour"], "#896109");
+    assert.equal(heading.style.color, "#896109");
     assert.equal(controller.countTarget.textContent, "4 resources included");
-    const grid = controller.cardsTarget.children[0].children[1];
     assert.match(grid.className, /grid-cols-1/);
     assert.match(grid.className, /lg:grid-cols-2/);
     assert.equal(grid.children.length, 4);

@@ -69,8 +69,11 @@ class FlyersController < ApplicationController
     @sections = CategorySearch.call(**@flyer.filters, origin: origin)
     respond_to do |format|
       format.json do
+        palette = FlyerCategoryPalette.new(@sections.reject(&:label).map(&:name))
         render json: {categories: @sections.map { |section|
+          colour = section.label ? nil : palette.colour_for(section.name)
           {key: section.category&.id&.to_s, name: section.name,
+           colour: colour,
            resources: section.resources.map { |resource| ResourceCard.new(resource, origin: origin).as_json }}
         }}
       end
