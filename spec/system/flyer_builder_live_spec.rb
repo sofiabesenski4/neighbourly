@@ -247,6 +247,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") do
       list = find("[aria-label='Category list']")
       expect(list.evaluate_script("getComputedStyle(this).overflowY")).to eq("auto")
+      expect(list.evaluate_script("getComputedStyle(this).overscrollBehaviorY")).to eq("auto")
       expect(list.evaluate_script("this.scrollHeight > this.clientHeight")).to be(true)
       list.execute_script("this.scrollTop = this.scrollHeight")
       expect(list.evaluate_script("this.scrollTop")).to be > 0
