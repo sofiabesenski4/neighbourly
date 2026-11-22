@@ -1,6 +1,8 @@
 <% content_for :title, "Organizations" %>
-<% content_for :admin_actions do %>
-  <%= link_to "Add organization", new_organization_path, class: "admin-button-primary" %>
+<% if policy(Organization).create? %>
+  <% content_for :admin_actions do %>
+    <%= link_to "Add organization", new_organization_path, class: "admin-button-primary" %>
+  <% end %>
 <% end %>
 
 <%= render "admin/page_header", title: "Organizations", description: "The groups that offer services, and what each one runs." %>

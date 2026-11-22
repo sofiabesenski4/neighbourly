@@ -213,6 +213,7 @@ RSpec.describe "Sources", type: :system do
         document = Document.find_by!(title: "Harbour Meals")
         expect(document.content).to eq("Name: Harbour Meals\nAddress: 100 Harbour St")
         expect(document.enriched_at).to be_nil
+        expect(document.service).to have_attributes(confirmed_by: admin, confirmation_method: "upload")
         expect(RubyLLM).not_to have_received(:chat)
         expect(page).not_to have_content("AI summaries")
       end

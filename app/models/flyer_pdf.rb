@@ -93,7 +93,7 @@ class FlyerPdf
     title = clean(card.title)
     rows = card.fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
-       size: ["Last updated", "Information source"].include?(field[:label]) ? SECONDARY_SIZE : BODY_SIZE}
+       size: ["Last confirmed", "Last updated", "Information source"].include?(field[:label]) ? SECONDARY_SIZE : BODY_SIZE}
     }
     # Keep an unusually long name in the body, where it can continue across
     # pages, rather than repeating an oversized header on every page.

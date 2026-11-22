@@ -17,6 +17,15 @@ RSpec.describe "Users", type: :request do
         expect(target_user.reload.email).to eq("new@example.com")
       end
 
+      it "makes a user a member of an organization" do
+        organization = Organization.create!(name: "Our Place Society")
+
+        patch user_path(target_user), params: {user: {organization_id: organization.id}}
+
+        expect(target_user.reload.organization).to eq(organization)
+        expect(organization.members).to eq([target_user])
+      end
+
       it "allows granting admin privileges" do
         patch user_path(target_user), params: {user: {admin: true}}
 

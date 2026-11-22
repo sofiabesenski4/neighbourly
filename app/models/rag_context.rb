@@ -71,7 +71,8 @@ class RagContext
       "Phone" => service.phone,
       "Email" => service.email,
       "Website" => service.website,
-      "Hours" => service.hours
+      "Hours" => service.hours,
+      "Last confirmed" => service.confirmation
     }
     service.additional_details.each do |key, value|
       # The interface shows the source link, and the model must not write one.

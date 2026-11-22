@@ -7,9 +7,14 @@
       <%= form.text_field :name, placeholder: "e.g. Community lunch", autofocus: true, class: "admin-input" %>
     </div>
     <div class="min-w-0 space-y-2">
-      <%= form.label :organization_id, "Offered by", class: "admin-label" %>
-      <%= form.collection_select :organization_id, Organization.alphabetical, :id, :name,
-          { include_blank: "No organization" }, class: "admin-input" %>
+      <% if current_user.admin? %>
+        <%= form.label :organization_id, "Offered by", class: "admin-label" %>
+        <%= form.collection_select :organization_id, Organization.alphabetical, :id, :name,
+            { include_blank: "No organization" }, class: "admin-input" %>
+      <% else %>
+        <p class="admin-label">Offered by</p>
+        <p class="flex min-h-11 items-center text-sm text-stone-900"><%= current_user.organization.name %></p>
+      <% end %>
     </div>
   </div>
 
