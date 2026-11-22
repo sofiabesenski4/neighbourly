@@ -6,16 +6,17 @@ class IngestSourceJob < ApplicationJob
   # Two runs for one source would write the same documents at once, and the
   # loser's unique-index error would mark the source failed mid-ingestion.
   # Solid Queue holds a second run until the first finishes.
-  limits_concurrency to: 1, key: ->(source) { source }, duration: 1.hour
+  limits_concurrency to: 1, key: ->(source, *) { source }, duration: 1.hour
 
   # The source was deleted before its upload was ingested.
   discard_on ActiveJob::DeserializationError
 
-  def perform(source)
+  # uploaded_by confirms the services the upload brings in.
+  def perform(source, uploaded_by = nil)
     return if source.upload_content.nil?
 
     source.update!(ingestion_status: :ingesting, ingestion_error: nil)
-    ContentPipeline::Ingester.new(source).ingest(source.upload_content)
+    ContentPipeline::Ingester.new(source, confirmed_by: uploaded_by).ingest(source.upload_content)
     source.update!(ingestion_status: :succeeded, upload_content: nil)
   rescue => e
     # Reload first: a document that failed to save is still in the in-memory

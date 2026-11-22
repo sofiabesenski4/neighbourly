@@ -11,8 +11,8 @@ class CategorySearch
     end
   end
 
-  def self.call(categories:, query: "", sort: Flyer::DEFAULT_SORT, origin: nil, service_ids: nil)
-    selection = Flyer.new(categories: categories, query: query, sort: sort, service_ids: service_ids)
+  def self.call(categories:, organizations: [], query: "", sort: Flyer::DEFAULT_SORT, origin: nil, service_ids: nil)
+    selection = Flyer.new(categories: categories, organizations: organizations, query: query, sort: sort, service_ids: service_ids)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
     unfiltered = selection.categories.empty?
@@ -24,6 +24,8 @@ class CategorySearch
     resources = Service.visible
     resources = resources.where(id: selection.service_ids) if selection.service_ids
     resources = resources.in_categories(selected.map(&:id)) unless unfiltered
+    # Someone printing for one organization, or a few, sees only what they offer.
+    resources = resources.where(organization_id: selection.organizations) if selection.organizations.any?
     resources = resources.includes(:source, :categories, :address).alphabetical.to_a
 
     if selection.query.present?

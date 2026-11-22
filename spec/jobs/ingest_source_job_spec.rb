@@ -16,6 +16,14 @@ RSpec.describe IngestSourceJob do
     expect { described_class.perform_now(source) }.to change(source.documents, :count).by(2)
   end
 
+  it "counts the services it brings in as confirmed by the person who uploaded it" do
+    uploader = User.create!(email: "uploader@example.com", password: "password123")
+
+    described_class.perform_now(source, uploader)
+
+    expect(source.services).to all(have_attributes(confirmed_by: uploader, confirmation_method: "upload"))
+  end
+
   it "queues enrichment for each row not yet enriched" do
     described_class.perform_now(source)
 

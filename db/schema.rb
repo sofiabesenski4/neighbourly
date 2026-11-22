@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -167,6 +167,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
     t.bigint "source_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "former_names", default: [], null: false, array: true
+    t.index ["former_names"], name: "index_organizations_on_former_names", using: :gin
     t.index ["normalized_name"], name: "index_organizations_on_normalized_name", unique: true
     t.index ["source_id"], name: "index_organizations_on_source_id"
   end
@@ -286,6 +288,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.jsonb "additional_details", default: {}, null: false
+    t.datetime "confirmed_at"
+    t.string "confirmation_method"
+    t.bigint "confirmed_by_id"
+    t.index ["confirmed_by_id"], name: "index_services_on_confirmed_by_id"
     t.index ["document_id"], name: "index_services_on_document_id", unique: true
     t.index ["organization_id"], name: "index_services_on_organization_id"
     t.index ["source_id"], name: "index_services_on_source_id"
@@ -463,7 +469,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
     t.datetime "reset_password_sent_at"
     t.string "reset_password_token"
     t.datetime "updated_at", null: false
+    t.bigint "organization_id"
     t.index ["email"], name: "index_users_on_email", unique: true
+    t.index ["organization_id"], name: "index_users_on_organization_id"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
 
@@ -489,6 +497,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
   add_foreign_key "services", "documents", on_delete: :nullify
   add_foreign_key "services", "organizations", on_delete: :nullify
   add_foreign_key "services", "sources", on_delete: :cascade
+  add_foreign_key "services", "users", column: "confirmed_by_id", on_delete: :nullify
   add_foreign_key "solid_queue_batch_executions", "solid_queue_batches", column: "batch_id", on_delete: :cascade
   add_foreign_key "solid_queue_batch_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_blocked_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
@@ -497,4 +506,5 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
   add_foreign_key "solid_queue_ready_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_recurring_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
   add_foreign_key "solid_queue_scheduled_executions", "solid_queue_jobs", column: "job_id", on_delete: :cascade
+  add_foreign_key "users", "organizations", on_delete: :nullify
 end

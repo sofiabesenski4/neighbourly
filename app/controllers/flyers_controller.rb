@@ -138,6 +138,8 @@ class FlyersController < ApplicationController
         "None of the selected resources are available to print. Refresh the preview and choose again."
       elsif @flyer.query.present?
         "No resources match your search."
+      elsif @flyer.organizations.any?
+        "No resources from those organizations match. Try another selection."
       elsif @flyer.categories.empty?
         "No resources are available to print."
       else
@@ -202,7 +204,7 @@ class FlyersController < ApplicationController
     supported = input.is_a?(ActionController::Parameters)
     @flyer = Flyer.new
     if supported
-      list_fields = %w[categories service_ids]
+      list_fields = %w[categories organizations service_ids]
       text_fields = %w[query sort near lat lng detail_level]
       unexpected = input.keys - list_fields - text_fields
       @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}") if unexpected.any?
@@ -228,6 +230,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, :detail_level, categories: [], service_ids: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, :detail_level, categories: [], organizations: [], service_ids: []) : {}
   end
 end

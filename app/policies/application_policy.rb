@@ -42,6 +42,10 @@ class ApplicationPolicy
     user&.admin?
   end
 
+  def member?
+    user&.member?
+  end
+
   class Scope
     def initialize(user, scope)
       @user = user

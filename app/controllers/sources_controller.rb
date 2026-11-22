@@ -63,9 +63,10 @@ class SourcesController < ApplicationController
   private
 
   # A source whose job was never queued would wait forever, so record the
-  # failure where the admin can see it. The upload is kept for a retry.
+  # failure where the admin can see it. The upload is kept for a retry. The
+  # admin uploading it confirms the services it brings in.
   def enqueue_ingestion(source)
-    return true if IngestSourceJob.perform_later(source)
+    return true if IngestSourceJob.perform_later(source, current_user)
 
     source.update!(ingestion_status: :failed, ingestion_error: "Ingestion could not be queued.")
     false

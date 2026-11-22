@@ -84,4 +84,40 @@ RSpec.describe "Organizations", type: :request do
       expect(service.reload.organization).to be_nil
     end
   end
+
+  context "as a member of an organization" do
+    let(:member) { User.create!(email: "organizations-org-member@example.com", password: "password123", organization: organization) }
+    let(:other_organization) { Organization.create!(name: "Harbour Street Society") }
+
+    before { sign_in member }
+
+    it "shows and edits their own organization" do
+      get organization_path(organization)
+      expect(response).to have_http_status(:ok)
+      expect(response.body).not_to include(">Delete<")
+
+      patch organization_path(organization), params: {organization: {phone: "250-555-0199"}}
+      expect(organization.reload.phone).to eq("250-555-0199")
+    end
+
+    it "lists only their own organization" do
+      other_organization
+
+      get organizations_path
+
+      expect(response.body).to include("Our Place Society")
+      expect(response.body).not_to include("Harbour Street Society", "Add organization")
+    end
+
+    it "keeps them away from other organizations, and from adding or deleting any" do
+      get organization_path(other_organization)
+      expect(response).to redirect_to(root_path)
+
+      post organizations_path, params: {organization: {name: "Sneaky"}}
+      expect(Organization.find_by(name: "Sneaky")).to be_nil
+
+      delete organization_path(organization)
+      expect(Organization.exists?(organization.id)).to be(true)
+    end
+  end
 end

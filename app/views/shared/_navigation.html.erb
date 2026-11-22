@@ -28,14 +28,16 @@
           </svg>
           Printout
         <% end %>
-        <% if user_signed_in? && current_user.admin? %>
-          <%= link_to admin_path, aria: { current: ("page" if active_tab == :admin) },
+        <% if user_signed_in? && (current_user.admin? || current_user.member?) %>
+          <%# Members manage their organization in the same pages admins use. %>
+          <% console_path = current_user.admin? ? admin_path : organization_path(current_user.organization) %>
+          <%= link_to console_path, aria: { current: ("page" if active_tab == :admin) },
                 class: ["inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-lg px-2 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600 sm:px-3",
                         active_tab == :admin ? "bg-sage-100 text-sage-700 hover:bg-sage-200" : "text-stone-700 hover:bg-sage-50"] do %>
             <svg aria-hidden="true" class="hidden h-4 w-4 shrink-0 sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z" />
             </svg>
-            <span class="whitespace-nowrap">Admin console</span>
+            <span class="whitespace-nowrap"><%= current_user.admin? ? "Admin console" : "Your organization" %></span>
           <% end %>
         <% end %>
       </div>

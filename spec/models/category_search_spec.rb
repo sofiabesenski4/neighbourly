@@ -123,6 +123,17 @@ RSpec.describe CategorySearch do
     expect(sections.first.resources).to eq([listing])
   end
 
+  it "narrows any selection to the chosen organizations" do
+    ours = Organization.create!(name: "Our Place Society")
+    theirs = Organization.create!(name: "Harbour Street Society")
+    lunch = resource("Lunch", [meals], organization: ours)
+    resource("Dinner", [meals], organization: theirs)
+    resource("Breakfast", [meals])
+
+    expect(described_class.call(categories: [meals.id.to_s], organizations: [ours.id.to_s]).flat_map(&:resources)).to eq([lunch])
+    expect(described_class.call(categories: [], organizations: [ours.id.to_s]).flat_map(&:resources)).to eq([lunch])
+  end
+
   it "leaves uncategorized resources out of an explicit selection" do
     meal = resource("Meals", [meals])
     resource("Other", [])

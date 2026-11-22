@@ -41,6 +41,22 @@
         <%= options_for_select(Flyer::SORT_OPTIONS, selected: @flyer.sort, disabled: Flyer::DISTANCE_SORT) %>
       </select>
 
+      <% if organizations.any? %>
+        <fieldset class="mt-5 shrink-0">
+          <legend class="text-sm font-semibold">Organizations</legend>
+          <p class="mt-1 mb-2.5 text-sm text-stone-600">Leave unchecked to include every organization.</p>
+          <div role="region" aria-label="Organization list" tabindex="0"
+               class="grid max-h-40 content-start gap-1.5 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] focus-visible:outline-sage-600">
+            <% organizations.each do |id, name| %>
+              <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-stone-200 px-3 py-2 text-sm has-checked:border-sage-600 has-checked:bg-sage-50">
+                <input type="checkbox" value="<%= id %>" class="size-4 shrink-0 accent-sage-600" data-flyer-builder-target="draftOrganization">
+                <span class="min-w-0 break-words"><%= name %></span>
+              </label>
+            <% end %>
+          </div>
+        </fieldset>
+      <% end %>
+
       <fieldset class="mt-5 flex min-h-0 flex-1 flex-col">
         <legend class="text-sm font-semibold">Categories</legend>
         <p class="mt-1 mb-2.5 shrink-0 text-sm text-stone-600">

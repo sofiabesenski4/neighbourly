@@ -85,6 +85,33 @@ RSpec.describe Organization, type: :model do
       expect(Organization.for_name("Our Place Society")).to eq(existing)
     end
 
+    # A member renames their organization, then its source is imported again
+    # under the old name.
+    it "finds a renamed organization by the name it had before" do
+      renamed = Organization.create!(name: "Our Place")
+      renamed.update!(name: "Our Place Society")
+
+      expect(renamed.former_names).to eq(["our place"])
+      expect { expect(Organization.for_name("OUR PLACE")).to eq(renamed) }.not_to change(Organization, :count)
+    end
+
+    it "prefers an organization's current name over another's former one" do
+      renamed = Organization.create!(name: "Harbour House")
+      renamed.update!(name: "Harbour House Society")
+      newer = Organization.create!(name: "Harbour House")
+
+      expect(Organization.for_name("Harbour House")).to eq(newer)
+      expect(renamed.reload.former_names).to eq(["harbour house"])
+    end
+
+    it "forgets a former name once it is the current name again" do
+      organization = Organization.create!(name: "Our Place")
+      organization.update!(name: "Our Place Society")
+      organization.update!(name: "Our Place")
+
+      expect(organization.former_names).to eq(["our place society"])
+    end
+
     it "gives nothing for a blank name" do
       expect(Organization.for_name("  ")).to be_nil
       expect(Organization.count).to eq(0)

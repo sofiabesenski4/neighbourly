@@ -81,6 +81,33 @@ RSpec.describe Flyer, type: :model do
     expect(flyer.errors[:categories].first).to include("spaceships")
   end
 
+  describe "organizations" do
+    let(:organization) { Organization.create!(name: "Our Place Society") }
+
+    it "offers only organizations with a service a printout could list" do
+      Organization.create!(name: "No services yet")
+      closed_only = Organization.create!(name: "Closed Society")
+      Source.form_entry_source.services.create!(name: "Lunch", organization: organization)
+      Source.form_entry_source.services.create!(name: "Shut", organization: closed_only, closed: true)
+
+      expect(Flyer.available_organizations).to eq(organization.id.to_s => "Our Place Society")
+    end
+
+    it "accepts an offered organization and rejects others" do
+      Source.form_entry_source.services.create!(name: "Lunch", organization: organization)
+
+      expect(Flyer.new(organizations: ["", organization.id, organization.id.to_s])).to be_valid.and have_attributes(organizations: [organization.id.to_s])
+      expect(Flyer.new(organizations: ["0"]).tap(&:valid?).errors[:organizations].first).to include("0")
+    end
+
+    it "includes chosen organizations in the filters" do
+      Source.form_entry_source.services.create!(name: "Lunch", organization: organization)
+
+      expect(Flyer.new.filters).not_to have_key(:organizations)
+      expect(Flyer.new(organizations: [organization.id]).filters).to include(organizations: [organization.id.to_s])
+    end
+  end
+
   it "drops blank values and duplicates from the selection" do
     flyer = Flyer.new(categories: ["", meals.id, meals.id.to_s])
 

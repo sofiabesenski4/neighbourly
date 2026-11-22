@@ -7,7 +7,13 @@ module ApplicationHelper
     link_to url, url, target: "_blank", rel: "noopener noreferrer", class: "admin-link"
   end
 
+  # Admin pages, and for an organization's members, the pages for their
+  # organization and its services.
   def administration_page?
-    current_user&.admin? && %w[admin users organizations services sources documents reports models].include?(controller_name)
+    return false unless current_user
+
+    pages = current_user.admin? ? %w[admin users organizations services sources documents reports models] : []
+    pages += %w[organizations services] if current_user.member?
+    pages.include?(controller_name)
   end
 end
