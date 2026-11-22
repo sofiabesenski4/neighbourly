@@ -24,7 +24,7 @@ class FlyerPdf
   Measure = Data.define(:height, :header_height, :row_heights)
 
   def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed")
-    @sections = sections
+    @sections = sections.reject { |section| section.resources.empty? }
     @origin = origin
     @printed_at = printed_at
     @detail_level = detail_level
@@ -39,17 +39,25 @@ class FlyerPdf
     @column_width = (@width - GUTTER) / 2
     @measurements = {}
     @started = false
+    @flat_categories = @sections.select { |section| flat_section?(section) }.flat_map(&:resources)
+      .to_h { |service| [key_for(service), service.category_names.presence || ["Other resources"]] }
+    grouped_categories = @sections.reject { |section| flat_section?(section) }.map(&:name)
+    @quick_finder = FlyerQuickFinder.new(@pdf, categories: (grouped_categories + @flat_categories.values.flatten).uniq)
+    @category_pages = Hash.new { |pages, name| pages[name] = [] }
   end
 
   def render
     render_cover
+    @quick_finder.page_count.times { @pdf.start_new_page }
+    @pdf.start_new_page
+    first_listing_page = @pdf.page_number
     new_page
-    @sections.each do |section|
-      render_section(section) if section.resources.any?
-    end
+    @sections.each { |section| render_section(section) }
     render_map if entries.any?
+    @quick_finder.draw(@category_pages)
     @pdf.number_pages("Printed #{@printed_at.strftime("%Y-%m-%d %H:%M %Z")}  |  Page <page>",
-      at: [0, -16], width: @width, size: 9.5, start_count_at: 2, page_filter: ->(page) { page > 1 })
+      at: [0, -16], width: @width, size: 9.5,
+      start_count_at: first_listing_page, page_filter: ->(page) { page >= first_listing_page })
     @pdf.render
   end
 
@@ -60,7 +68,18 @@ class FlyerPdf
     @pdf.canvas do
       @pdf.image(artwork.to_s, at: [0, @pdf.bounds.top], fit: [@pdf.bounds.width, @pdf.bounds.height])
     end
-    @pdf.start_new_page
+  end
+
+  def flat_section?(section)
+    section.category.nil? && section.label == "Resources"
+  end
+
+  def record_category_page(entry)
+    names = flat_section?(@active_section) ? @flat_categories.fetch(entry.key) : [@active_section.name]
+    names.each do |name|
+      pages = @category_pages[name]
+      pages << @pdf.page_number unless pages.last == @pdf.page_number
+    end
   end
 
   def clean(value)
@@ -175,6 +194,8 @@ class FlyerPdf
     second_narrow = measurement(second, @column_width).height if second
 
     if second && first_narrow <= available && second_narrow <= available
+      record_category_page(first)
+      record_category_page(second)
       draw_card(first, 0, @cursor, @column_width)
       draw_card(second, @column_width + GUTTER, @cursor, @column_width)
       @cursor -= [first_narrow, second_narrow].max + GAP
@@ -183,6 +204,7 @@ class FlyerPdf
       wide_height = measurement(first, @width).height
       raise "Unable to place a resource card" if wide_height > available
 
+      record_category_page(first)
       draw_card(first, 0, @cursor, @width)
       @cursor -= wide_height + GAP
       remaining.shift
@@ -190,6 +212,7 @@ class FlyerPdf
   end
 
   def render_section(section)
+    @active_section = section
     remaining = section.resources.map { |service| entry_for(service) }
     continued = false
     heading_pending = true
@@ -255,6 +278,7 @@ class FlyerPdf
       box = Prawn::Text::Formatted::Box.new(remaining.map(&:dup), options)
       leftover = box.render(dry_run: true)
       raise "An oversized resource field could not be laid out" if box.height.zero? || leftover == remaining
+      record_category_page(entry)
       height = header + 2 * PADDING + box.height
       frame(title, 0, @cursor, @width, height, header)
       @pdf.formatted_text_box(remaining.map(&:dup), options.except(:document))

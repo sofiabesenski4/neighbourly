@@ -90,6 +90,7 @@ gem "neighbor", "~> 1.1"
 
 # Render resource cards directly from saved data, without a browser or LLM.
 gem "prawn", "~> 2.5"
+gem "rqrcode_core", "~> 2.1"
 
 group :test do
   gem "pdf-reader", "~> 2.15"
