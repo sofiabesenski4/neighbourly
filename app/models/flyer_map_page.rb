@@ -47,6 +47,7 @@ class FlyerMapPage
   SCALE_BAR_HEIGHT = 3
   LIST_SIZE = 9.5
   CREDIT_SIZE = 6.5
+  CREDIT_LEADING = 2
   GAP = 6
 
   # items are MapPinLayout::Item values. centre is a GeoPoint, or nil for downtown.
@@ -314,7 +315,7 @@ class FlyerMapPage
   end
 
   def draw_credit
-    @pdf.text(credit, size: CREDIT_SIZE)
+    @pdf.text(credit, size: CREDIT_SIZE, leading: CREDIT_LEADING)
   end
 
   # OpenStreetMap's licence asks for the credit near the map. The style's CC BY licence only
@@ -324,7 +325,7 @@ class FlyerMapPage
   end
 
   def credit_height
-    @pdf.height_of(credit, width: @width, size: CREDIT_SIZE)
+    @pdf.height_of(credit, width: @width, size: CREDIT_SIZE, leading: CREDIT_LEADING)
   end
 
   # Runs on as one paragraph, so a long list takes little space and can continue on the next

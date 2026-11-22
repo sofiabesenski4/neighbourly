@@ -16,7 +16,6 @@ class FlyerQuickFinder
   DEFAULT_URL = "https://github.com/sofiabesenski4/neighbourly".freeze
   INK = "1A1A1A"
   LINK_COLOUR = "263B64"
-  GOLD = "CB800E"
   GUTTER = 23
   PARENT_ROW_HEIGHT = 28
   CHILD_ROW_HEIGHT = 23
@@ -36,7 +35,15 @@ class FlyerQuickFinder
     @pdf = pdf
     @width = pdf.bounds.width
     @url = ENV["NEIGHBOURLY_PUBLIC_URL"].presence || DEFAULT_URL
-    @columns = build_columns(category_groups(categories))
+    groups = category_groups(categories)
+    @category_colours = groups.each_with_object({}) do |group, colours|
+      group.categories.each { |name| colours[name] = group.colour }
+    end
+    @columns = build_columns(groups)
+  end
+
+  def colour_for(category_name)
+    @category_colours.fetch(category_name)
   end
 
   def page_count
@@ -100,14 +107,8 @@ class FlyerQuickFinder
   end
 
   def draw_page(columns, printed_pages, page_index)
-    @pdf.move_cursor_to(@pdf.bounds.top)
-    @pdf.fill_color(INK)
-    @pdf.text("NEIGHBOURLY RESOURCE GUIDE", size: 9.75, style: :bold, character_spacing: 1)
-    @pdf.move_down(7)
-    @pdf.stroke_color(GOLD)
-    @pdf.line_width(3)
-    @pdf.stroke_horizontal_line(0, @width, at: @pdf.cursor)
-    @pdf.move_down(14)
+    FlyerPdf.draw_page_header(@pdf)
+    @pdf.move_cursor_to(@pdf.bounds.top - FlyerPdf::PAGE_HEADER_HEIGHT)
     @pdf.text(page_index.zero? ? "Quick finder" : "Quick finder continued", size: 23.25, style: :bold)
     @pdf.move_down(6)
     @pdf.text("Find a service, then turn to the page shown.", size: 10.5)
@@ -122,7 +123,7 @@ class FlyerQuickFinder
     draw_website(website_top)
     draw_notes(website_top - WEBSITE_HEIGHT - SECTION_GAP)
 
-    @pdf.stroke_color(GOLD)
+    @pdf.stroke_color(FlyerPdf::GOLD)
     @pdf.line_width(1.5)
     @pdf.stroke_horizontal_line(0, @width, at: FOOTER_RULE_Y)
     @pdf.text_box("Neighbourly Resource Guide", at: [0, -4], width: @width, height: 12, size: 8.25)

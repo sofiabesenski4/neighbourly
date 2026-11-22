@@ -14,6 +14,16 @@ class FlyerPdf
   TITLE_SIZE = 13.5
   SECONDARY_SIZE = 10.5
   BOTTOM = 6
+  PAGE_HEADER_HEIGHT = 32
+  GOLD = "CB800E"
+  INK = "000000"
+  # Darker text shades for the lighter category colours.
+  SECTION_TITLE_COLOURS = {"EE6677" => "B34559", "CCBB44" => "796B16", "66CCEE" => "28738B"}.freeze
+  SECTION_TITLE_SIZE = 19
+  SECTION_INSET = 16
+  SECTION_MIN_HEIGHT = 39
+  SECTION_GAP = 9
+  CARD_RADIUS = 14
   # One resource's card. number is its one number for the whole guide, which its map pin also
   # shows. heading is what the card's header prints, and title stays the plain name for lists.
   Entry = Data.define(:key, :number, :title, :rows) do
@@ -22,6 +32,19 @@ class FlyerPdf
     end
   end
   Measure = Data.define(:height, :header_height, :row_heights)
+
+  def self.draw_page_header(pdf)
+    pdf.canvas do
+      top = pdf.bounds.top - MARGIN
+      right = pdf.bounds.right - MARGIN
+      pdf.fill_color("1A1A1A")
+      pdf.text_box("NEIGHBOURLY RESOURCE GUIDE", at: [MARGIN, top], width: right - MARGIN,
+        height: 15, size: 9.75, style: :bold, character_spacing: 1)
+      pdf.stroke_color(GOLD)
+      pdf.line_width(3)
+      pdf.stroke_horizontal_line(MARGIN, right, at: top - 18)
+    end
+  end
 
   def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed")
     @sections = sections.reject { |section| section.resources.empty? }
@@ -49,11 +72,15 @@ class FlyerPdf
   def render
     render_cover
     @quick_finder.page_count.times { @pdf.start_new_page }
-    @pdf.start_new_page
+    @pdf.start_new_page(top_margin: MARGIN + PAGE_HEADER_HEIGHT)
     first_listing_page = @pdf.page_number
     new_page
     @sections.each { |section| render_section(section) }
     render_map if entries.any?
+    (first_listing_page..@pdf.page_count).each do |page_number|
+      @pdf.go_to_page(page_number)
+      self.class.draw_page_header(@pdf)
+    end
     @quick_finder.draw(@category_pages)
     @pdf.number_pages("Printed #{@printed_at.strftime("%Y-%m-%d %H:%M %Z")}  |  Page <page>",
       at: [0, -16], width: @width, size: 9.5,
@@ -153,12 +180,10 @@ class FlyerPdf
     first_page = !@started
     @pdf.start_new_page if @started
     @started = true
-    @pdf.text("Greater Victoria resource guide", size: 23, style: :bold)
     if first_page && @origin && @detail_level == "detailed"
-      @pdf.move_down(4)
       @pdf.text(origin_note, size: SECONDARY_SIZE)
+      @pdf.move_down(12)
     end
-    @pdf.move_down(12)
     @cursor = @page_top = @pdf.cursor
   end
 
@@ -177,13 +202,21 @@ class FlyerPdf
   end
 
   def heading_height(label)
-    @pdf.height_of(label, width: @width, size: 18, style: :bold) + 8
+    text_height = @pdf.height_of(label, width: @width - 2 * SECTION_INSET, size: SECTION_TITLE_SIZE, style: :bold)
+    [SECTION_MIN_HEIGHT, text_height + 16].max + SECTION_GAP
   end
 
-  def draw_heading(label)
-    height = heading_height(label)
-    @pdf.text_box(label, at: [0, @cursor], width: @width, height: height, size: 18, style: :bold)
-    @cursor -= height
+  def draw_heading(label, colour: nil)
+    height = heading_height(label) - SECTION_GAP
+    accent = colour || INK
+    @pdf.stroke_color(accent)
+    @pdf.line_width(1.8)
+    @pdf.stroke_rounded_rectangle([0, @cursor], @width, height, SECTION_MIN_HEIGHT / 2.0)
+    @pdf.fill_color(SECTION_TITLE_COLOURS.fetch(accent, accent))
+    @pdf.text_box(label, at: [SECTION_INSET, @cursor], width: @width - 2 * SECTION_INSET,
+      height: height, size: SECTION_TITLE_SIZE, style: :bold, valign: :center)
+    @pdf.fill_color(INK)
+    @cursor -= height + SECTION_GAP
   end
 
   def draw_next_row(remaining)
@@ -213,6 +246,7 @@ class FlyerPdf
 
   def render_section(section)
     @active_section = section
+    @section_colour = flat_section?(section) ? nil : @quick_finder.colour_for(section.name)
     remaining = section.resources.map { |service| entry_for(service) }
     continued = false
     heading_pending = true
@@ -221,7 +255,7 @@ class FlyerPdf
       available = @cursor - BOTTOM - (heading_pending ? heading_height(label) : 0)
       unless measurement(remaining.first, @width).height <= available
         if @cursor == @page_top
-          draw_heading(label) if heading_pending
+          draw_heading(label, colour: @section_colour) if heading_pending
           render_oversized(remaining.shift, section.name)
           heading_pending = false
           continued = true
@@ -232,7 +266,7 @@ class FlyerPdf
         next
       end
       if heading_pending
-        draw_heading(label)
+        draw_heading(label, colour: @section_colour)
         heading_pending = false
       end
       draw_next_row(remaining)
@@ -242,13 +276,13 @@ class FlyerPdf
   end
 
   def frame(title, x, top, width, height, header_height)
-    @pdf.fill_color("EFEFEF")
-    @pdf.fill_rectangle([x, top], width, header_height)
-    @pdf.stroke_color("B4B4B4")
+    @pdf.stroke_color(INK)
+    @pdf.line_width(1.35)
+    @pdf.stroke_rounded_rectangle([x, top], width, height, CARD_RADIUS)
+    @pdf.stroke_color("D4D4D4")
     @pdf.line_width(0.6)
-    @pdf.stroke_rectangle([x, top], width, height)
-    @pdf.stroke_line([x, top - header_height], [x + width, top - header_height])
-    @pdf.fill_color("000000")
+    @pdf.stroke_horizontal_line(x + PADDING, x + width - PADDING, at: top - header_height)
+    @pdf.fill_color(INK)
     @pdf.text_box(title, at: [x + PADDING, top - 8], width: width - 2 * PADDING,
       height: header_height, size: TITLE_SIZE, style: :bold, leading: 2)
   end
@@ -286,7 +320,7 @@ class FlyerPdf
       remaining = leftover
       if remaining.any?
         new_page
-        draw_heading("#{category_name} continued")
+        draw_heading("#{category_name} continued", colour: @section_colour)
       end
       part += 1
     end
