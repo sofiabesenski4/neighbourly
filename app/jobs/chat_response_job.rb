@@ -22,6 +22,7 @@ class ChatResponseJob < ApplicationJob
     end
 
     rag_documents = result.documents
+    rag_services = result.services
 
     # Keep reference context request-local: persisted system messages are also
     # broadcast to the conversation, just like user messages.
@@ -34,12 +35,14 @@ class ChatResponseJob < ApplicationJob
       end
     end
 
-    if rag_documents.any?
+    if rag_documents.any? || rag_services.any?
       user_message = chat.messages.where(role: "user").last
       assistant_message = chat.messages.where(role: "assistant").last
 
       user_message&.rag_documents = rag_documents
+      user_message&.rag_services = rag_services
       assistant_message&.rag_documents = rag_documents
+      assistant_message&.rag_services = rag_services
 
       assistant_message&.broadcast_rag_context
     end

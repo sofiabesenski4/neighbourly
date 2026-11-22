@@ -92,6 +92,18 @@ RSpec.describe "Documents", type: :request do
         expect(doc.content).to include("Description: Drop-in centre offering meals and shelter")
       end
 
+      it "asks AI to fill in the new resource's service when the box is checked" do
+        expect { post documents_path, params: valid_params.deep_merge(document: {enrich: "1"}) }
+          .to have_enqueued_job(EnrichServiceJob)
+
+        expect(Document.last.service).to be_awaiting_enrichment
+      end
+
+      it "leaves the service alone when the box is unchecked" do
+        expect { post documents_path, params: valid_params.deep_merge(document: {enrich: "0"}) }
+          .not_to have_enqueued_job(EnrichServiceJob)
+      end
+
       # Checks the real form path end to end: submitting the form ends with a lookup
       # queued. address_spec.rb covers the rules for when a lookup is needed.
       # The resource's address and its service each hold coordinates until the

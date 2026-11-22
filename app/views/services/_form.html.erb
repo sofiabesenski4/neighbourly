@@ -62,6 +62,16 @@
     <span class="text-sm font-medium text-stone-800">This service is closed</span>
   <% end %>
 
+  <%# Checked for a new service, so it gets a description chat can search. %>
+  <% enrich = params.dig(:service, :enrich) ? params.dig(:service, :enrich) == "1" : @service.new_record? %>
+  <div class="space-y-1">
+    <%= form.label :enrich, class: "flex min-h-11 cursor-pointer items-center gap-3" do %>
+      <%= form.check_box :enrich, { checked: enrich, class: "admin-checkbox", aria: { describedby: "service_enrich_hint" } }, "1", "0" %>
+      <span class="text-sm font-medium text-stone-800">Fill in what's left blank with AI after saving</span>
+    <% end %>
+    <p id="service_enrich_hint" class="ml-7 text-xs leading-5 text-stone-500">It only adds details the service doesn't have, using what's written here, and writes the description chat searches. The name can be left blank for it to fill.</p>
+  </div>
+
   <div class="flex flex-wrap items-center gap-3 border-t border-stone-100 pt-6">
     <%= form.submit button_text, class: "admin-button-primary" %>
     <%= link_to "Cancel", cancel_path, class: "admin-button-secondary" %>

@@ -1,10 +1,10 @@
 require "rails_helper"
 
-RSpec.describe EnrichDocumentJob do
+RSpec.describe EnrichServiceJob do
   include ActiveJob::TestHelper
 
   let(:source) { Source.create!(name: "Drop-in Centres", source_type: "csv", enrich_documents: true) }
-  let(:document) { source.documents.create!(content: "Name: Harbour Meals", external_id: "1", metadata: {"Name" => "Harbour Meals"}) }
+  let(:service) { source.services.create!(name: "Harbour Meals", enrichment_requested: true) }
   let(:enricher) { instance_double(ContentPipeline::Enricher, enrich!: true) }
 
   before do
@@ -20,73 +20,65 @@ RSpec.describe EnrichDocumentJob do
     expect(reserved).not_to be_empty
   end
 
-  it "enriches the document" do
-    described_class.perform_now(document)
+  it "enriches the service" do
+    described_class.perform_now(service)
 
-    expect(ContentPipeline::Enricher).to have_received(:new).with(document)
+    expect(ContentPipeline::Enricher).to have_received(:new).with(service)
     expect(enricher).to have_received(:enrich!)
   end
 
-  it "skips a document that is already enriched" do
-    document.update!(enriched_at: Time.current)
+  it "skips a service that is already enriched" do
+    service.update!(enriched_at: Time.current)
 
-    described_class.perform_now(document)
-
-    expect(enricher).not_to have_received(:enrich!)
-  end
-
-  it "skips documents whose source did not opt in" do
-    source.update!(enrich_documents: false)
-
-    described_class.perform_now(document)
+    described_class.perform_now(service)
 
     expect(enricher).not_to have_received(:enrich!)
   end
 
-  it "skips documents that did not come from a CSV" do
-    source.update!(source_type: "html", url: "https://example.com")
+  it "skips a service nobody asked to enrich" do
+    service.update!(enrichment_requested: false)
 
-    described_class.perform_now(document)
+    described_class.perform_now(service)
 
     expect(enricher).not_to have_received(:enrich!)
   end
 
   it "runs after chat replies" do
-    expect(described_class.new(document).priority).to be > ChatResponseJob.new(1, "hi").priority.to_i
+    expect(described_class.new(service).priority).to be > ChatResponseJob.new(1, "hi").priority.to_i
   end
 
-  it "runs one job per document at a time" do
+  it "runs one job per service at a time" do
     expect(described_class.concurrency_limit).to eq(1)
-    expect(described_class.new(document).concurrency_key).to eq(described_class.new(Document.find(document.id)).concurrency_key)
+    expect(described_class.new(service).concurrency_key).to eq(described_class.new(Service.find(service.id)).concurrency_key)
   end
 
-  it "retries later when embedding the summary is rate limited" do
+  it "retries later when embedding the description is rate limited" do
     chat = instance_double(RubyLLM::Chat)
     allow(ContentPipeline::Enricher).to receive(:new).and_call_original
     allow(RubyLLM).to receive(:chat).and_return(chat)
     allow(chat).to receive_messages(with_instructions: chat, with_schema: chat,
-      ask: instance_double(RubyLLM::Message, content: {title: "Harbour Meals", summary: "Lunches.", categories: []}.to_json))
-    document
+      ask: instance_double(RubyLLM::Message, content: {name: "Harbour Meals", summary: "Lunches.", categories: []}.to_json))
+    service
     allow(ContentPipeline::Embedder).to receive(:embed).and_raise(RubyLLM::RateLimitError, "slow down")
 
-    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+    expect { described_class.perform_now(service) }.to have_enqueued_job(described_class).with(service)
   end
 
   it "retries later when the connection to the model times out" do
     allow(enricher).to receive(:enrich!).and_raise(Faraday::TimeoutError, "timed out")
 
-    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+    expect { described_class.perform_now(service) }.to have_enqueued_job(described_class).with(service)
   end
 
   it "asks again later when the model's reply cannot be used" do
     allow(enricher).to receive(:enrich!).and_raise(ContentPipeline::Enricher::InvalidResponse, "The model returned no summary.")
 
-    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+    expect { described_class.perform_now(service) }.to have_enqueued_job(described_class).with(service)
   end
 
   it "retries later when the model is rate limited" do
     allow(enricher).to receive(:enrich!).and_raise(RubyLLM::RateLimitError, "slow down")
 
-    expect { described_class.perform_now(document) }.to have_enqueued_job(described_class).with(document)
+    expect { described_class.perform_now(service) }.to have_enqueued_job(described_class).with(service)
   end
 end

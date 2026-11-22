@@ -66,7 +66,7 @@ class Address < ApplicationRecord
       (country.nil? || CANADA_NAMES.include?(country.downcase))
   end
 
-  # Queues a lookup when one could find coordinates. A row waiting for
+  # Queues a lookup when one could find coordinates. A service waiting for
   # enrichment is skipped, because enrichment may still fill in its address.
   # Enrichment calls this itself once it has saved.
   def locate_later
@@ -75,13 +75,10 @@ class Address < ApplicationRecord
     GeocodeAddressJob.perform_later(self)
   end
 
-  # True while enrichment may still fill in the row this address came from.
+  # True while enrichment may still fill in the service this address
+  # belongs to. Rows and organizations are never enriched.
   def awaiting_enrichment?
-    case addressable
-    when Document then addressable.awaiting_enrichment?
-    when Service then addressable.document&.awaiting_enrichment? || false
-    else false
-    end
+    addressable.is_a?(Service) && addressable.awaiting_enrichment?
   end
 
   # A resource and the service read from it usually share an address, and

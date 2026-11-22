@@ -41,6 +41,26 @@ RSpec.describe "Chat reference citations", type: :system do
     expect(page).to have_link("Community Directory", href: source.url, count: 2)
   end
 
+  # A service added on the site has no row, so chat cites the service itself.
+  it "links a service citation to its reference card, numbered before the rows" do
+    service = Source.form_entry_source.services.create!(name: "Breakfast Club",
+      enriched_description: "Breakfast Club serves free breakfast on weekdays.")
+    reply = chat.messages.create!(role: "assistant", content: "Try Breakfast Club [ref:s#{service.id}] or Rainbow Kitchen [ref:#{document.id}].")
+    reply.rag_documents = [document]
+    reply.rag_services = [service]
+    visit chat_path(chat)
+
+    within(output_for(reply)) do
+      expect(page).to have_link("[1]", href: "#message_#{reply.id}_reference_s#{service.id}")
+      expect(page).to have_link("[2]", href: reference_for(reply, document))
+      click_link "[1]"
+    end
+    within("#message_#{reply.id}_reference_s#{service.id}") do
+      expect(page).to have_text("Breakfast Club")
+      expect(page).to have_css("[data-citation-status]", text: "Cited")
+    end
+  end
+
   it "resolves citations when reference metadata arrives later and preserves badges on panel replacement" do
     reply = chat.messages.create!(role: "assistant", content: "Try Rainbow Kitchen [ref:#{document.id}].")
     visit chat_path(chat)

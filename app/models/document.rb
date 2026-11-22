@@ -57,12 +57,6 @@ class Document < ApplicationRecord
     location.coordinates
   end
 
-  # Enrichment finds the row's address, so geocoding waits for it rather than
-  # looking up whatever the row's columns happen to give.
-  def awaiting_enrichment?
-    enriched_at.nil? && source.enrich_documents?
-  end
-
   # Resources geocoded before addresses had their own table have lat and lng
   # in their metadata. Those are not part of the row as uploaded, so they do
   # not make it look changed. Coordinates the row itself supplied are still

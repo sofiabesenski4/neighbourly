@@ -15,6 +15,7 @@ class ChatResponseRunner
     checkpoint!
     result = RagContext.new.augment(@response.user_message.content)
     @documents = result.documents
+    @services = result.services
     checkpoint!
     @chat.with_instructions(result.instructions, append: true, persist: false) if result.instructions.present?
     raise RubyLLM::CancelledError unless @response.start_writing!
@@ -101,12 +102,16 @@ class ChatResponseRunner
     link_documents
   end
 
+  # Links the rows and services chat found to both messages, so the reply
+  # lists them as references.
   def link_documents
-    return if @documents.blank?
+    return if @documents.blank? && @services.blank?
 
     @response.user_message.rag_documents = @documents
+    @response.user_message.rag_services = @services
     if @assistant&.persisted? && Message.visible_in_conversation.exists?(id: @assistant.id)
       @assistant.rag_documents = @documents
+      @assistant.rag_services = @services
       @assistant.broadcast_rag_context
     end
   end

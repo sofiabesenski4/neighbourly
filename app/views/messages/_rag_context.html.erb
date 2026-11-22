@@ -1,26 +1,28 @@
 <div id="message_<%= message.id %>_rag_context" data-citations-target="references">
-  <% if message.rag_documents.any? %>
+  <% references = message_references(message) %>
+  <% if references.any? %>
     <details class="mt-2">
       <summary class="min-h-11 w-fit cursor-pointer rounded-full border border-stone-200 bg-white px-3 py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50 focus-visible:outline-sage-600">
-        References · <%= message.rag_documents.size %>
+        References · <%= references.size %>
       </summary>
       <div class="mt-2 rounded-lg border border-stone-200 bg-white px-4 pb-2">
         <p class="py-3 text-xs text-stone-500">Reference material found for this reply. Cited items are marked.</p>
-        <% message.rag_documents.includes(:source, :service).order("document_messages.id").each_with_index do |doc, index| %>
-          <div id="message_<%= message.id %>_reference_<%= doc.id %>" tabindex="-1" data-reference-id="<%= doc.id %>" data-reference-number="<%= index + 1 %>" data-reference-title="<%= reference_title(doc) %>" class="border-t border-stone-100 py-3 focus-visible:outline-sage-600" data-controller="dialog">
+        <% references.each_with_index do |ref, index| %>
+          <% reportable = local_assigns.fetch(:show_report_button, false) && ref.report_document %>
+          <div id="message_<%= message.id %>_reference_<%= ref.key %>" tabindex="-1" data-reference-id="<%= ref.key %>" data-reference-number="<%= index + 1 %>" data-reference-title="<%= ref.title %>" class="border-t border-stone-100 py-3 focus-visible:outline-sage-600" data-controller="dialog">
             <div class="flex justify-between items-start gap-3">
               <div class="min-w-0 flex-1">
-                <p class="break-words text-sm font-medium text-stone-800"><span class="mr-1 text-xs text-stone-400">[<%= index + 1 %>]</span><%= reference_title(doc) %></p>
+                <p class="break-words text-sm font-medium text-stone-800"><span class="mr-1 text-xs text-stone-400">[<%= index + 1 %>]</span><%= ref.title %></p>
                 <span data-citation-status hidden class="mr-1.5 rounded bg-sage-50 px-1.5 py-0.5 text-xs font-medium text-sage-700">Cited</span>
-                <% if (source_url = reference_source_url(doc.source)) %>
+                <% if (source_url = reference_source_url(ref.source)) %>
                   <%= link_to source_url, target: "_blank", rel: "noopener noreferrer", class: "inline-block min-h-11 max-w-full py-3 text-sm text-sage-700 underline break-words focus-visible:outline-sage-600" do %>
-                    <%= doc.source.name %><span class="sr-only"> (opens in a new tab)</span>
+                    <%= ref.source.name %><span class="sr-only"> (opens in a new tab)</span>
                   <% end %>
                 <% else %>
-                  <p class="text-xs text-stone-500"><%= doc.source.name %> · No public link available</p>
+                  <p class="text-xs text-stone-500"><%= ref.source.name %> · No public link available</p>
                 <% end %>
               </div>
-              <% if local_assigns.fetch(:show_report_button, false) %>
+              <% if reportable %>
                 <button type="button"
                         data-action="dialog#open"
                         class="min-h-11 shrink-0 rounded-lg px-2 text-sm text-stone-500 hover:text-red-600 transition-colors cursor-pointer focus-visible:outline-sage-600"
@@ -31,11 +33,11 @@
             </div>
             <details class="mt-2">
               <summary class="min-h-11 w-fit cursor-pointer py-3 text-sm font-medium text-stone-500 hover:text-stone-700 focus-visible:outline-sage-600">View full text</summary>
-              <p class="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap break-words text-sm text-stone-600"><%= doc.content %></p>
+              <p class="mt-2 max-h-80 overflow-y-auto whitespace-pre-wrap break-words text-sm text-stone-600"><%= ref.text %></p>
             </details>
 
-            <% if local_assigns.fetch(:show_report_button, false) %>
-              <% report_heading_id = "message_#{message.id}_reference_#{doc.id}_report_heading" %>
+            <% if reportable %>
+              <% report_heading_id = "message_#{message.id}_reference_#{ref.key}_report_heading" %>
               <dialog data-dialog-target="dialog"
                       data-action="click->dialog#clickOutside"
                       aria-labelledby="<%= report_heading_id %>"
@@ -43,11 +45,11 @@
                 <div class="p-4 sm:p-6">
                   <h3 id="<%= report_heading_id %>" class="text-lg font-semibold text-stone-900 mb-1">Report Document</h3>
                   <p class="break-words text-sm text-stone-500 mb-4">
-                    Reporting: <span class="font-medium"><%= reference_title(doc) %></span>
+                    Reporting: <span class="font-medium"><%= ref.title %></span>
                   </p>
 
                   <%= form_with url: reports_path, scope: :report, method: :post, class: "space-y-4" do |f| %>
-                    <%= f.hidden_field :document_id, value: doc.id %>
+                    <%= f.hidden_field :document_id, value: ref.report_document.id %>
 
                     <fieldset>
                       <legend class="text-sm font-medium text-stone-700 mb-2">Reason for reporting</legend>
@@ -63,7 +65,7 @@
                     </fieldset>
 
                     <div>
-                      <% details_id = "message_#{message.id}_reference_#{doc.id}_report_details" %>
+                      <% details_id = "message_#{message.id}_reference_#{ref.key}_report_details" %>
                       <%= f.label :details, "Additional details (optional)", for: details_id, class: "block text-sm font-medium text-stone-700 mb-1" %>
                       <%= f.text_area :details, rows: 3,
                           id: details_id,
