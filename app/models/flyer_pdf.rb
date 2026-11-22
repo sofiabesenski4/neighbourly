@@ -19,8 +19,8 @@ class FlyerPdf
   INK = "000000"
   SECTION_TITLE_SIZE = 19
   SECTION_INSET = 16
-  SECTION_MIN_HEIGHT = 39
   SECTION_GAP = 9
+  SECTION_LINE_WIDTH = 2.25
   CARD_RADIUS = 14
   # One resource's card. number is its one number for the whole guide, which its map pin also
   # shows. heading is what the card's header prints, and title stays the plain name for lists.
@@ -38,9 +38,11 @@ class FlyerPdf
       pdf.fill_color("1A1A1A")
       pdf.text_box("NEIGHBOURLY RESOURCE GUIDE", at: [MARGIN, top], width: right - MARGIN,
         height: 15, size: 9.75, style: :bold, character_spacing: 1)
-      pdf.stroke_color(GOLD)
-      pdf.line_width(3)
-      pdf.stroke_horizontal_line(MARGIN, right, at: top - 18)
+      if pdf.page_number == 2
+        pdf.stroke_color(GOLD)
+        pdf.line_width(3)
+        pdf.stroke_horizontal_line(MARGIN, right, at: top - 18)
+      end
     end
   end
 
@@ -57,7 +59,6 @@ class FlyerPdf
     })
     @pdf.font("ResourceSans", size: BODY_SIZE)
     @width = @pdf.bounds.width
-    @column_width = (@width - GUTTER) / 2
     @measurements = {}
     @started = false
     @flat_categories = @sections.select { |section| flat_section?(section) }.flat_map(&:resources)
@@ -176,6 +177,7 @@ class FlyerPdf
   end
 
   def new_page
+    finish_section_line
     first_page = !@started
     @pdf.start_new_page if @started
     @started = true
@@ -200,22 +202,31 @@ class FlyerPdf
     end
   end
 
-  def heading_height(label)
-    text_height = @pdf.height_of(label, width: @width - 2 * SECTION_INSET, size: SECTION_TITLE_SIZE, style: :bold)
-    [SECTION_MIN_HEIGHT, text_height + 16].max + SECTION_GAP
+  def heading_height(label, inset: 0)
+    @pdf.height_of(label, width: @width - inset, size: SECTION_TITLE_SIZE, style: :bold) + SECTION_GAP
   end
 
   def draw_heading(label, colour: nil)
-    height = heading_height(label) - SECTION_GAP
-    accent = colour || INK
-    @pdf.stroke_color(accent)
-    @pdf.line_width(1.8)
-    @pdf.stroke_rounded_rectangle([0, @cursor], @width, height, SECTION_MIN_HEIGHT / 2.0)
-    @pdf.fill_color(accent)
-    @pdf.text_box(label, at: [SECTION_INSET, @cursor], width: @width - 2 * SECTION_INSET,
-      height: height, size: SECTION_TITLE_SIZE, style: :bold, valign: :center)
+    inset = colour ? SECTION_INSET : 0
+    height = heading_height(label, inset: inset)
+    @section_top = @cursor if colour
+    @pdf.fill_color(colour || INK)
+    @pdf.text_box(label, at: [inset, @cursor], width: @width - inset,
+      height: height - SECTION_GAP, size: SECTION_TITLE_SIZE, style: :bold)
     @pdf.fill_color(INK)
-    @cursor -= height + SECTION_GAP
+    @cursor -= height
+  end
+
+  def finish_section_line
+    return unless @section_top
+
+    # The row cursor includes a trailing gap after the bottom of the last card.
+    height = @section_top - (@cursor + GAP)
+    @pdf.save_graphics_state do
+      @pdf.fill_color(@section_colour)
+      @pdf.fill_rounded_rectangle([0, @section_top], SECTION_LINE_WIDTH, height, SECTION_LINE_WIDTH / 2)
+    end
+    @section_top = nil
   end
 
   def draw_next_row(remaining)
@@ -228,16 +239,16 @@ class FlyerPdf
     if second && first_narrow <= available && second_narrow <= available
       record_category_page(first)
       record_category_page(second)
-      draw_card(first, 0, @cursor, @column_width)
-      draw_card(second, @column_width + GUTTER, @cursor, @column_width)
+      draw_card(first, @section_left, @cursor, @column_width)
+      draw_card(second, @section_left + @column_width + GUTTER, @cursor, @column_width)
       @cursor -= [first_narrow, second_narrow].max + GAP
       remaining.shift(2)
     else
-      wide_height = measurement(first, @width).height
+      wide_height = measurement(first, @section_width).height
       raise "Unable to place a resource card" if wide_height > available
 
       record_category_page(first)
-      draw_card(first, 0, @cursor, @width)
+      draw_card(first, @section_left, @cursor, @section_width)
       @cursor -= wide_height + GAP
       remaining.shift
     end
@@ -246,13 +257,16 @@ class FlyerPdf
   def render_section(section)
     @active_section = section
     @section_colour = flat_section?(section) ? nil : @category_palette.colour_for(section.name)
+    @section_left = @section_colour ? SECTION_INSET : 0
+    @section_width = @width - @section_left
+    @column_width = (@section_width - GUTTER) / 2
     remaining = section.resources.map { |service| entry_for(service) }
     continued = false
     heading_pending = true
     while remaining.any?
       label = section.name + (continued ? " continued" : "")
-      available = @cursor - BOTTOM - (heading_pending ? heading_height(label) : 0)
-      unless measurement(remaining.first, @width).height <= available
+      available = @cursor - BOTTOM - (heading_pending ? heading_height(label, inset: @section_left) : 0)
+      unless measurement(remaining.first, @section_width).height <= available
         if @cursor == @page_top
           draw_heading(label, colour: @section_colour) if heading_pending
           render_oversized(remaining.shift, section.name)
@@ -271,6 +285,7 @@ class FlyerPdf
       draw_next_row(remaining)
       continued = true
     end
+    finish_section_line
     @cursor -= 8
   end
 
@@ -304,16 +319,17 @@ class FlyerPdf
     part = 0
     while remaining.any?
       title = entry.heading + (part.positive? ? " continued" : "")
-      header = @pdf.height_of(title, width: @width - 2 * PADDING, size: TITLE_SIZE, style: :bold, leading: 2) + 16
+      inner_width = @section_width - 2 * PADDING
+      header = @pdf.height_of(title, width: inner_width, size: TITLE_SIZE, style: :bold, leading: 2) + 16
       available = @cursor - BOTTOM - header - 2 * PADDING
-      options = {at: [PADDING, @cursor - header - PADDING], width: @width - 2 * PADDING,
+      options = {at: [@section_left + PADDING, @cursor - header - PADDING], width: inner_width,
                  height: available, leading: 2, document: @pdf}
       box = Prawn::Text::Formatted::Box.new(remaining.map(&:dup), options)
       leftover = box.render(dry_run: true)
       raise "An oversized resource field could not be laid out" if box.height.zero? || leftover == remaining
       record_category_page(entry)
       height = header + 2 * PADDING + box.height
-      frame(title, 0, @cursor, @width, height, header)
+      frame(title, @section_left, @cursor, @section_width, height, header)
       @pdf.formatted_text_box(remaining.map(&:dup), options.except(:document))
       @cursor -= height + GAP
       remaining = leftover

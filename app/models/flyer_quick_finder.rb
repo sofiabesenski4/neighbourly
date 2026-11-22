@@ -137,20 +137,21 @@ class FlyerQuickFinder
         top -= PARENT_ROW_HEIGHT
       end
       group.categories.each do |name|
-        top = draw_row(name, printed_pages.fetch(name), x, top, width, child: name != group.parent_name)
+        top = draw_row(name, printed_pages.fetch(name), x, top, width,
+          colour: group.colour, child: name != group.parent_name)
       end
     end
     top
   end
 
-  def draw_row(name, pages, x, top, width, child:)
+  def draw_row(name, pages, x, top, width, colour:, child:)
     reference = page_reference(pages)
     reference = "Page #{pages.first}" if @pdf.width_of(reference, size: 8.25, style: :bold) > width / 2
     reference_width = @pdf.width_of(reference, size: 8.25, style: :bold) + 2
     reference_left = x + width - reference_width
 
     draw_category_name(name, x, top, reference_left - x - 10, child: child)
-    @pdf.formatted_text_box([{text: reference, styles: [:bold], anchor: destination(pages.first), color: LINK_COLOUR}],
+    @pdf.formatted_text_box([{text: reference, styles: [:bold], anchor: destination(pages.first), color: colour}],
       at: [reference_left, top - 8], width: reference_width, height: 12, size: 8.25, align: :right)
     @pdf.stroke_color("DFE4DC")
     @pdf.line_width(0.5)

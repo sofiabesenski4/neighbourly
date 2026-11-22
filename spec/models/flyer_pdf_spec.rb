@@ -134,10 +134,11 @@ RSpec.describe FlyerPdf do
     content = reader.pages.fetch(2).raw_content
 
     expect(content).to match(/11\.5\s+Tf/)
-    expect(pdf).to have_received(:stroke_rounded_rectangle).with(anything, be_within(0.1).of(525.6), anything, described_class::CARD_RADIUS)
+    width = 525.6 - described_class::SECTION_INSET
+    expect(pdf).to have_received(:stroke_rounded_rectangle).with(anything, be_within(0.1).of(width), anything, described_class::CARD_RADIUS)
   end
 
-  it "repeats parent colours on category headings and keeps resource card borders black" do
+  it "matches category titles to their lines and keeps rounded borders on resource cards" do
     parents = 1.upto(7).map { |number| Category.create!(name: "Palette group #{number}") }
     child = Category.create!(name: "Palette child", parent: parents.first)
     sections = [parents.first, child, *parents.drop(1)].map do |category|
@@ -145,24 +146,36 @@ RSpec.describe FlyerPdf do
     end
     renderer = described_class.new(sections: sections)
     pdf = renderer.instance_variable_get(:@pdf)
-    outlines = Hash.new { |by_radius, radius| by_radius[radius] = [] }
+    outlines = []
+    line_colours = []
     palette = FlyerCategoryPalette::COLOURS
     title_colours = []
+    reference_colours = []
     allow(pdf).to receive(:stroke_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
-      outlines[radius] << pdf.stroke_color
+      outlines << [radius, pdf.stroke_color] if pdf.page_number >= 3
+      draw.call(corner, width, height, radius)
+    end
+    allow(pdf).to receive(:fill_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
+      line_colours << pdf.fill_color if width == described_class::SECTION_LINE_WIDTH
       draw.call(corner, width, height, radius)
     end
     allow(pdf).to receive(:text_box).and_wrap_original do |draw, text, options = {}|
       title_colours << pdf.fill_color if options[:size] == described_class::SECTION_TITLE_SIZE
       draw.call(text, options)
     end
+    allow(pdf).to receive(:formatted_text_box).and_wrap_original do |draw, fragments, options = {}|
+      reference = fragments.find { |fragment| fragment[:anchor] }
+      reference_colours << reference.fetch(:color) if reference
+      draw.call(fragments, options)
+    end
 
     renderer.render
 
     expected = [palette.first, *palette, palette.first, "000000"]
     expect(title_colours).to eq(expected)
-    expect(outlines.fetch(described_class::SECTION_MIN_HEIGHT / 2.0)).to eq(expected)
-    expect(outlines.fetch(described_class::CARD_RADIUS)).to eq(["000000"] * sections.size)
+    expect(line_colours).to eq(expected.take(sections.size))
+    expect(reference_colours).to eq(line_colours)
+    expect(outlines).to eq([[described_class::CARD_RADIUS, "000000"]] * sections.size)
   end
 
   it "prints differently sized cards alphabetically across aligned rows" do
@@ -187,7 +200,9 @@ RSpec.describe FlyerPdf do
     expect(placements[0][:top]).to eq(placements[1][:top])
     expect(placements[2][:top]).to eq(placements[3][:top])
     expect(placements[0][:top]).to be > placements[2][:top]
-    expect(placements.map { |placement| placement[:x] }).to eq([0, renderer.instance_variable_get(:@column_width) + described_class::GUTTER] * 2)
+    left = described_class::SECTION_INSET
+    right = left + renderer.instance_variable_get(:@column_width) + described_class::GUTTER
+    expect(placements.map { |placement| placement[:x] }).to eq([left, right] * 2)
     first_mentions = titles.map { |title| reader.pages.fetch(2).text.index(title) }
     expect(first_mentions).to all(be_present)
     expect(first_mentions).to eq(first_mentions.sort)
@@ -200,6 +215,12 @@ RSpec.describe FlyerPdf do
     }
     section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
     renderer = described_class.new(sections: [section])
+    pdf = renderer.instance_variable_get(:@pdf)
+    line_pages = []
+    allow(pdf).to receive(:fill_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
+      line_pages << pdf.page_number if width == described_class::SECTION_LINE_WIDTH
+      draw.call(corner, width, height, radius)
+    end
     printed_titles = []
     allow(renderer).to receive(:draw_card).and_wrap_original do |draw, entry, x, top, width|
       printed_titles << entry.title
@@ -209,6 +230,7 @@ RSpec.describe FlyerPdf do
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
     expect(reader.page_count).to be > 4
+    expect(line_pages).to eq((3...reader.page_count).to_a)
     expect(reader.pages.fetch(1).text).to include("Pages 3–#{reader.page_count - 1}")
     expect(printed_titles).to eq(titles)
     text = reader.pages.map(&:text).join("\n")
