@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_20_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -63,7 +63,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
     t.string "name", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "parent_id"
     t.index ["name"], name: "index_categories_on_name", unique: true
+    t.index ["parent_id"], name: "index_categories_on_parent_id"
   end
 
   create_table "categories_documents", id: false, force: :cascade do |t|
@@ -467,6 +469,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_18_000400) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "categories", "categories", column: "parent_id", on_delete: :nullify
   add_foreign_key "categories_documents", "categories", on_delete: :cascade
   add_foreign_key "categories_documents", "documents", on_delete: :cascade
   add_foreign_key "categories_services", "categories", on_delete: :cascade

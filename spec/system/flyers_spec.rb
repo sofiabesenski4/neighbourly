@@ -5,16 +5,22 @@ RSpec.describe "Flyers", type: :system do
   let!(:food) { Category.create!(name: "Meals") }
   let!(:shelter) { Category.create!(name: "Shelters") }
   let!(:harm_reduction) { Category.create!(name: "Harm Reduction Resources") }
+  let(:site_url) { URI.join(page.current_url, root_path).to_s }
 
   before do
     driven_by(:rack_test)
   end
 
   it "lets a visitor choose categories and request a flyer from the home page" do
-    expect(FlyerGenerator).to receive(:call).with(categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s), origin: nil).and_return(nil)
-
     visit root_path
     click_link "Create printout"
+
+    expect(FlyerGenerator).to receive(:call).with(
+      categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s),
+      origin: nil,
+      detail_level: "summary",
+      site_url: site_url
+    ).and_return(nil)
 
     check "Meals"
     check "Harm Reduction Resources"
@@ -24,11 +30,17 @@ RSpec.describe "Flyers", type: :system do
   end
 
   it "lets a visitor print the complete guide without selecting filters" do
-    expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all-resources")
-
     visit new_flyer_path
     expect(page).not_to have_checked_field("Meals")
     expect(page).not_to have_checked_field("Shelters")
+
+    expect(FlyerGenerator).to receive(:call).with(
+      categories: [],
+      origin: nil,
+      detail_level: "summary",
+      site_url: site_url
+    ).and_return("%PDF-all-resources")
+
     click_button "Generate printout"
 
     expect(page.response_headers["Content-Type"]).to include("application/pdf")
@@ -44,6 +56,7 @@ RSpec.describe "Flyers", type: :system do
 
     visit new_flyer_path
     fill_in "Enter a place", with: "Douglas St and Yates St"
+    check "Include extra details in printout"
     click_button "Generate printout"
 
     text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")

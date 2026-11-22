@@ -141,6 +141,19 @@ These all run in pre-commit hooks, which `yarn install` should set up. If they a
 - lint-scss for SCSS files
 - herb for ERB analysis
 
+### Questionnaire handoff to printout
+
+The questionnaire's final form can POST to `from_questionnaire_flyers_path`
+(`/printout/from-questionnaire`). Use a regular Rails form with CSRF protection
+and `data-turbo="false"`. Pass the answers that narrow the resource list as
+`flyer[categories][]` (category IDs) and, when relevant, `flyer[query]` (a
+keyword to match against the saved service information). If a location has
+already been resolved, pass both `flyer[lat]` and `flyer[lng]`. The
+`flyer[sort]` option can use `distance` when coordinates are present.
+
+The form response opens the preview directly with these filters applied.
+Each field is optional. The preview and PDF generation use the same filters.
+
 ## Testing
 
 We use RSpec on this project.

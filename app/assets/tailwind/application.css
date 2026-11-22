@@ -39,6 +39,21 @@
 }
 
 @layer components {
+  .flyer-category-marker {
+    @apply pointer-events-none absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-full;
+  }
+
+  .flyer-category-group {
+    @apply relative pl-4;
+  }
+
+  .flyer-category-group::before {
+    @apply pointer-events-none absolute inset-y-0 left-0 rounded-full;
+    width: 3px;
+    background-color: var(--flyer-category-colour);
+    content: "";
+  }
+
   .admin-panel {
     @apply min-w-0 rounded-2xl border border-stone-200 bg-white shadow-sm;
   }

@@ -56,14 +56,14 @@ RSpec.describe FlyerPdf do
       expect(text).not_to include("Distance")
     end
 
-    it "only prints the note on the first page" do
+    it "only prints the note on the first resource page" do
       resources = (1..24).map { |number| resource(title: "Resource #{number}", lat: 48.43, lng: -123.36, notes: "Details. " * 60) }
       section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
       reader = PDF::Reader.new(StringIO.new(described_class.new(sections: [section], origin: located).render))
 
-      expect(reader.page_count).to be > 2
-      expect(reader.pages.first.text.gsub(/\s+/, " ")).to include("Distances are from")
-      expect(reader.pages[1].text).not_to include("Distances are from")
+      expect(reader.page_count).to be > 4
+      expect(reader.pages.fetch(2).text.gsub(/\s+/, " ")).to include("Distances are from")
+      expect(reader.pages.fetch(3).text).not_to include("Distances are from")
     end
   end
 
@@ -94,11 +94,20 @@ RSpec.describe FlyerPdf do
     end
   end
 
-  it "ends the guide with a map page" do
+  it "prints Start Here, a linked Quick finder, the listings, then the map" do
     reader = reader_for([resource(lat: 48.4265, lng: -123.3656)])
 
-    expect(reader.pages.last.text).to include("Map", "© OpenMapTiles © OpenStreetMap contributors")
-    expect(reader.pages.first.text).not_to include("OpenStreetMap")
+    expect(reader.page_count).to eq(4)
+    expect(reader.pages.drop(1).map { |page| page.text.gsub(/\s+/, "") }).to all(include("NEIGHBOURLYRESOURCEGUIDE"))
+    expect(reader.pages.first.raw_content).to match(%r{/I\d+\s+Do})
+    finder = reader.pages.fetch(1)
+    expect(finder.text).to include("Quick finder", "Food", "Page 3", "My notes", "Page 2 of 4")
+    expect(finder.text.scan(/Quick finder|Food|Made with Neighbourly|My notes/))
+      .to eq(["Quick finder", "Food", "Made with Neighbourly", "My notes"])
+    links = finder.attributes.fetch(:Annots).map { |annotation| reader.objects.deref(annotation) }
+    expect(links).to include(a_hash_including(Subtype: :Link, Dest: "service-page-3"))
+    expect(reader.pages.fetch(2).text).to include("Meal program", "Page 3")
+    expect(reader.pages.last.text).to include("Map", "© OpenMapTiles © OpenStreetMap contributors", "Page 4")
   end
 
   it "creates a real readable PDF with the print date and missing fields omitted" do
@@ -115,13 +124,58 @@ RSpec.describe FlyerPdf do
     expect(text).to include("Café", "Привет", "Children’s meals")
   end
 
-  it "keeps the body size and uses full width for a final single card" do
-    reader = reader_for([resource(notes: "A short note")])
-    content = reader.pages.first.raw_content
+  it "keeps the body size and rounds the full-width frame of a final single card" do
+    section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: [resource(notes: "A short note")])
+    renderer = described_class.new(sections: [section])
+    pdf = renderer.instance_variable_get(:@pdf)
+    allow(pdf).to receive(:stroke_rounded_rectangle).and_call_original
+
+    reader = PDF::Reader.new(StringIO.new(renderer.render))
+    content = reader.pages.fetch(2).raw_content
 
     expect(content).to match(/11\.5\s+Tf/)
-    widths = content.scan(/[-\d.]+\s+[-\d.]+\s+([\d.]+)\s+[-\d.]+\s+re/).flatten.map(&:to_f)
-    expect(widths.any? { |width| (width - 525.6).abs < 0.1 }).to be(true)
+    width = 525.6 - described_class::SECTION_INSET
+    expect(pdf).to have_received(:stroke_rounded_rectangle).with(anything, be_within(0.1).of(width), anything, described_class::CARD_RADIUS)
+  end
+
+  it "matches category titles to their lines and keeps rounded borders on resource cards" do
+    parents = 1.upto(7).map { |number| Category.create!(name: "Palette group #{number}") }
+    child = Category.create!(name: "Palette child", parent: parents.first)
+    sections = [parents.first, child, *parents.drop(1)].map do |category|
+      CategorySearch::Section.new(category: category, resources: [resource(title: category.name)])
+    end
+    renderer = described_class.new(sections: sections)
+    pdf = renderer.instance_variable_get(:@pdf)
+    outlines = []
+    line_colours = []
+    palette = FlyerCategoryPalette::COLOURS
+    title_colours = []
+    reference_colours = []
+    allow(pdf).to receive(:stroke_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
+      outlines << [radius, pdf.stroke_color] if pdf.page_number >= 3
+      draw.call(corner, width, height, radius)
+    end
+    allow(pdf).to receive(:fill_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
+      line_colours << pdf.fill_color if width == described_class::SECTION_LINE_WIDTH
+      draw.call(corner, width, height, radius)
+    end
+    allow(pdf).to receive(:text_box).and_wrap_original do |draw, text, options = {}|
+      title_colours << pdf.fill_color if options[:size] == described_class::SECTION_TITLE_SIZE
+      draw.call(text, options)
+    end
+    allow(pdf).to receive(:formatted_text_box).and_wrap_original do |draw, fragments, options = {}|
+      reference = fragments.find { |fragment| fragment[:anchor] }
+      reference_colours << reference.fetch(:color) if reference
+      draw.call(fragments, options)
+    end
+
+    renderer.render
+
+    expected = [palette.first, *palette, palette.first, "000000"]
+    expect(title_colours).to eq(expected)
+    expect(line_colours).to eq(expected.take(sections.size))
+    expect(reference_colours).to eq(line_colours)
+    expect(outlines).to eq([[described_class::CARD_RADIUS, "000000"]] * sections.size)
   end
 
   it "prints differently sized cards alphabetically across aligned rows" do
@@ -140,14 +194,16 @@ RSpec.describe FlyerPdf do
 
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
-    expect(reader.page_count).to eq(2) # the cards, then the map
+    expect(reader.page_count).to eq(4) # the cover, the finder, the cards, then the map
     expect(placements.map { |placement| placement[:title] }).to eq(titles)
-    expect(placements.map { |placement| placement[:page] }).to eq([1, 1, 1, 1])
+    expect(placements.map { |placement| placement[:page] }).to eq([3, 3, 3, 3])
     expect(placements[0][:top]).to eq(placements[1][:top])
     expect(placements[2][:top]).to eq(placements[3][:top])
     expect(placements[0][:top]).to be > placements[2][:top]
-    expect(placements.map { |placement| placement[:x] }).to eq([0, renderer.instance_variable_get(:@column_width) + described_class::GUTTER] * 2)
-    first_mentions = titles.map { |title| reader.pages.first.text.index(title) }
+    left = described_class::SECTION_INSET
+    right = left + renderer.instance_variable_get(:@column_width) + described_class::GUTTER
+    expect(placements.map { |placement| placement[:x] }).to eq([left, right] * 2)
+    first_mentions = titles.map { |title| reader.pages.fetch(2).text.index(title) }
     expect(first_mentions).to all(be_present)
     expect(first_mentions).to eq(first_mentions.sort)
   end
@@ -159,6 +215,12 @@ RSpec.describe FlyerPdf do
     }
     section = CategorySearch::Section.new(category: Category.new(name: "Food"), resources: resources)
     renderer = described_class.new(sections: [section])
+    pdf = renderer.instance_variable_get(:@pdf)
+    line_pages = []
+    allow(pdf).to receive(:fill_rounded_rectangle).and_wrap_original do |draw, corner, width, height, radius|
+      line_pages << pdf.page_number if width == described_class::SECTION_LINE_WIDTH
+      draw.call(corner, width, height, radius)
+    end
     printed_titles = []
     allow(renderer).to receive(:draw_card).and_wrap_original do |draw, entry, x, top, width|
       printed_titles << entry.title
@@ -167,7 +229,9 @@ RSpec.describe FlyerPdf do
 
     reader = PDF::Reader.new(StringIO.new(renderer.render))
 
-    expect(reader.page_count).to be > 2 # more than one page of cards, then the map
+    expect(reader.page_count).to be > 4
+    expect(line_pages).to eq((3...reader.page_count).to_a)
+    expect(reader.pages.fetch(1).text).to include("Pages 3–#{reader.page_count - 1}")
     expect(printed_titles).to eq(titles)
     text = reader.pages.map(&:text).join("\n")
     first_mentions = titles.map { |title| text.index(title) }
@@ -200,7 +264,8 @@ RSpec.describe FlyerPdf do
     reader = reader_for([resource(notes: words.join(" "), intake_info: "Walk in")])
     text = reader.pages.map(&:text).join("\n")
 
-    expect(reader.page_count).to be > 2 # more than one page of cards, then the map
+    expect(reader.page_count).to be > 4
+    expect(reader.pages.fetch(1).text).to include("Pages 3–#{reader.page_count - 1}")
     expect(text).to include("continued")
     expect(text.scan(/step\d{5}/)).to eq(words)
     expect(reader.pages[-2].text).to include("Intake:", "Walk in")
@@ -223,6 +288,6 @@ RSpec.describe FlyerPdf do
     bytes = described_class.new(sections: sections).render
     text = PDF::Reader.new(StringIO.new(bytes)).pages.map(&:text).join("\n")
 
-    expect(text.scan(/^Health(?: continued)?$/).first).to eq("Health")
+    expect(text.lines.map(&:strip).grep(/\AHealth(?: continued)?\z/).first).to eq("Health")
   end
 end

@@ -7,6 +7,7 @@ export default class extends Controller {
   static targets = [
     "form",
     "category",
+    "categoryMarker",
     "toolbar",
     "sidebar",
     "desktopSearch",
@@ -21,6 +22,7 @@ export default class extends Controller {
     "draftSort",
     "clearSearchOrder",
     "cards",
+    "includeResource",
     "count",
     "status",
     "generate",
@@ -47,32 +49,48 @@ export default class extends Controller {
     "locationSummary",
     "subtitle",
   ];
-  static values = { previewUrl: String, locateUrl: String };
+  static values = {
+    previewUrl: String,
+    locateUrl: String,
+    summaryLabels: Array,
+    fromQuestionnaire: Boolean,
+  };
 
   connect() {
     this.revision = (this.revision || 0) + 1;
     this.hasResults = false;
     this.generating = false;
+    this.excludedServiceIds = new Set();
     this.locationRequest = 0;
-    // Browsers can restore a page's old field values, but not which screen it was on.
-    // Starting clean on the first screen means a location is never used invisibly.
-    this.forgetLocationChoice();
+    if (!this.fromQuestionnaireValue) this.forgetLocationChoice();
     const supported = Boolean(navigator.geolocation);
     this.useLocationTarget.hidden = !supported;
     this.locationNoteTarget.hidden = !supported;
     this.confirmPlaceButtonTarget.hidden = false;
     this.skipLocationTarget.hidden = false;
-    this.showLocationStep();
-    // The guide loads behind the first screen, so it's ready when the person moves on.
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
-    this.updateFilterControls();
-    this.refresh();
+    if (this.fromQuestionnaireValue) {
+      this.showBuilderStep(
+        this.latTarget.value
+          ? "Distances from the location you provided."
+          : "Distances won't be shown on your printout.",
+      );
+    } else {
+      this.showLocationStep();
+      // Load the guide behind the location screen so it's ready when the person continues.
+      this.updateFilterControls();
+      this.refresh();
+    }
   }
 
   disconnect() {
     this.beforeCache();
+  }
+
+  categoryMarkerTargetConnected(marker) {
+    marker.style.backgroundColor = `#${marker.dataset.categoryColour}`;
   }
 
   beforeCache() {
@@ -286,16 +304,14 @@ export default class extends Controller {
     this.locationStatusTarget.hidden = false;
   }
 
-  // With a location chosen, the preview needs it to show the same distances as the
-  // printout. It goes in a POST body rather than the URL, because web server logs
-  // record URLs, and this may be someone's home. Categories have to go in the body with
-  // it: Rails doesn't combine a `flyer` from the URL with one from the body, it keeps
-  // only the URL's, which would lose the location.
+  // Keep questionnaire answers and locations in the POST body so they stay out
+  // of URLs. Rails takes the complete flyer input from either the URL or the body.
   previewRequestOptions(categories, url) {
     const headers = { Accept: "application/json" };
     const query = this.searchTarget.value.trim();
     const sort = this.sortTarget.value;
-    if (!this.hasLatTarget || !this.latTarget.value) {
+    const hasLocation = this.hasLatTarget && this.latTarget.value;
+    if (!this.fromQuestionnaireValue && !hasLocation) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
@@ -308,8 +324,10 @@ export default class extends Controller {
     categories.forEach((key) => body.append("flyer[categories][]", key));
     if (query) body.append("flyer[query]", query);
     if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
-    body.append("flyer[lat]", this.latTarget.value);
-    body.append("flyer[lng]", this.lngTarget.value);
+    if (hasLocation) {
+      body.append("flyer[lat]", this.latTarget.value);
+      body.append("flyer[lng]", this.lngTarget.value);
+    }
     return {
       method: "POST",
       body,
@@ -491,15 +509,20 @@ export default class extends Controller {
   render(categories) {
     const fragment = document.createDocumentFragment();
     const ids = new Set();
-    let total = 0;
     categories.forEach((category) => {
       if (category.resources.length === 0) return;
       const section = document.createElement("section");
-      section.className = "mt-4 first:mt-0 sm:mt-7";
+      section.className = "mt-7 first:mt-0 sm:mt-9";
       const heading = document.createElement("h3");
       heading.className =
-        "mb-1.5 text-sm font-semibold text-sage-700 sm:mb-3 sm:text-lg sm:text-stone-900";
+        "mb-2 text-sm font-semibold text-stone-900 sm:mb-3 sm:text-lg";
       heading.textContent = category.name;
+      if (category.colour) {
+        const colour = `#${category.colour}`;
+        section.className += " flyer-category-group";
+        section.style.setProperty("--flyer-category-colour", colour);
+        heading.style.color = colour;
+      }
       const count = document.createElement("span");
       count.className =
         "ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm";
@@ -510,14 +533,13 @@ export default class extends Controller {
       grid.className =
         "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
       category.resources.forEach((resource) => {
-        ids.add(resource.id);
-        total += 1;
+        ids.add(String(resource.id));
         grid.append(this.card(resource));
       });
       section.append(grid);
       fragment.append(section);
     });
-    if (total === 0) {
+    if (ids.size === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className =
@@ -532,11 +554,38 @@ export default class extends Controller {
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    this.countTarget.textContent = `${ids.size} ${ids.size === 1 ? "resource" : "resources"} included`;
-    this.hasResults = total > 0;
+    this.resourceIds = ids;
     this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
-    this.generateTarget.disabled = !this.hasResults || this.generating;
+    this.updateIncludedResources();
+  }
+
+  selectedServiceIds() {
+    return [...this.resourceIds].filter(
+      (id) => !this.excludedServiceIds.has(id),
+    );
+  }
+
+  toggleResource(event) {
+    const { value, checked } = event.currentTarget;
+    if (checked) this.excludedServiceIds.delete(value);
+    else this.excludedServiceIds.add(value);
+    this.includeResourceTargets.forEach((input) => {
+      if (input.value === value) input.checked = checked;
+    });
+    this.discardPrintout();
+    this.updateIncludedResources();
+  }
+
+  updateIncludedResources() {
+    const count = this.selectedServiceIds().length;
+    this.countTarget.textContent = `${count} ${count === 1 ? "resource" : "resources"} included`;
+    this.hasResults = count > 0;
+    this.generateTarget.disabled =
+      !this.hasResults ||
+      this.generating ||
+      this.cardsTarget.getAttribute("aria-busy") === "true" ||
+      !this.previewErrorTarget.hidden;
   }
 
   card(resource) {
@@ -545,12 +594,63 @@ export default class extends Controller {
       "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
     const title = document.createElement("h4");
     title.className =
-      "px-3 pt-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:py-[13px] sm:text-base";
+      "min-w-0 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
     title.textContent = resource.title;
-    const details = document.createElement("dl");
-    details.className =
-      "grid gap-1 px-3 pt-1.5 pb-3 text-[0.8125rem] sm:gap-[9px] sm:px-4 sm:pt-[14px] sm:pb-4 sm:text-base";
-    resource.fields.forEach((field) => {
+    const header = document.createElement("header");
+    header.className =
+      "flex items-center justify-between gap-2 px-3 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4";
+    const inclusion = document.createElement("label");
+    inclusion.className =
+      "flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 text-sm";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = String(resource.id);
+    checkbox.checked = !this.excludedServiceIds.has(checkbox.value);
+    checkbox.className = "size-4 accent-sage-700";
+    checkbox.setAttribute(
+      "aria-label",
+      `Include ${resource.title} in printout`,
+    );
+    checkbox.dataset.flyerBuilderTarget = "includeResource";
+    checkbox.dataset.action = "change->flyer-builder#toggleResource";
+    inclusion.append(checkbox, "Include");
+    header.append(title, inclusion);
+    const summaryFields = resource.fields.filter((field) =>
+      this.summaryLabelsValue.includes(field.label),
+    );
+    const detailFields = resource.fields.filter(
+      (field) => !this.summaryLabelsValue.includes(field.label),
+    );
+    article.append(header);
+    if (summaryFields.length) {
+      const summary = this.fieldList(summaryFields);
+      summary.className += " px-3 pt-2 sm:px-4";
+      article.append(summary);
+    }
+
+    const disclosure = document.createElement("details");
+    disclosure.className = "px-3 pb-2 sm:px-4";
+    const toggle = document.createElement("summary");
+    toggle.className =
+      "min-h-11 cursor-pointer py-3 text-sm font-medium text-sage-700 focus-visible:outline-sage-600";
+    toggle.textContent = "See details";
+    disclosure.append(toggle);
+    if (detailFields.length) {
+      disclosure.append(this.fieldList(detailFields));
+    } else {
+      const empty = document.createElement("p");
+      empty.className = "text-sm text-stone-600";
+      empty.textContent = "No additional details available.";
+      disclosure.append(empty);
+    }
+    article.append(disclosure);
+    return article;
+  }
+
+  fieldList(fields) {
+    const list = document.createElement("dl");
+    list.className = "grid gap-1 text-sm";
+    fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "[overflow-wrap:anywhere]";
       const label = document.createElement("dt");
@@ -560,10 +660,9 @@ export default class extends Controller {
       value.className = "m-0 inline whitespace-pre-line";
       value.textContent = field.value;
       row.append(label, value);
-      details.append(row);
+      list.append(row);
     });
-    article.append(title, details);
-    return article;
+    return list;
   }
 
   async generate(event) {
@@ -577,6 +676,10 @@ export default class extends Controller {
     this.generateLabelTarget.textContent = "Preparing printout…";
     this.printRequest = new AbortController();
     const { signal } = this.printRequest;
+    const body = new FormData(this.formTarget);
+    this.selectedServiceIds().forEach((id) =>
+      body.append("flyer[service_ids][]", id),
+    );
     // Open from the click, before the asynchronous PDF request can lose user activation.
     const tab = window.open("about:blank", "_blank");
     this.pendingPrintoutTab = tab;
@@ -594,7 +697,7 @@ export default class extends Controller {
             document.querySelector('meta[name="csrf-token"]')?.content || "",
         },
         credentials: "same-origin",
-        body: new FormData(this.formTarget),
+        body,
         signal,
       });
       if (
@@ -628,14 +731,14 @@ export default class extends Controller {
         this.pdfLinkTarget.focus();
       }
     } catch (error) {
-      if (error.name === "AbortError" || revision !== this.revision) return;
+      if (signal.aborted || revision !== this.revision) return;
       this.printErrorTarget.textContent = error.message;
       this.printErrorTarget.hidden = false;
     } finally {
       if (this.pendingPrintoutTab === tab) this.closePreparingTab();
       if (revision === this.revision) {
         this.generating = false;
-        this.generateTarget.disabled = !this.hasResults;
+        this.updateIncludedResources();
         this.generateLabelTarget.textContent = "Generate printout";
       }
     }

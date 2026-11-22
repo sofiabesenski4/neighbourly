@@ -2,6 +2,7 @@ class FlyersController < ApplicationController
   # The printout opens in its own tab rather than in a frame on this page, so this
   # screen keeps the app-wide policy that blocks all embedded content.
 
+  before_action :prevent_preview_caching, only: [:from_questionnaire, :preview], if: -> { request.post? }
   before_action :reject_malformed_selection
 
   # Flyers are open to anonymous users so outreach workers and neighbours can
@@ -26,10 +27,25 @@ class FlyersController < ApplicationController
     only: :preview, if: -> { request.format.json? }
 
   def new
-    @flyer = Flyer.new(flyer_params)
+    @flyer = Flyer.new({detail_level: "summary"}.merge(flyer_params.to_h.symbolize_keys))
     return if @flyer.valid?
 
     render :new, status: :unprocessable_content
+  end
+
+  def from_questionnaire
+    @flyer = Flyer.new(flyer_params.slice(:categories, :query, :sort, :lat, :lng).merge(detail_level: "summary"))
+    unless @flyer.valid?
+      render :new, status: :unprocessable_content
+      return
+    end
+
+    if (point = @flyer.coordinates)
+      @flyer.lat = point.lat
+      @flyer.lng = point.lng
+    end
+    @from_questionnaire = true
+    render :new
   end
 
   def preview
@@ -53,8 +69,11 @@ class FlyersController < ApplicationController
     @sections = CategorySearch.call(**@flyer.filters, origin: origin)
     respond_to do |format|
       format.json do
+        palette = FlyerCategoryPalette.new(@sections.reject(&:label).map(&:name))
         render json: {categories: @sections.map { |section|
+          colour = section.label ? nil : palette.colour_for(section.name)
           {key: section.category&.id&.to_s, name: section.name,
+           colour: colour,
            resources: section.resources.map { |resource| ResourceCard.new(resource, origin: origin).as_json }}
         }}
       end
@@ -108,12 +127,16 @@ class FlyersController < ApplicationController
       return
     end
 
-    pdf = FlyerGenerator.call(**@flyer.filters, origin: origin)
+    filters = @flyer.filters
+    filters[:service_ids] = @flyer.service_ids if @flyer.service_ids
+    pdf = FlyerGenerator.call(**filters, origin: origin, detail_level: @flyer.detail_level, site_url: root_url)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
     else
-      message = if @flyer.query.present?
+      message = if @flyer.service_ids
+        "None of the selected resources are available to print. Refresh the preview and choose again."
+      elsif @flyer.query.present?
         "No resources match your search."
       elsif @flyer.categories.empty?
         "No resources are available to print."
@@ -137,6 +160,10 @@ class FlyersController < ApplicationController
   end
 
   private
+
+  def prevent_preview_caching
+    response.set_header("Cache-Control", "no-store")
+  end
 
   # Landmarks like "Central Library" and shorthand like "Douglas & Yates" don't get a
   # trustworthy match from the geocoder, so this shows the forms that do work.
@@ -173,20 +200,25 @@ class FlyersController < ApplicationController
 
     input = params[:flyer]
     supported = input.is_a?(ActionController::Parameters)
-    unexpected = supported ? input.keys - %w[categories query sort near lat lng] : []
-    categories = input[:categories] if supported
-    valid_categories = categories.nil? || (categories.is_a?(Array) && categories.all?(String))
-    invalid_fields = supported ? %w[query sort near lat lng].select { |field| input.key?(field) && !input[field].is_a?(String) } : []
-    return if supported && unexpected.empty? && valid_categories && invalid_fields.empty?
-
     @flyer = Flyer.new
-    if unexpected.any?
-      @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}")
-    elsif invalid_fields.any?
-      invalid_fields.each { |field| @flyer.errors.add(field, "must be text") }
+    if supported
+      list_fields = %w[categories service_ids]
+      text_fields = %w[query sort near lat lng detail_level]
+      unexpected = input.keys - list_fields - text_fields
+      @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}") if unexpected.any?
+      input.slice(*text_fields).each do |field, value|
+        @flyer.errors.add(field, "must be text") unless value.is_a?(String)
+      end
+      input.slice(*list_fields).each do |field, value|
+        if !value.nil? && !(value.is_a?(Array) && value.all?(String))
+          @flyer.errors.add(field, "must be provided as a list")
+        end
+      end
     else
       @flyer.errors.add(:categories, "must be provided as a list")
     end
+    return if @flyer.errors.empty?
+
     if request.format.json? || request.format.pdf?
       render json: {errors: @flyer.errors.full_messages}, status: :unprocessable_content
     else
@@ -196,6 +228,6 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, categories: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, :detail_level, categories: [], service_ids: []) : {}
   end
 end

@@ -1,5 +1,6 @@
 require "rails_helper"
 require "pdf/reader"
+require "rqrcode_core"
 
 RSpec.describe "Flyers", type: :request do
   let!(:food) { Category.create!(name: "Meals") }
@@ -75,9 +76,96 @@ RSpec.describe "Flyers", type: :request do
     end
   end
 
+  it "marks parent categories and nests their children in both filter controls" do
+    parent = Category.create!(name: "Food and meals")
+    food.update!(parent: parent)
+
+    get new_flyer_path, params: {flyer: {categories: [food.id.to_s]}}
+
+    document = Nokogiri::HTML(response.body)
+    %w[category draftCategory].each do |target|
+      parent_input = document.at_css("input[data-flyer-builder-target='#{target}'][value='#{parent.id}']")
+      child_input = parent_input.ancestors("li").first.at_css("ul input[value='#{food.id}']")
+      expect(parent_input.parent.at_css("[data-category-colour]")["data-category-colour"]).to eq(FlyerCategoryPalette::COLOURS.first)
+      expect(child_input.parent.at_css("[data-category-colour]")).to be_nil
+      expect(child_input["data-flyer-builder-target"]).to eq(target)
+      expect(child_input.key?("checked")).to eq(target == "category")
+    end
+  end
+
+  describe "POST /printout/from-questionnaire" do
+    it "opens the printout with the submitted filters and rounds the supplied location" do
+      post from_questionnaire_flyers_path, params: {flyer: {
+        categories: [food.id.to_s], query: "hot meals", lat: "48.42739", lng: "-123.35819", sort: "distance"
+      }}
+
+      expect(response).to have_http_status(:ok)
+      expect(response.headers["Cache-Control"]).to eq("no-store")
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('meta[name="turbo-cache-control"]')["content"]).to eq("no-cache")
+      expect(document.at_css('[data-controller="flyer-builder"]')["data-flyer-builder-from-questionnaire-value"]).to eq("true")
+      expect(document.at_css('input[name="flyer[categories][]"][checked]')["value"]).to eq(food.id.to_s)
+      expect(document.at_css('input[name="flyer[query]"]')["value"]).to eq("hot meals")
+      expect(document.at_css('input[name="flyer[lat]"]')["value"]).to eq("48.427")
+      expect(document.at_css('input[name="flyer[lng]"]')["value"]).to eq("-123.358")
+      expect(document.at_css('input[name="flyer[sort]"]')["value"]).to eq("distance")
+    end
+
+    it "shows validation errors when the questionnaire supplies an unknown category" do
+      post from_questionnaire_flyers_path, params: {flyer: {categories: ["unknown"]}}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.headers["Cache-Control"]).to eq("no-store")
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css('[role="alert"]').text).to include("Categories include unknown options")
+    end
+  end
+
   describe "POST /printout" do
+    it "prints only the selected services that still match the preview filters" do
+      source = Source.create!(name: "Local guide", source_type: "csv")
+      included = source.services.create!(name: "Community meals", categories: [food])
+      source.services.create!(name: "Breakfast hall", categories: [food])
+      outside_filter = source.services.create!(name: "Community clinic", categories: [health])
+      closed = source.services.create!(name: "Closed kitchen", categories: [food], closed: true)
+
+      post flyers_path, params: {flyer: {
+        categories: [food.id.to_s],
+        service_ids: [included.id.to_s, outside_filter.id.to_s, closed.id.to_s]
+      }}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text).to include("Community meals")
+      expect(text).not_to include("Breakfast hall", "Community clinic", "Closed kitchen")
+    end
+
+    it "rejects an explicitly empty or malformed resource selection" do
+      expect(FlyerGenerator).not_to receive(:call)
+
+      [[""], ["12x"], ["9223372036854775808"], "12"].each do |ids|
+        post flyers_path(format: :pdf), params: {flyer: {service_ids: ids}}
+        expect(response).to have_http_status(:unprocessable_content)
+      end
+    end
+
+    it "prints only the contact fields in a summary printout" do
+      source = Source.create!(name: "Local guide", source_type: "csv")
+      source.services.create!(name: "Community meals", phone: "250-555-0100",
+        hours: "Mondays at noon", description: "Free hot meals",
+        address_attributes: {street_address: "123 Example Street", city: "Victoria"},
+        additional_details: {notes: "Ask for the volunteer coordinator"})
+
+      post flyers_path, params: {flyer: {detail_level: "summary"}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(2).text
+      expect(text).to include("Community meals", "250-555-0100", "123 Example Street")
+      expect(text).not_to include("Mondays at noon", "Free hot meals", "volunteer coordinator")
+    end
+
     it "hands the selected categories to the generator" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil).and_return(nil)
+      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: ["", food.id.to_s, harm_reduction.id.to_s]}}
 
@@ -98,6 +186,7 @@ RSpec.describe "Flyers", type: :request do
 
     it "prints the same matching resources in the same order as the preview" do
       allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      food.update!(parent: Category.create!(name: "Neighbourhood kitchens"))
       source = Source.create!(name: "Local", source_type: "csv")
       source.services.create!(name: "Alpha meals", categories: [food, shelter])
       source.services.create!(name: "Zebra meals", categories: [shelter])
@@ -111,8 +200,12 @@ RSpec.describe "Flyers", type: :request do
 
       post flyers_path, params: filters
       expect(response).to have_http_status(:ok)
-      # These cards fit on the first page; the map can repeat names in its legend.
-      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      # These cards fit on the first resource page; the map can repeat names in its legend.
+      reader = PDF::Reader.new(StringIO.new(response.body))
+      finder = reader.pages.fetch(1).text
+      expect(finder).to include("Neighbourhood kitchens", "Meals", "Shelters", "Page 3")
+      expect(finder).not_to include("Health Care", "Shelter & housing")
+      text = reader.pages.fetch(2).text
       expect(text.scan(/(?:Zebra|Alpha) meals/)).to eq(names)
       expect(text).not_to include("Other clinic")
     end
@@ -128,17 +221,18 @@ RSpec.describe "Flyers", type: :request do
 
       post preview_flyers_path(format: :json), params: filters
       expect(response).to have_http_status(:ok)
+      expect(response.headers["Cache-Control"]).to eq("no-store")
       names = response.parsed_body.fetch("categories").flat_map { |section| section.fetch("resources").pluck("title") }
       expect(names).to eq(["Zebra meals", "Alpha meals", "Aardvark meals"])
 
       post flyers_path, params: filters
       expect(response).to have_http_status(:ok)
-      text = PDF::Reader.new(StringIO.new(response.body)).pages.first.text
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(2).text
       expect(text.scan(/(?:Zebra|Alpha|Aardvark) meals/)).to eq(names)
     end
 
     it "generates the unfiltered guide when nothing is selected" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return("%PDF-all")
 
       post flyers_path, params: {flyer: {categories: [""]}}
 
@@ -147,7 +241,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when no flyer params are sent" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return("%PDF-all")
 
       post flyers_path
 
@@ -234,7 +328,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "explains when the complete guide has no available resources" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
 
       post flyers_path, headers: {"Accept" => "application/pdf"}
 
@@ -243,7 +337,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "shows the same complete-guide message after a standard form submission" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: [""]}}
       expect(response).to redirect_to(new_flyer_path)
@@ -578,11 +672,14 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "returns the same filtered data as JSON for the front-end integration" do
+      Category.create!(name: "Access support")
+      food.update!(parent: Category.create!(name: "Family support"))
       get preview_flyers_path(format: :json), params: {flyer: {categories: [food.id.to_s]}}
 
       expect(response).to have_http_status(:ok)
       category = response.parsed_body.fetch("categories").first
       expect(category["key"]).to eq(food.id.to_s)
+      expect(category.fetch("colour")).to eq(FlyerCategoryPalette::COLOURS.second)
       expect(category["resources"].map { |resource| resource["title"] }).to eq(["Community meal"])
       expect(category["resources"].first["fields"]).to include({"label" => "Notes", "value" => "Call ahead"})
     end
@@ -653,12 +750,21 @@ RSpec.describe "Flyers", type: :request do
       expect(response.parsed_body["errors"]).to be_present
     end
 
-    it "renders a usable PDF through the existing create action" do
+    it "prints and encodes the homepage URL from the PDF request" do
+      https!
+      host! "guide.example.test:3443"
+      site_url = "https://guide.example.test:3443/"
+      expect(RQRCodeCore::QRCode).to receive(:new).with(site_url, level: :m).and_call_original
+
       post flyers_path, params: {flyer: {categories: [food.id.to_s]}}
 
       expect(response).to have_http_status(:ok)
       expect(response.media_type).to eq("application/pdf")
-      expect(response.body).to start_with("%PDF-")
+      reader = PDF::Reader.new(StringIO.new(response.body))
+      finder = reader.pages.fetch(1)
+      expect(finder.text).to include(site_url)
+      links = finder.attributes.fetch(:Annots).map { |annotation| reader.objects.deref(annotation) }
+      expect(links).to include(a_hash_including(A: a_hash_including(S: :URI, URI: site_url)))
     end
 
     it "records a temporary database outage without exposing details to the front end" do

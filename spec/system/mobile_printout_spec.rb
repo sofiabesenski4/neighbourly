@@ -88,7 +88,7 @@ RSpec.describe "Mobile printouts", type: :system do
         reader.readAsDataURL(window.capturedMobilePrintout);
       JS
       pdf = PDF::Reader.new(StringIO.new(data_url.split(",", 2).last.unpack1("m")))
-      expect(pdf.pages.first.text.scan(/(?:Nearby|Farther) kitchen/)).to eq(["Nearby kitchen", "Farther kitchen"])
+      expect(pdf.pages.fetch(2).text.scan(/(?:Nearby|Farther) kitchen/)).to eq(["Nearby kitchen", "Farther kitchen"])
       expect(pdf.pages.last.text).to include("Map", "OpenStreetMap contributors")
       expect(pdf.pages.map(&:text).join("\n")).not_to include("Community clinic")
     ensure
