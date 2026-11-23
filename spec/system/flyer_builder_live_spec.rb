@@ -233,6 +233,40 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("legend", text: "Text size")
   end
 
+  it "moves the header actions below the introduction at widths under 730 pixels" do
+    browser = page.driver.browser
+    browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 729, height: 800, deviceScaleFactor: 1, mobile: false)
+    visit_builder
+
+    header = find("h1", text: "Build your resource guide").ancestor("header")
+    within(header) do
+      expect(page).to have_button("Add distances")
+      expect(page).to have_button("Generate printout")
+      expect(page).to have_css('summary[aria-label="Print settings"]')
+    end
+
+    layout = <<~JS
+      (() => {
+        const introduction = this.firstElementChild.getBoundingClientRect();
+        const actions = this.querySelector('[data-flyer-builder-target="desktopActions"]');
+        const first = actions.firstElementChild.getBoundingClientRect();
+        const last = actions.lastElementChild.getBoundingClientRect();
+        return {
+          below: first.top >= introduction.bottom,
+          right: Math.abs(last.right - this.getBoundingClientRect().right) < 1
+        };
+      })()
+    JS
+    expect(header.evaluate_script(layout)).to eq({"below" => true, "right" => true})
+
+    browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 730, height: 800, deviceScaleFactor: 1, mobile: false)
+    expect(header.evaluate_script(layout)).to eq({"below" => false, "right" => true})
+  ensure
+    browser&.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "shows resource detail filters between Categories and Sort and applies them to the preview" do
     Service.find_by!(name: "Alpha meals").update!(
       additional_details: {"age range" => {"min" => 18}, "eligibility" => "Local residents"}

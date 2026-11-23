@@ -15,12 +15,12 @@
      data-action="turbo:before-cache@document->flyer-builder#beforeCache resize@window->flyer-builder#layoutChanged">
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
         data: { turbo: false, flyer_builder_target: "form", action: "submit->flyer-builder#generate" } do |form| %>
-    <header class="mb-3 pt-3 sm:mb-7 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:pt-0">
+    <header class="mb-3 pt-3 sm:mb-7 sm:pt-0 min-[730px]:flex min-[730px]:items-center min-[730px]:justify-between min-[730px]:gap-4">
       <div class="min-w-0">
         <h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">Build your resource guide</h1>
         <p class="mt-1 text-sm text-stone-600" data-flyer-builder-target="subtitle">Print a contact list with names, addresses, and ways to get in touch.</p>
       </div>
-      <div class="relative z-20 hidden shrink-0 items-center gap-2 sm:flex" hidden data-flyer-builder-target="desktopActions">
+      <div class="relative z-20 hidden shrink-0 items-center justify-end gap-2 sm:flex sm:max-[730px]:mt-3" hidden data-flyer-builder-target="desktopActions">
         <button type="button" hidden class="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border border-stone-300 bg-white px-3 text-sm font-medium text-sage-800 hover:bg-sage-50 max-sm:w-full"
                 aria-haspopup="dialog" aria-controls="flyer-distances"
                 data-flyer-builder-target="distanceButton" data-action="flyer-builder#changeLocation">
