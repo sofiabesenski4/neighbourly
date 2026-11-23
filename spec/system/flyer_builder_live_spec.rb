@@ -227,7 +227,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       width: 729, height: 800, deviceScaleFactor: 1, mobile: false)
     visit_builder
 
-    header = find("h1", text: "Build your resource guide").ancestor("header")
+    header = find("nav[aria-label='Printout view']").ancestor("header")
     within(header) do
       expect(page).to have_button("Add distances")
       expect(page).to have_button("Generate printout")
@@ -236,13 +236,15 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     layout = <<~JS
       (() => {
-        const introduction = this.firstElementChild.getBoundingClientRect();
+        const choices = this.querySelector('[aria-label="Printout view"]').getBoundingClientRect();
         const actions = this.querySelector('[data-flyer-builder-target="desktopActions"]');
         const first = actions.firstElementChild.getBoundingClientRect();
         const last = actions.lastElementChild.getBoundingClientRect();
+        const rightPadding = parseFloat(getComputedStyle(this).paddingRight);
+        const rightEdge = this.getBoundingClientRect().right - this.clientLeft - rightPadding;
         return {
-          below: first.top >= introduction.bottom,
-          right: Math.abs(last.right - this.getBoundingClientRect().right) < 1
+          below: first.top >= choices.bottom,
+          right: Math.abs(last.right - rightEdge) < 1
         };
       })()
     JS
@@ -511,7 +513,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be > 0
     panel.execute_script("window.scrollTo(0, window.scrollY + this.getBoundingClientRect().top + 50)")
     expect(panel.evaluate_script("this.getBoundingClientRect().top")).to be_within(1).of(0)
-    expect(find("h1", text: "Build your resource guide").evaluate_script("this.getBoundingClientRect().bottom")).to be < 0
+    expect(find("nav[aria-label='Printout view']").evaluate_script("this.getBoundingClientRect().bottom")).to be < 0
   ensure
     page.current_window.resize_to(1280, 900)
   end
@@ -630,9 +632,9 @@ RSpec.describe "Live resource guide builder", type: :system do
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
     visit_builder
 
-    title = find("h1", text: "Build your resource guide")
-    expect(page).to have_text("Print a contact list with names, addresses, and ways to get in touch.")
-    expect(title.evaluate_script("getComputedStyle(this.closest('header')).position")).to eq("static")
+    view_selector = find("nav[aria-label='Printout view']")
+    expect(page).to have_text("Choose how to build your printout")
+    expect(view_selector.evaluate_script("getComputedStyle(this.closest('header')).position")).to eq("static")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
     find("button[aria-label='Filters']").click
@@ -779,7 +781,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       page.current_window.resize_to(1280, 900)
       visit_location_screen
       continue_with_place("919 Pandora Ave")
-      within(find("h1", text: "Build your resource guide").ancestor("header")) do
+      within(find("nav[aria-label='Printout view']").ancestor("header")) do
         expect(page).to have_button("919 Pandora Ave", exact: true)
         expect(page).to have_button("Generate printout")
       end
@@ -825,7 +827,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       expect(page).to have_css("article h4", text: "Alpha meals")
       expect(page).to have_field("Meals", type: "checkbox")
-      expect(page).to have_text("Print a contact list with names, addresses, and ways to get in touch.")
+      expect(page).to have_text("Choose how to build your printout")
       expect(page).to have_no_button("Use my location")
       expect(page).to have_no_field("Enter a place")
     end

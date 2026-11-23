@@ -25,7 +25,6 @@ function locationController() {
     },
   };
   controller.locationHeadingTarget = stub();
-  controller.subtitleTarget = stub();
   controller.desktopActionsTarget = stub({ hidden: true });
   controller.builderStepTarget = stub({ hidden: true });
   controller.builderHeadingTarget = stub();

@@ -59,7 +59,6 @@ export default class extends Controller {
     "distanceLabel",
     "distanceWarning",
     "closeLocation",
-    "subtitle",
   ];
   static values = {
     previewUrl: String,
@@ -151,7 +150,6 @@ export default class extends Controller {
   showLocationStep() {
     this.locationStepTarget.open = true;
     this.builderStepTarget.hidden = true;
-    this.subtitleTarget.hidden = true;
     this.desktopActionsTarget.hidden = true;
     this.closeLocationTarget.hidden = true;
     this.locationSummaryTarget.hidden = true;
@@ -172,7 +170,6 @@ export default class extends Controller {
     if (editing) this.locationStepTarget.close();
     else this.locationStepTarget.open = false;
     this.builderStepTarget.hidden = false;
-    this.subtitleTarget.hidden = false;
     this.desktopActionsTarget.hidden = false;
     this.updateFilterControls();
     if (editing) this.distanceButtonTarget.focus();
