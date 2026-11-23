@@ -58,7 +58,7 @@ RSpec.describe "Flyers", type: :system do
 
     visit new_flyer_path
     fill_in "Enter a place", with: "Douglas St and Yates St"
-    check "Include extra details in printout"
+    check "Include extra details in printout", visible: :all
     click_button "Generate printout"
 
     text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")

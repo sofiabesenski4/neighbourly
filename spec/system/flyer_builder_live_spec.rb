@@ -41,6 +41,13 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
   end
 
+  def include_extra_printout_details
+    settings = find('summary[aria-label="Print settings"]')
+    settings.click
+    check "Include extra details in printout"
+    settings.click
+  end
+
   it "goes directly from the questionnaire submission to its filtered preview" do
     source = Source.find_by!(name: "Local")
     source.services.create!(name: "Delta meals", categories: [food])
@@ -192,6 +199,7 @@ RSpec.describe "Live resource guide builder", type: :system do
   it "shows the default print settings and lets people change the available controls" do
     visit_builder
     expect(page).to have_no_field("Text size")
+    expect(page).to have_no_field("Include extra details in printout")
 
     settings = find('summary[aria-label="Print settings"]')
     expect(settings).to have_css("svg[aria-hidden='true']")
@@ -210,6 +218,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_css("legend", text: /Colour map|Colour resource cards/)
     expect(page).to have_no_text("Colour choices do not affect the PDF yet.")
     expect(page).to have_select("Text size", options: %w[Small Medium Large], selected: "Medium")
+    expect(page).to have_unchecked_field("Include extra details in printout")
     expect(page).to have_no_field("Notes")
 
     settings.click
@@ -822,7 +831,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_no_css("article", text: "Distance:")
       within_fieldset("Resource details") { check "Distance and walking time" }
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
-      check "Include extra details in printout"
+      include_extra_printout_details
       click_button "Generate printout"
 
       expect(page).to have_link("Open printout", href: /\Ablob:/)
@@ -875,7 +884,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_text("We can't check 919 Pandora Ave right now")
-      check "Include extra details in printout"
+      include_extra_printout_details
       click_button "Generate printout"
 
       expect(page).to have_link("Open printout", href: /\Ablob:/)
@@ -1015,7 +1024,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
 
-        check "Include extra details in printout"
+        include_extra_printout_details
         click_button "Generate printout"
         expect(page).to have_link("Open printout", href: /\Ablob:/)
         expect(printed_text).to include("Distances are from your location", "Distance: 1.1 km")
