@@ -113,6 +113,10 @@ test("rounds the device's position before it can leave the browser, then moves o
     assert.equal(controller.latTarget.value, "48.427");
     assert.equal(controller.lngTarget.value, "-123.358");
     assert.equal(controller.nearTarget.value, "");
+    assert.equal(
+      controller.distanceLabelTarget.textContent,
+      "Current location",
+    );
     assertOnBuilderStep(controller);
     assert.match(
       controller.locationSummaryTarget.textContent,
@@ -261,6 +265,7 @@ test("checks a typed place with the server, then moves on", async () => {
     controller.locationSummaryTarget.textContent,
     "Distances from: 919 Pandora Ave.",
   );
+  assert.equal(controller.distanceLabelTarget.textContent, "919 Pandora Ave");
   assert.equal(controller.confirmPlaceButtonTarget.disabled, false);
   // Kept so the preview and printout don't need to look the place up again.
   assert.equal(controller.latTarget.value, 48.427);

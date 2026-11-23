@@ -794,7 +794,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       continue_with_place("919 Pandora Ave")
       within(find("h1", text: "Build your resource guide").ancestor("header")) do
-        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("919 Pandora Ave", exact: true)
         expect(page).to have_button("Generate printout")
       end
       find("summary[aria-label='Sort resources']").click
@@ -805,18 +805,23 @@ RSpec.describe "Live resource guide builder", type: :system do
       page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
         width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
       expect(page).to have_no_text("Guide preview")
-      expect(page).to have_no_button("Edit distances")
+      expect(page).to have_no_button("919 Pandora Ave")
       find("button[aria-label='Filters (active)']").click
       within("#flyer-filters") do
         expect(page).to have_select("Sort by", selected: "Distance")
         expect(page).to have_css("option[value='distance']:not([disabled])", visible: :all)
         check "Meals"
-        click_button "Edit distances"
+        click_button "919 Pandora Ave", exact: true
       end
 
       within("#flyer-distances") { click_button "Skip distances" }
       within("#flyer-filters") do
-        expect(page).to have_button("Add distances")
+        distances = find_button("Add distances")
+        expect(distances).to have_no_text("919 Pandora Ave")
+        expect(distances.evaluate_script(<<~JS)).to be(true)
+          this.getBoundingClientRect().bottom <=
+            document.querySelector('label[for="flyer-filter-order"]').getBoundingClientRect().top
+        JS
         expect(page).to have_checked_field("Meals")
         expect(page).to have_select("Sort by", selected: "Category")
         expect(page).to have_css("option[value='distance'][disabled]", visible: :all)
@@ -861,7 +866,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       continue_with_place("919 Pandora Ave")
 
-      expect(page).to have_button("Edit distances")
+      expect(page).to have_button("919 Pandora Ave")
       open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
@@ -886,7 +891,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       visit_location_screen
       find_field("Enter a place").send_keys("919 Pandora Ave", :return)
 
-      expect(page).to have_button("Edit distances")
+      expect(page).to have_button("919 Pandora Ave")
       expect(page).to have_no_link("Open printout")
       expect(page).to have_current_path(new_flyer_path)
     end
@@ -906,7 +911,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_no_css("[data-flyer-builder-target='placeError']")
       click_button "Continue"
 
-      expect(page).to have_button("Edit distances")
+      expect(page).to have_button("919 Pandora Ave")
     end
 
     it "asks for a place when the box is empty" do
@@ -944,7 +949,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       click_button "Generate printout"
       expect(page).to have_link("Open printout", href: /\Ablob:/)
 
-      click_button "Edit distances"
+      click_button "919 Pandora Ave"
 
       within("dialog#flyer-distances[open]") do
         expect(page).to have_text("Distances from: 919 Pandora Ave.")
@@ -971,19 +976,19 @@ RSpec.describe "Live resource guide builder", type: :system do
       open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
-      click_button "Edit distances"
+      click_button "919 Pandora Ave"
       fill_in "Enter a place", with: "535 Ellice St"
       find_field("Enter a place").send_keys(:escape)
       expect(page).to have_no_css("dialog#flyer-distances[open]")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
-      expect(page.evaluate_script("document.activeElement.textContent.trim()")).to eq("Edit distances")
+      expect(page.evaluate_script("document.activeElement.innerText.trim()")).to eq("919 Pandora Ave")
 
       allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.41, lng: -123.36))
-      click_button "Edit distances"
+      click_button "919 Pandora Ave"
       expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
       continue_with_place("535 Ellice St")
 
-      expect(page).to have_button("Edit distances")
+      expect(page).to have_button("535 Ellice St")
       open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+2\.2 km/)
     end
@@ -1023,7 +1028,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       end
       printout = window_opened_by { click_button "Generate printout" }
       expect(page).to have_button("Preparing printout…", disabled: true)
-      click_button "Edit distances"
+      click_button "919 Pandora Ave"
       click_button "Skip distances"
 
       expect(page).to have_button("Generate printout", disabled: false)
@@ -1060,7 +1065,14 @@ RSpec.describe "Live resource guide builder", type: :system do
 
         click_button "Use my location"
 
-        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("Current location", exact: true)
+        emulate_mobile
+        find("button[aria-label='Filters']").click
+        within("#flyer-filters") do
+          expect(page).to have_button("Current location", exact: true)
+          find("button[aria-label='Close filters']").click
+        end
+        clear_mobile_emulation
         open_alpha_details
         expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
@@ -1071,6 +1083,8 @@ RSpec.describe "Live resource guide builder", type: :system do
         expect(page).to have_link("Open printout", href: /\Ablob:/)
         expect(printed_text).to include("Distances are from your location", "Distance: 1.1 km")
         expect(printed_text).not_to include("48.42", "123.36")
+      ensure
+        page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
       end
 
       it "warns on the second screen when the device's location is rough" do
@@ -1081,7 +1095,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         click_button "Use my location"
 
         expect(page).to have_text("may be off by about 3 km")
-        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("Current location")
       end
 
       it "stays on this screen and offers typing a place when location access is turned off" do
@@ -1096,7 +1110,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         expect(page).to have_no_button("Generate printout")
 
         continue_with_place("919 Pandora Ave")
-        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("919 Pandora Ave")
       end
 
       it "switches between a typed place and the device position in distance settings" do
@@ -1106,18 +1120,18 @@ RSpec.describe "Live resource guide builder", type: :system do
         set_device_position(latitude: 48.42, longitude: -123.36)
 
         continue_with_place("919 Pandora Ave")
-        expect(page).to have_button("Edit distances")
-        click_button "Edit distances"
+        expect(page).to have_button("919 Pandora Ave")
+        click_button "919 Pandora Ave"
         click_button "Use my location"
 
-        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("Current location")
         expect(find_field("Enter a place", visible: :all).value).to eq("")
 
-        click_button "Edit distances"
+        click_button "Current location"
         expect(page).to have_text("Distances from your location")
         continue_with_place("535 Ellice St")
 
-        expect(page).to have_button("Edit distances")
+        expect(page).to have_button("535 Ellice St")
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.42")
       end
     end

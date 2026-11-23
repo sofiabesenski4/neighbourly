@@ -2,6 +2,7 @@ import { Controller } from "@hotwired/stimulus";
 
 const DEFAULT_SORT = "default";
 const DISTANCE_SORT = "distance";
+const ADD_DISTANCES = "Add distances";
 
 export default class extends Controller {
   static targets = [
@@ -91,6 +92,7 @@ export default class extends Controller {
         this.latTarget.value
           ? "Distances from the location you provided."
           : "Distances won't be shown on your printout.",
+        { locationLabel: "Provided location" },
       );
     } else {
       this.showLocationStep();
@@ -126,6 +128,7 @@ export default class extends Controller {
     this.forgetLocationChoice();
     this.nearTarget.value = "";
     this.locationSummaryTarget.textContent = "";
+    this.distanceLabelTarget.textContent = ADD_DISTANCES;
     this.distanceWarningTarget.textContent = "";
     this.generateLabelTarget.textContent = "Generate printout";
   }
@@ -152,13 +155,11 @@ export default class extends Controller {
     this.subtitleTarget.hidden = true;
     this.desktopActionsTarget.hidden = true;
     this.closeLocationTarget.hidden = true;
-    this.locationHeadingTarget.textContent =
-      "Where should we measure distances from?";
     this.locationSummaryTarget.hidden = true;
     this.distanceWarningTarget.hidden = true;
   }
 
-  showBuilderStep(summary = "", warn = false) {
+  showBuilderStep(summary = "", { warn = false, locationLabel = "" } = {}) {
     const editing = Boolean(this.locationBeforeEdit);
     const hasLocation = Boolean(this.latTarget.value && this.lngTarget.value);
     this.locationSummaryTarget.textContent = summary;
@@ -166,8 +167,8 @@ export default class extends Controller {
     this.distanceWarningTarget.textContent = warn ? summary : "";
     this.distanceWarningTarget.hidden = !warn;
     this.distanceLabelTarget.textContent = hasLocation
-      ? "Edit distances"
-      : "Add distances";
+      ? locationLabel
+      : ADD_DISTANCES;
     this.locationBeforeEdit = null;
     if (editing) this.locationStepTarget.close();
     else this.locationStepTarget.open = false;
@@ -188,8 +189,6 @@ export default class extends Controller {
     };
     this.discardPrintout();
     this.closeLocationTarget.hidden = false;
-    this.locationHeadingTarget.textContent =
-      this.distanceLabelTarget.textContent;
     this.locationStepTarget.showModal();
     this.locationHeadingTarget.focus();
   }
@@ -254,13 +253,15 @@ export default class extends Controller {
       } else if (data.located) {
         this.latTarget.value = data.lat;
         this.lngTarget.value = data.lng;
-        this.showBuilderStep(`Distances from: ${place}.`);
+        this.showBuilderStep(`Distances from: ${place}.`, {
+          locationLabel: place,
+        });
       } else {
         // The geocoder is down. The guide can still print, so this shouldn't stop
         // the person. The printout itself explains any missing distances.
         this.showBuilderStep(
           `We can't check ${place} right now, so your printout may not show distances.`,
-          true,
+          { warn: true },
         );
       }
     } catch (error) {
@@ -325,10 +326,10 @@ export default class extends Controller {
     this.lngTarget.value = longitude.toFixed(3);
     this.nearTarget.value = "";
     this.locationStatusTarget.hidden = true;
-    this.showBuilderStep(
-      this.deviceLocationMessage(accuracy),
-      accuracy >= 1000,
-    );
+    this.showBuilderStep(this.deviceLocationMessage(accuracy), {
+      warn: accuracy >= 1000,
+      locationLabel: "Current location",
+    });
   }
 
   // Laptops estimate their position from nearby Wi-Fi and can be far off. Saying how
