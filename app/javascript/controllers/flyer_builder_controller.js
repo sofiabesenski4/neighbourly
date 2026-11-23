@@ -34,8 +34,6 @@ export default class extends Controller {
     "includeMap",
     "printSettings",
     "mapColourSettings",
-    "textSizeInput",
-    "textSizeSlider",
     "previewError",
     "previewErrorMessage",
     "printError",
@@ -90,7 +88,6 @@ export default class extends Controller {
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
     this.updateMapColourSettings();
-    this.syncTextSizeSlider();
     this.updateResourceDetails();
     if (this.fromQuestionnaireValue) {
       this.showBuilderStep(
@@ -120,20 +117,6 @@ export default class extends Controller {
   mapSettingChanged() {
     this.updateMapColourSettings();
     this.discardPrintout();
-  }
-
-  syncTextSizeSlider() {
-    const input = this.textSizeInputTarget;
-    if (!input.validity.valid) return;
-
-    const slider = this.textSizeSliderTarget;
-    slider.value = input.value;
-    slider.setAttribute("aria-valuetext", `${slider.value} pixels`);
-  }
-
-  syncTextSizeInput() {
-    this.textSizeInputTarget.value = this.textSizeSliderTarget.value;
-    this.syncTextSizeSlider();
   }
 
   disconnect() {

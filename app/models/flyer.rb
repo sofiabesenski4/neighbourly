@@ -13,6 +13,7 @@ class Flyer
   DETAIL_LEVELS = %w[summary detailed].freeze
   DEFAULT_INCLUDE_MAP = "yes"
   DEFAULT_TEXT_SIZE = "15.5"
+  TEXT_SIZE_PRESETS = {"Small" => "12", "Medium" => DEFAULT_TEXT_SIZE, "Large" => "20"}.freeze
   MIN_TEXT_SIZE = 8
   MAX_TEXT_SIZE = 25
   TEXT_SIZE_STEP = 0.5

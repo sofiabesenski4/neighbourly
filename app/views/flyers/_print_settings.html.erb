@@ -34,28 +34,12 @@
       <% end %>
 
       <div>
-        <% text_size = @flyer.errors[:text_size].empty? && @flyer.text_size.present? ? @flyer.text_size : Flyer::DEFAULT_TEXT_SIZE %>
-        <% size_bounds = { min: Flyer::MIN_TEXT_SIZE, max: Flyer::MAX_TEXT_SIZE, step: Flyer::TEXT_SIZE_STEP } %>
-        <div class="flex items-baseline justify-between gap-2">
-          <%= label_tag "print-settings-text-size", "Text size", class: "text-sm font-medium text-stone-900" %>
-          <div class="flex items-baseline gap-1 text-sm text-stone-600">
-            <%= number_field_tag "print_settings[text_size]", text_size, id: "print-settings-text-size",
-                  **size_bounds, required: true, aria: { describedby: "print-settings-text-size-unit" },
-                  class: "w-[5.5rem] rounded-md border border-stone-300 px-2 py-1.5 text-right tabular-nums text-stone-900 focus-visible:outline-sage-600",
-                  data: { flyer_builder_target: "textSizeInput",
-                          action: "input->flyer-builder#syncTextSizeSlider change->flyer-builder#discardPrintout" } %>
-            <span id="print-settings-text-size-unit">px</span>
-          </div>
-        </div>
-        <div class="flex min-h-11 items-center gap-3 text-sm text-stone-600">
-          <span aria-hidden="true">Smaller</span>
-          <%= tag.input type: "range", value: text_size, **size_bounds,
-                aria: { label: "Text size slider" },
-                data: { flyer_builder_target: "textSizeSlider",
-                        action: "input->flyer-builder#syncTextSizeInput change->flyer-builder#discardPrintout" },
-                class: "min-w-0 flex-1 accent-sage-600 focus-visible:outline-sage-600" %>
-          <span aria-hidden="true">Larger</span>
-        </div>
+        <% text_size = Flyer::TEXT_SIZE_PRESETS.value?(@flyer.text_size) ? @flyer.text_size : Flyer::DEFAULT_TEXT_SIZE %>
+        <%= label_tag "print-settings-text-size", "Text size", class: "block text-sm font-medium text-stone-900" %>
+        <%= select_tag "print_settings[text_size]", options_for_select(Flyer::TEXT_SIZE_PRESETS, text_size),
+              id: "print-settings-text-size",
+              class: "mt-1 min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-base text-stone-900 focus-visible:outline-sage-600 sm:text-sm",
+              data: { action: "change->flyer-builder#discardPrintout" } %>
       </div>
 
     </div>

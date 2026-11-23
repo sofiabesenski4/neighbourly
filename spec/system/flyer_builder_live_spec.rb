@@ -221,7 +221,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       choose "Yes"
       expect(page).to have_checked_field("Yes")
     end
-    expect(find_field("Text size").value).to eq("15.5")
+    expect(page).to have_select("Text size", options: %w[Small Medium Large], selected: "Medium")
     expect(page).to have_no_field("Notes")
 
     settings.click
@@ -300,19 +300,15 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit_builder
     find('summary[aria-label="Print settings"]').click
     within_fieldset("Include map") { choose "No" }
-    slider = find('input[aria-label="Text size slider"]')
-    slider.send_keys(:home)
-    expect(page).to have_field("Text size", with: "8")
-    slider.send_keys(:right)
-    expect(page).to have_field("Text size", with: "8.5")
-    slider.send_keys(:end)
-    expect(page).to have_field("Text size", with: "25")
-    fill_in "Text size", with: "21.5"
-    expect(slider.value).to eq("21.5")
-    expect(slider["aria-valuetext"]).to eq("21.5 pixels")
+    select "Small", from: "Text size"
+    expect(page).to have_select("Text size", selected: "Small")
+    select "Large", from: "Text size"
     find('summary[aria-label="Print settings"]').click
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
+    find('summary[aria-label="Print settings"]').click
+    expect(page).to have_select("Text size", selected: "Large")
+    find('summary[aria-label="Print settings"]').click
 
     page.execute_script(<<~JS)
       window.open = () => null;
@@ -329,7 +325,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     JS
     click_button "Generate printout"
     expect(page).to have_link("Open printout")
-    expect(page.evaluate_script("window.submittedSettings")).to eq({"map" => "no", "size" => "21.5"})
+    expect(page.evaluate_script("window.submittedSettings")).to eq({"map" => "no", "size" => "20"})
   end
 
   it "opens the generated PDF in a new tab with one click" do
