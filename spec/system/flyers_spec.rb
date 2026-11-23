@@ -19,7 +19,8 @@ RSpec.describe "Flyers", type: :system do
       categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s),
       origin: nil,
       detail_level: "summary",
-      site_url: site_url
+      site_url: site_url,
+      text_size_px: 15.5
     ).and_return(nil)
 
     check "Meals"
@@ -38,7 +39,8 @@ RSpec.describe "Flyers", type: :system do
       categories: [],
       origin: nil,
       detail_level: "summary",
-      site_url: site_url
+      site_url: site_url,
+      text_size_px: 15.5
     ).and_return("%PDF-all-resources")
 
     click_button "Generate printout"

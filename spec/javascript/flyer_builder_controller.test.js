@@ -15,13 +15,25 @@ function locationController() {
   controller.locationStatusTarget = stub({ textContent: "", hidden: true });
   controller.placeErrorTarget = stub({ textContent: "", hidden: true });
   controller.confirmPlaceButtonTarget = stub({ textContent: "Continue" });
-  controller.locationStepTarget = stub();
+  controller.locationStepTarget = {
+    open: true,
+    showModal() {
+      this.open = true;
+    },
+    close() {
+      this.open = false;
+    },
+  };
   controller.locationHeadingTarget = stub();
   controller.subtitleTarget = stub();
+  controller.desktopActionsTarget = stub({ hidden: true });
   controller.builderStepTarget = stub({ hidden: true });
   controller.builderHeadingTarget = stub();
-  controller.locationSummaryRowTarget = stub({ hidden: true });
   controller.locationSummaryTarget = stub({ textContent: "" });
+  controller.distanceButtonTarget = stub();
+  controller.distanceLabelTarget = stub();
+  controller.distanceWarningTarget = stub();
+  controller.closeLocationTarget = stub();
   controller.printErrorTarget = stub({ hidden: true });
   controller.clearPrintout = () => {};
   controller.updateFilterControls = () => {};
@@ -30,12 +42,12 @@ function locationController() {
 }
 
 function assertOnBuilderStep(controller) {
-  assert.equal(controller.locationStepTarget.hidden, true);
+  assert.equal(controller.locationStepTarget.open, false);
   assert.equal(controller.builderStepTarget.hidden, false);
 }
 
 function assertOnLocationStep(controller) {
-  assert.equal(controller.locationStepTarget.hidden, false);
+  assert.equal(controller.locationStepTarget.open, true);
   assert.equal(controller.builderStepTarget.hidden, true);
 }
 
@@ -209,7 +221,7 @@ test("skipping clears any location and moves on", () => {
 
 // A finished or in-progress printout has distances from the old location, so it
 // must not stay available once the person goes back to change it.
-test("changing the location discards a printout and returns to the first screen", () => {
+test("editing distances opens the dialog and discards a printout", () => {
   const events = [];
   const controller = locationController();
   controller.printRequest = { abort: () => events.push("aborted") };
@@ -220,7 +232,8 @@ test("changing the location discards a printout and returns to the first screen"
   controller.changeLocation();
 
   assert.deepEqual(events, ["aborted", "cleared"]);
-  assertOnLocationStep(controller);
+  assert.equal(controller.locationStepTarget.open, true);
+  assert.equal(controller.builderStepTarget.hidden, false);
 });
 
 test("checks a typed place with the server, then moves on", async () => {
@@ -496,6 +509,7 @@ test("resource cards separate visible contacts from the details disclosure", () 
         append(...children) {
           this.children.push(...children);
         },
+        addEventListener() {},
       }),
     };
 
@@ -559,7 +573,7 @@ test("resource cards stay in row-major order in one responsive grid", () => {
         );
       },
       setAttribute() {},
-      getAttribute() {},
+      addEventListener() {},
     });
 
     globalThis.document = {
@@ -582,6 +596,9 @@ test("resource cards stay in row-major order in one responsive grid", () => {
     controller.searchTarget = { value: "" };
     controller.selectedCategories = () => [];
     controller.generating = false;
+    controller.resourceSelectionTargets = [];
+    controller.selectAllTarget = {};
+    controller.deselectAllTarget = {};
 
     controller.render([
       { name: "Empty category", resources: [] },
@@ -677,4 +694,76 @@ test("a delayed preview response cannot replace a newer selection", async () => 
     globalThis.window = previousWindow;
     globalThis.fetch = previousFetch;
   }
+});
+
+function resourceSelectionController() {
+  const controller = Object.create(FlyerBuilderController.prototype);
+  controller.previewReady = true;
+  controller.previewCategories = [
+    {
+      resources: [
+        { id: 1, title: "Alpha" },
+        { id: 2, title: "Beta" },
+      ],
+    },
+    { resources: [{ id: 1, title: "Alpha" }] },
+  ];
+  controller.excludedServiceIds = new Set(["99"]);
+  controller.resourceSelectionTargets = [1, 2, 1].map((id) => ({
+    value: String(id),
+  }));
+  controller.countTarget = {};
+  controller.selectAllTarget = {};
+  controller.deselectAllTarget = {};
+  controller.generateTarget = {};
+  controller.generateLabelTarget = {};
+  controller.generating = false;
+  controller.revision = 4;
+  controller.discardPrintout = () => {
+    controller.discarded = true;
+  };
+  return controller;
+}
+
+test("bulk selection changes only matching resources and counts category duplicates once", () => {
+  const controller = resourceSelectionController();
+  controller.selectResources({ params: { selected: false } });
+  assert.deepEqual([...controller.excludedServiceIds], ["99", "1", "2"]);
+  assert.equal(controller.countTarget.textContent, "0 resources included");
+  assert.equal(controller.generateTarget.disabled, true);
+  assert.ok(
+    controller.resourceSelectionTargets.every((input) => !input.checked),
+  );
+
+  controller.toggleResource({ target: { value: "1", checked: true } });
+  assert.deepEqual(
+    controller.resourceSelectionTargets.map((input) => input.checked),
+    [true, false, true],
+  );
+  assert.equal(controller.countTarget.textContent, "1 resource included");
+  assert.equal(controller.generateTarget.disabled, false);
+
+  controller.selectResources({ params: { selected: true } });
+  assert.deepEqual([...controller.excludedServiceIds], ["99"]);
+  assert.equal(controller.countTarget.textContent, "2 resources included");
+});
+
+test("selection changes invalidate an in-flight printout without replacing checkbox focus", () => {
+  const controller = resourceSelectionController();
+  controller.generating = true;
+  controller.renderCards = () =>
+    assert.fail("selection must preserve the existing checkbox elements");
+  controller.toggleResource({ target: { value: "1", checked: false } });
+  assert.equal(controller.discarded, true);
+  assert.equal(controller.revision, 5);
+  assert.equal(controller.generating, false);
+  assert.equal(controller.generateLabelTarget.textContent, "Generate printout");
+  assert.equal(controller.countTarget.textContent, "1 resource included");
+});
+
+test("bulk selection ignores stale results while a filter refresh is pending", () => {
+  const controller = resourceSelectionController();
+  controller.previewReady = false;
+  controller.selectResources({ params: { selected: false } });
+  assert.deepEqual([...controller.excludedServiceIds], ["99"]);
 });

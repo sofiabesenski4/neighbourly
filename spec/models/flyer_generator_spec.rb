@@ -15,7 +15,8 @@ RSpec.describe FlyerGenerator do
     allow(CategorySearch).to receive(:call).with(categories: ["17"], origin: nil).and_return(sections)
     renderer = instance_double(FlyerPdf, render: "%PDF-real")
     site_url = "https://guide.example.test/"
-    expect(FlyerPdf).to receive(:new).with(sections: sections, origin: nil, printed_at: time, detail_level: "detailed", site_url: site_url).and_return(renderer)
+    expect(FlyerPdf).to receive(:new).with(sections: sections, origin: nil, printed_at: time,
+      detail_level: "detailed", site_url: site_url, include_map: true, text_size_px: nil, hidden_detail_labels: []).and_return(renderer)
 
     expect(described_class.call(categories: ["17"], printed_at: time, site_url: site_url)).to eq("%PDF-real")
   end

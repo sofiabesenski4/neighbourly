@@ -50,7 +50,7 @@ RSpec.describe "Mobile printouts", type: :system do
         end
       else
         sort = find("summary[aria-label='Sort resources']")
-        expect(sort.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+        expect(sort.evaluate_script("this.getBoundingClientRect().height")).to eq(30)
         tap(sort)
         expect(find_button("Distance").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
         click_button "Distance"

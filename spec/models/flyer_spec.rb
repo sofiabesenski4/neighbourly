@@ -4,6 +4,12 @@ RSpec.describe Flyer, type: :model do
   let!(:meals) { Category.create!(name: "Meals") }
   let!(:shelters) { Category.create!(name: "Shelters") }
 
+  it "distinguishes omitted resource details from clearing every checkbox" do
+    expect(described_class.new.selected_details).to eq(%w[service address distance phone eligibility notes intake])
+    expect(described_class.new(details: [""]).selected_details).to eq([])
+    expect(described_class.new(details: ["", "phone", "phone"]).selected_details).to eq(["phone"])
+  end
+
   it "is valid with known categories" do
     flyer = Flyer.new(categories: [meals.id.to_s, shelters.id.to_s])
 

@@ -1,6 +1,6 @@
 require "prawn"
 
-# A measured, row-based layout. Cards stay at the agreed text sizes;
+# A measured, row-based layout. Cards are measured at the selected text size;
 # narrow and full-width measurements are cached for the duration of a render.
 # A card that exceeds a full page continues across pages without losing text.
 # Each resource gets one number for the guide, shown on its card and its pin on the final
@@ -46,18 +46,25 @@ class FlyerPdf
     end
   end
 
-  def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed", site_url: nil)
+  def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed", site_url: nil,
+    include_map: true, text_size_px: nil, hidden_detail_labels: [])
     @sections = sections.reject { |section| section.resources.empty? }
     @origin = origin
     @printed_at = printed_at
     @detail_level = detail_level
+    @include_map = include_map
+    @hidden_detail_labels = hidden_detail_labels
+    text_scale = text_size_px ? text_size_px * 0.75 / BODY_SIZE : 1.0
+    @body_size = (BODY_SIZE * text_scale).round(2)
+    @title_size = (TITLE_SIZE * text_scale).round(2)
+    @secondary_size = (SECONDARY_SIZE * text_scale).round(2)
     @pdf = Prawn::Document.new(page_size: "LETTER", margin: MARGIN, compress: true)
     fonts = Rails.root.join("app/assets/fonts/dejavu")
     @pdf.font_families.update("ResourceSans" => {
       normal: fonts.join("DejaVuSans.ttf").to_s,
       bold: fonts.join("DejaVuSans-Bold.ttf").to_s
     })
-    @pdf.font("ResourceSans", size: BODY_SIZE)
+    @pdf.font("ResourceSans", size: @body_size)
     @width = @pdf.bounds.width
     @measurements = {}
     @started = false
@@ -76,7 +83,7 @@ class FlyerPdf
     first_listing_page = @pdf.page_number
     new_page
     @sections.each { |section| render_section(section) }
-    render_map if entries.any?
+    render_map if @include_map && entries.any?
     (first_listing_page..@pdf.page_count).each do |page_number|
       @pdf.go_to_page(page_number)
       self.class.draw_page_header(@pdf)
@@ -148,14 +155,15 @@ class FlyerPdf
     card = ResourceCard.new(service, origin: @origin)
     title = clean(card.title)
     fields = (@detail_level == "summary") ? card.summary_fields : card.fields
+    fields = fields.reject { |field| @hidden_detail_labels.include?(field[:label]) }
     rows = fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
-       size: ["Last updated", "Information source"].include?(field[:label]) ? SECONDARY_SIZE : BODY_SIZE}
+       size: ["Last updated", "Information source"].include?(field[:label]) ? @secondary_size : @body_size}
     }
     # Keep an unusually long name in the body, where it can continue across
     # pages, rather than repeating an oversized header on every page.
-    if @pdf.height_of(title, width: @column_width - 2 * PADDING, size: TITLE_SIZE, style: :bold) > 80
-      rows.unshift({label: "Resource name", value: title, size: BODY_SIZE})
+    if @pdf.height_of(title, width: @column_width - 2 * PADDING, size: @title_size, style: :bold) > 80
+      rows.unshift({label: "Resource name", value: title, size: @body_size})
       title = title.each_grapheme_cluster.take(80).join + "…"
     end
     Entry.new(key: key_for(service), number: number, title: title, rows: rows)
@@ -169,7 +177,7 @@ class FlyerPdf
   def measurement(entry, width)
     @measurements[[entry.key, width]] ||= begin
       inner = width - 2 * PADDING
-      header = @pdf.height_of(entry.heading, width: inner, size: TITLE_SIZE, style: :bold, leading: 2) + 16
+      header = @pdf.height_of(entry.heading, width: inner, size: @title_size, style: :bold, leading: 2) + 16
       heights = entry.rows.map { |row| @pdf.height_of_formatted(fragments(row), width: inner, leading: 2) }
       Measure.new(height: header + 2 * PADDING + heights.sum + [heights.size - 1, 0].max * 5,
         header_height: header, row_heights: heights)
@@ -298,7 +306,7 @@ class FlyerPdf
     @pdf.stroke_horizontal_line(x + PADDING, x + width - PADDING, at: top - header_height)
     @pdf.fill_color(INK)
     @pdf.text_box(title, at: [x + PADDING, top - 8], width: width - 2 * PADDING,
-      height: header_height, size: TITLE_SIZE, style: :bold, leading: 2)
+      height: header_height, size: @title_size, style: :bold, leading: 2)
   end
 
   def draw_card(entry, x, top, width)
@@ -320,7 +328,7 @@ class FlyerPdf
     while remaining.any?
       title = entry.heading + (part.positive? ? " continued" : "")
       inner_width = @section_width - 2 * PADDING
-      header = @pdf.height_of(title, width: inner_width, size: TITLE_SIZE, style: :bold, leading: 2) + 16
+      header = @pdf.height_of(title, width: inner_width, size: @title_size, style: :bold, leading: 2) + 16
       available = @cursor - BOTTOM - header - 2 * PADDING
       options = {at: [@section_left + PADDING, @cursor - header - PADDING], width: inner_width,
                  height: available, leading: 2, document: @pdf}
