@@ -1,0 +1,21 @@
+# The categories every database starts with. db/seeds.rb creates them.
+#
+# They're in their own file so that specs can read them too: the test database isn't
+# seeded, and spec/models/questionnaire_spec.rb checks that config/questionnaire.yml
+# covers every one of these and names no others.
+- Meals
+- Shelters
+- Harm Reduction Resources
+- Supervised Consumption
+- Substance Use Support
+- Food Banks
+- Computer & Internet
+- Showers
+- Health Care
+- Clothing
+- Youth Services
+- Legal Support
+- Employment Support
+- Indigenous Support
+- Housing Services
+- Mental Health Support

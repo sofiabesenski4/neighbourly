@@ -11,5 +11,9 @@ Rails.application.config.filter_parameters += [
   # The place someone measures a printout's distances from may be their home.
   # Plain names here match anywhere in a parameter's name, so "lat" would also hide
   # names like "template". The pattern matches only these exact names.
-  :near, /\A(lat|lng)\z/
+  :near, /\A(lat|lng)\z/,
+  # Questionnaire answers. Every one is nested under this name, so this hides them all,
+  # including those of questions added later. Don't add names like :age here: plain names
+  # match anywhere, so it would also hide "message" and "language".
+  :questionnaire
 ]

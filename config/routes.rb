@@ -42,6 +42,10 @@ Rails.application.routes.draw do
     match :preview, on: :collection, via: [:get, :post]
     post :locate, on: :collection
   end
+  # The guided questionnaire. GET and POST share one URL, which never holds an answer.
+  get "find-help/myself", to: "questionnaires#show", as: :find_help_for_myself
+  post "find-help/myself", to: "questionnaires#create"
+
   # Keep existing builder and HTML preview bookmarks working.
   get "flyers/new", to: "flyers#preview"
   get "flyers/preview", to: "flyers#preview"
