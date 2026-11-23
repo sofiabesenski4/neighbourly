@@ -466,11 +466,9 @@ export default class extends Controller {
     this.desktopSortTarget.querySelector("summary").focus();
   }
 
-  hoverDesktopSort(event) {
-    if (event.pointerType !== "mouse") return;
-
-    this.advancedFiltersTarget.open = false;
-    this.desktopSortTarget.open = true;
+  closeDesktopSortOutside(event) {
+    const sort = this.desktopSortTarget;
+    if (sort.open && !sort.contains(event.target)) sort.open = false;
   }
 
   closeAdvancedFilters() {
@@ -499,14 +497,6 @@ export default class extends Controller {
       row.hidden = this.hiddenDetailLabels.has(row.dataset.detailLabel);
     }
     if (event) this.discardPrintout();
-  }
-
-  leaveDesktopSort(event) {
-    if (
-      event.pointerType === "mouse" &&
-      !this.desktopSortTarget.contains(document.activeElement)
-    )
-      this.desktopSortTarget.open = false;
   }
 
   applyDesktopSort(event) {

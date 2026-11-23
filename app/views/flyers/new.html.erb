@@ -112,7 +112,7 @@
           <p class="min-w-0 flex-1 text-lg font-semibold text-stone-900">Categories</p>
           <%= render "resource_details" %>
           <details class="relative hidden shrink-0 sm:block" data-flyer-builder-target="desktopSort"
-                   data-action="pointerenter->flyer-builder#hoverDesktopSort pointerleave->flyer-builder#leaveDesktopSort keydown.esc->flyer-builder#closeDesktopSort">
+                   data-action="click@window->flyer-builder#closeDesktopSortOutside keydown.esc->flyer-builder#closeDesktopSort">
             <summary aria-label="Sort resources"
                      class="grid size-7.5 cursor-pointer list-none place-items-center rounded-md border border-stone-200 text-stone-700 hover:bg-sage-50 focus-visible:outline-sage-600 [&::-webkit-details-marker]:hidden">
               <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

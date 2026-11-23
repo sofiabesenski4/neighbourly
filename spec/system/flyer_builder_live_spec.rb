@@ -29,7 +29,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
   # Crossing the desktop breakpoint moves the search field between the mobile toolbar and the
   # sidebar, which shifts the controls next to it. The move happens on the window's resize event,
-  # a frame after the new layout applies, so wait for it before clicking or hovering.
+  # a frame after the new layout applies, so wait for it before using the controls.
   def emulate_mobile
     page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
       width: 390, height: 800, deviceScaleFactor: 1, mobile: true)
@@ -540,14 +540,19 @@ RSpec.describe "Live resource guide builder", type: :system do
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
-  it "reveals the same sort choices on desktop hover and in mobile filters" do
+  it "opens desktop sorting on click and offers the same choices in mobile filters" do
     page.current_window.resize_to(1280, 900)
     visit_builder
     expect(page).to have_css("article h4", count: 3)
 
     sort = find("summary[aria-label='Sort resources']")
-    expect(page).to have_no_button("Name (Z–A)")
     sort.hover
+    expect(page).to have_no_button("Name (Z–A)")
+    sort.click
+    expect(page).to have_button("Name (Z–A)")
+    find("#flyer-preview-heading").click
+    expect(page).to have_no_button("Name (Z–A)")
+    sort.click
     options = ["Category", "Name (A–Z)", "Name (Z–A)", "Distance"]
     within("[aria-labelledby='desktop-sort-heading']") do
       expect(all("button").map(&:text)).to eq(options)
@@ -574,7 +579,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     end
     expect(page).to have_css("article:first-child h4", text: "Alpha meals")
     clear_mobile_emulation
-    find("summary[aria-label='Sort resources']").hover
+    find("summary[aria-label='Sort resources']").click
     expect(page).to have_css("button[aria-pressed='true']", text: "Name (A–Z)")
     click_button "Category"
     expect(page).to have_css("h3", text: "Health Care")
@@ -741,7 +746,7 @@ RSpec.describe "Live resource guide builder", type: :system do
         expect(page).to have_button("Edit distances")
         expect(page).to have_button("Generate printout")
       end
-      find("summary[aria-label='Sort resources']").hover
+      find("summary[aria-label='Sort resources']").click
       click_button "Distance"
       expect(page).to have_css("article:nth-child(2) h4", text: "Alpha meals")
       expect(all("article h4").map(&:text)).to eq(["Beta clinic", "Alpha meals", "Gamma noticeboard"])
