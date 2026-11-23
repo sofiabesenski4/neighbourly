@@ -198,7 +198,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
   it "shows the default print settings and lets people change the available controls" do
     visit_builder
-    expect(page).to have_no_field("Text size")
+    expect(page).to have_no_css("legend", text: "Text size")
     expect(page).to have_no_field("Include extra details in printout")
 
     settings = find('summary[aria-label="Print settings"]')
@@ -217,16 +217,20 @@ RSpec.describe "Live resource guide builder", type: :system do
     end
     expect(page).to have_no_css("legend", text: /Colour map|Colour resource cards/)
     expect(page).to have_no_text("Colour choices do not affect the PDF yet.")
-    expect(page).to have_select("Text size", options: %w[Small Medium Large], selected: "Medium")
+    within_fieldset("Text size") do
+      expect(page).to have_unchecked_field("Small", type: "radio")
+      expect(page).to have_checked_field("Medium", type: "radio")
+      expect(page).to have_unchecked_field("Large", type: "radio")
+    end
     expect(page).to have_unchecked_field("Include extra details in printout")
     expect(page).to have_no_field("Notes")
 
     settings.click
-    expect(page).to have_no_field("Text size")
+    expect(page).to have_no_css("legend", text: "Text size")
     settings.click
-    expect(page).to have_field("Text size")
+    expect(page).to have_css("legend", text: "Text size")
     find("#flyer-preview-heading").click
-    expect(page).to have_no_field("Text size")
+    expect(page).to have_no_css("legend", text: "Text size")
   end
 
   it "shows resource detail filters between Categories and Sort and applies them to the preview" do
@@ -297,14 +301,18 @@ RSpec.describe "Live resource guide builder", type: :system do
     visit_builder
     find('summary[aria-label="Print settings"]').click
     within_fieldset("Include map") { choose "No" }
-    select "Small", from: "Text size"
-    expect(page).to have_select("Text size", selected: "Small")
-    select "Large", from: "Text size"
+    within_fieldset("Text size") do
+      choose "Small", allow_label_click: true
+      expect(page).to have_checked_field("Small")
+      find(:radio_button, "Small").send_keys(:right)
+      expect(page).to have_checked_field("Medium")
+      choose "Large", allow_label_click: true
+    end
     find('summary[aria-label="Print settings"]').click
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     find('summary[aria-label="Print settings"]').click
-    expect(page).to have_select("Text size", selected: "Large")
+    within_fieldset("Text size") { expect(page).to have_checked_field("Large") }
     find('summary[aria-label="Print settings"]').click
 
     page.execute_script(<<~JS)

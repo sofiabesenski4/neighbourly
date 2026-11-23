@@ -26,14 +26,21 @@
         </div>
       </fieldset>
 
-      <div>
+      <fieldset class="min-w-0">
+        <legend class="text-sm font-medium text-stone-900">Text size</legend>
         <% text_size = Flyer::TEXT_SIZE_PRESETS.value?(@flyer.text_size) ? @flyer.text_size : Flyer::DEFAULT_TEXT_SIZE %>
-        <%= label_tag "print-settings-text-size", "Text size", class: "block text-sm font-medium text-stone-900" %>
-        <%= select_tag "print_settings[text_size]", options_for_select(Flyer::TEXT_SIZE_PRESETS, text_size),
-              id: "print-settings-text-size",
-              class: "mt-1 min-h-11 w-full rounded-md border border-stone-300 bg-white px-3 text-base text-stone-900 focus-visible:outline-sage-600 sm:text-sm",
-              data: { action: "change->flyer-builder#discardPrintout" } %>
-      </div>
+        <div class="relative grid grid-cols-3">
+          <span aria-hidden="true" class="pointer-events-none absolute inset-x-[16.667%] top-4 h-0.5 -translate-y-1/2 rounded-full bg-stone-300"></span>
+          <% Flyer::TEXT_SIZE_PRESETS.each do |label, value| %>
+            <label class="flex min-h-12 cursor-pointer flex-col items-center gap-1 pt-2 text-sm text-stone-700">
+              <%= radio_button_tag "print_settings[text_size]", value, value == text_size,
+                    class: "peer sr-only", data: { action: "change->flyer-builder#discardPrintout" } %>
+              <span aria-hidden="true" class="relative size-4 rounded-full border-2 border-stone-400 bg-white peer-checked:border-sage-700 peer-checked:bg-sage-700 peer-focus-visible:ring-2 peer-focus-visible:ring-sage-700 peer-focus-visible:ring-offset-2"></span>
+              <span class="peer-checked:font-semibold peer-checked:text-sage-900"><%= label %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
 
       <label class="flex min-h-11 cursor-pointer items-center gap-2 border-t border-stone-200 pt-2 text-sm text-stone-800 sm:col-span-2">
         <%= form.check_box :detail_level, {checked: @flyer.detail_level == "detailed",
