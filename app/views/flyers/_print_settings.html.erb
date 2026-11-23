@@ -42,12 +42,6 @@
         </div>
       </fieldset>
 
-      <label class="flex min-h-11 cursor-pointer items-center gap-2 border-t border-stone-200 pt-2 text-sm text-stone-800 sm:col-span-2">
-        <%= form.check_box :detail_level, {checked: @flyer.detail_level == "detailed",
-              class: "size-4 shrink-0 accent-sage-600 focus-visible:outline-sage-600",
-              data: { action: "change->flyer-builder#discardPrintout" }}, "detailed", "summary" %>
-        <span>Include extra details in printout</span>
-      </label>
     </div>
   </div>
 </details>

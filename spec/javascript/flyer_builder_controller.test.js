@@ -501,7 +501,7 @@ test("clearing every category requests and renders the complete guide", async ()
   }
 });
 
-test("resource cards separate visible contacts from the details disclosure", () => {
+test("resource cards show contact information and other details in one list", () => {
   const previousDocument = globalThis.document;
 
   try {
@@ -520,9 +520,6 @@ test("resource cards separate visible contacts from the details disclosure", () 
 
     const controller = Object.create(FlyerBuilderController.prototype);
     controller.excludedServiceIds = new Set();
-    Object.defineProperty(controller, "summaryLabelsValue", {
-      value: ["Phone"],
-    });
     const article = controller.card({
       id: 1,
       title: "Food bank",
@@ -535,20 +532,14 @@ test("resource cards separate visible contacts from the details disclosure", () 
     assert.match(article.className, /\bborder\b/);
     assert.match(article.className, /\bbg-white\b/);
     assert.match(article.children[0].className, /\bbg-stone-100\b/);
-    assert.match(
-      article.children[1].children[0].children[1].className,
-      /\bwhitespace-pre-line\b/,
-    );
-    assert.equal(
-      article.children[1].children[0].children[1].textContent,
-      "250-555-0100",
-    );
-    const disclosure = article.children[2];
-    assert.equal(disclosure.tagName, "details");
-    assert.equal(disclosure.children[0].textContent, "See details");
-    assert.equal(
-      disclosure.children[1].children[0].children[1].textContent,
-      "Monday",
+    assert.equal(article.children.length, 2);
+    const list = article.children[1];
+    assert.equal(list.tagName, "dl");
+    const values = list.children.map((row) => row.children[1]);
+    assert.match(values[0].className, /\bwhitespace-pre-line\b/);
+    assert.deepEqual(
+      values.map((value) => value.textContent),
+      ["250-555-0100", "Monday"],
     );
     assert.doesNotMatch(article.className, /\bflyer-card\b/);
   } finally {

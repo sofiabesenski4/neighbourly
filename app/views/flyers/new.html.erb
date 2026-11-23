@@ -10,7 +10,6 @@
 <div data-controller="flyer-builder"
      data-flyer-builder-preview-url-value="<%= preview_flyers_path(format: :json) %>"
      data-flyer-builder-locate-url-value="<%= locate_flyers_path(format: :json) %>"
-     data-flyer-builder-summary-labels-value="<%= ResourceCard::SUMMARY_LABELS.to_json %>"
      data-flyer-builder-from-questionnaire-value="<%= @from_questionnaire == true %>"
      data-action="turbo:before-cache@document->flyer-builder#beforeCache resize@window->flyer-builder#layoutChanged">
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
@@ -198,7 +197,7 @@
             </svg>
             <span data-flyer-builder-target="generateLabel">Generate printout</span>
           <% end %>
-          <%= render "print_settings", form: form %>
+          <%= render "print_settings" %>
         </div>
       </section>
     </div>

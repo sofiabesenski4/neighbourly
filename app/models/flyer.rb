@@ -10,7 +10,6 @@ class Flyer
   DISTANCE_SORT = "distance"
   SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
   QUERY_LIMIT = 160
-  DETAIL_LEVELS = %w[summary detailed].freeze
   DEFAULT_INCLUDE_MAP = "yes"
   DEFAULT_TEXT_SIZE = "15.5"
   TEXT_SIZE_PRESETS = {"Small" => "12", "Medium" => DEFAULT_TEXT_SIZE, "Large" => "20"}.freeze
@@ -32,7 +31,6 @@ class Flyer
   attribute :service_ids
   attribute :query, :string, default: ""
   attribute :sort, :string, default: DEFAULT_SORT
-  attribute :detail_level, :string, default: "detailed"
   attribute :include_map, default: DEFAULT_INCLUDE_MAP
   attribute :text_size
   attribute :details
@@ -54,7 +52,6 @@ class Flyer
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
   validates :sort, inclusion: {in: SORT_OPTIONS.values}
-  validates :detail_level, inclusion: {in: DETAIL_LEVELS}
   validates :include_map, inclusion: {in: %w[yes no], message: "must be yes or no"}
   validate :text_size_is_supported
   validate :details_are_supported

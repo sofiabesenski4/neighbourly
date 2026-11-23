@@ -46,12 +46,11 @@ class FlyerPdf
     end
   end
 
-  def initialize(sections:, origin: nil, printed_at: Time.current, detail_level: "detailed", site_url: nil,
+  def initialize(sections:, origin: nil, printed_at: Time.current, site_url: nil,
     include_map: true, text_size_px: nil, hidden_detail_labels: [])
     @sections = sections.reject { |section| section.resources.empty? }
     @origin = origin
     @printed_at = printed_at
-    @detail_level = detail_level
     @include_map = include_map
     @hidden_detail_labels = hidden_detail_labels
     text_scale = text_size_px ? text_size_px * 0.75 / BODY_SIZE : 1.0
@@ -154,8 +153,7 @@ class FlyerPdf
   def build_entry(service, number)
     card = ResourceCard.new(service, origin: @origin)
     title = clean(card.title)
-    fields = (@detail_level == "summary") ? card.summary_fields : card.fields
-    fields = fields.reject { |field| @hidden_detail_labels.include?(field[:label]) }
+    fields = card.fields.reject { |field| @hidden_detail_labels.include?(field[:label]) }
     rows = fields.map { |field|
       {label: clean(field[:label]), value: clean(field[:value]),
        size: ["Last updated", "Information source"].include?(field[:label]) ? @secondary_size : @body_size}
@@ -189,7 +187,7 @@ class FlyerPdf
     first_page = !@started
     @pdf.start_new_page if @started
     @started = true
-    if first_page && @origin && @detail_level == "detailed"
+    if first_page && @origin
       @pdf.text(origin_note, size: SECONDARY_SIZE)
       @pdf.move_down(12)
     end

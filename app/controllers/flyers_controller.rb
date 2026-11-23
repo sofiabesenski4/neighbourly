@@ -27,14 +27,14 @@ class FlyersController < ApplicationController
     only: :preview, if: -> { request.format.json? }
 
   def new
-    @flyer = Flyer.new({detail_level: "summary"}.merge(flyer_params.to_h.symbolize_keys))
+    @flyer = Flyer.new(flyer_params)
     return if @flyer.valid?
 
     render :new, status: :unprocessable_content
   end
 
   def from_questionnaire
-    @flyer = Flyer.new(flyer_params.slice(:categories, :query, :sort, :lat, :lng).merge(detail_level: "summary"))
+    @flyer = Flyer.new(flyer_params.slice(:categories, :query, :sort, :lat, :lng))
     unless @flyer.valid?
       render :new, status: :unprocessable_content
       return
@@ -129,7 +129,7 @@ class FlyersController < ApplicationController
 
     filters = @flyer.filters
     filters[:service_ids] = @flyer.service_ids if @flyer.service_ids
-    pdf = FlyerGenerator.call(**filters, **@flyer.pdf_options, origin: origin, detail_level: @flyer.detail_level, site_url: root_url)
+    pdf = FlyerGenerator.call(**filters, **@flyer.pdf_options, origin: origin, site_url: root_url)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
@@ -203,8 +203,9 @@ class FlyersController < ApplicationController
     @flyer = Flyer.new
     if supported
       list_fields = %w[categories service_ids]
-      text_fields = %w[query sort near lat lng detail_level]
-      unexpected = input.keys - list_fields - text_fields
+      text_fields = %w[query sort near lat lng]
+      # Older open printout forms still submit this hidden field.
+      unexpected = input.keys - list_fields - text_fields - %w[detail_level]
       @flyer.errors.add(:base, "Unsupported flyer filters: #{unexpected.join(", ")}") if unexpected.any?
       input.slice(*text_fields).each do |field, value|
         @flyer.errors.add(field, "must be text") unless value.is_a?(String)
@@ -228,7 +229,7 @@ class FlyersController < ApplicationController
 
   def flyer_params
     flyer = params.fetch(:flyer, {})
-    flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, :detail_level, categories: [], service_ids: []) : {}
+    flyer.is_a?(ActionController::Parameters) ? flyer.except(:detail_level).permit(:query, :sort, :near, :lat, :lng, categories: [], service_ids: []) : {}
   end
 
   def print_settings

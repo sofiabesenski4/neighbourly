@@ -64,7 +64,6 @@ export default class extends Controller {
   static values = {
     previewUrl: String,
     locateUrl: String,
-    summaryLabels: Array,
     fromQuestionnaire: Boolean,
   };
 
@@ -774,41 +773,16 @@ export default class extends Controller {
     selectionLabel.textContent = `Include ${resource.title} in printout`;
     selection.append(checkbox, selectionLabel);
     header.append(title, selection);
-    const summaryFields = resource.fields.filter((field) =>
-      this.summaryLabelsValue.includes(field.label),
-    );
-    const detailFields = resource.fields.filter(
-      (field) => !this.summaryLabelsValue.includes(field.label),
-    );
     article.append(header);
-    if (summaryFields.length) {
-      const summary = this.fieldList(summaryFields);
-      summary.className += " px-3 pt-2 sm:px-4";
-      article.append(summary);
+    if (resource.fields.length) {
+      article.append(this.fieldList(resource.fields));
     }
-
-    const disclosure = document.createElement("details");
-    disclosure.className = "px-3 pb-2 sm:px-4";
-    const toggle = document.createElement("summary");
-    toggle.className =
-      "min-h-11 cursor-pointer py-3 text-sm font-medium text-sage-700 focus-visible:outline-sage-600";
-    toggle.textContent = "See details";
-    disclosure.append(toggle);
-    if (detailFields.length) {
-      disclosure.append(this.fieldList(detailFields));
-    } else {
-      const empty = document.createElement("p");
-      empty.className = "text-sm text-stone-600";
-      empty.textContent = "No additional details available.";
-      disclosure.append(empty);
-    }
-    article.append(disclosure);
     return article;
   }
 
   fieldList(fields) {
     const list = document.createElement("dl");
-    list.className = "grid gap-1 text-sm";
+    list.className = "grid gap-1 px-3 py-2 text-sm sm:px-4";
     fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "[overflow-wrap:anywhere]";

@@ -18,7 +18,6 @@ RSpec.describe "Flyers", type: :system do
     expect(FlyerGenerator).to receive(:call).with(
       categories: contain_exactly(food.id.to_s, harm_reduction.id.to_s),
       origin: nil,
-      detail_level: "summary",
       site_url: site_url,
       text_size_px: 15.5
     ).and_return(nil)
@@ -38,7 +37,6 @@ RSpec.describe "Flyers", type: :system do
     expect(FlyerGenerator).to receive(:call).with(
       categories: [],
       origin: nil,
-      detail_level: "summary",
       site_url: site_url,
       text_size_px: 15.5
     ).and_return("%PDF-all-resources")
@@ -58,7 +56,6 @@ RSpec.describe "Flyers", type: :system do
 
     visit new_flyer_path
     fill_in "Enter a place", with: "Douglas St and Yates St"
-    check "Include extra details in printout", visible: :all
     click_button "Generate printout"
 
     text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")

@@ -41,13 +41,6 @@ RSpec.describe "Live resource guide builder", type: :system do
     within("aside[aria-label='Resource filters']") { expect(page).to have_field("Search resources") }
   end
 
-  def include_extra_printout_details
-    settings = find('summary[aria-label="Print settings"]')
-    settings.click
-    check "Include extra details in printout"
-    settings.click
-  end
-
   it "goes directly from the questionnaire submission to its filtered preview" do
     source = Source.find_by!(name: "Local")
     source.services.create!(name: "Delta meals", categories: [food])
@@ -81,10 +74,6 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(page).to have_css("article h4", count: 1)
     expect(page).to have_checked_field("Include Alpha meals in printout")
-  end
-
-  def open_alpha_details
-    find("article", text: "Alpha meals").find("summary", text: "See details").click
   end
 
   # Capture the PDF blob before the page opens it, so assertions read the actual
@@ -199,7 +188,6 @@ RSpec.describe "Live resource guide builder", type: :system do
   it "shows the default print settings and lets people change the available controls" do
     visit_builder
     expect(page).to have_no_css("legend", text: "Text size")
-    expect(page).to have_no_field("Include extra details in printout")
 
     settings = find('summary[aria-label="Print settings"]')
     expect(settings).to have_css("svg[aria-hidden='true']")
@@ -222,7 +210,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(page).to have_checked_field("Medium", type: "radio")
       expect(page).to have_unchecked_field("Large", type: "radio")
     end
-    expect(page).to have_unchecked_field("Include extra details in printout")
+    expect(page).to have_no_field("Include extra details in printout")
     expect(page).to have_no_field("Notes")
 
     settings.click
@@ -272,7 +260,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       additional_details: {"age range" => {"min" => 18}, "eligibility" => "Local residents"}
     )
     visit_builder
-    open_alpha_details
+    expect(page).to have_no_css("article summary", text: "See details")
     expect(page).to have_css("article dt", text: "Services:")
     expect(page).to have_css("article dt", text: "Ages served:")
     expect(page).to have_css("article dt", text: "Eligibility:")
@@ -299,7 +287,6 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_field("Service")
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
-    open_alpha_details
     expect(page).to have_no_css("article dt", text: "Services:")
 
     advanced.click
@@ -325,7 +312,6 @@ RSpec.describe "Live resource guide builder", type: :system do
       within_fieldset("Resource details") { expect(page).to have_unchecked_field("Service") }
       advanced.click
     end
-    open_alpha_details
     expect(page).to have_no_css("article dt", text: "Services:")
   ensure
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
@@ -867,18 +853,15 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_button("919 Pandora Ave")
-      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       check "Meals"
       expect(page).to have_text("1 resource included")
-      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
       find('summary[title="Advanced filtering"]').click
       within_fieldset("Resource details") { uncheck "Distance and walking time" }
       expect(page).to have_no_css("article", text: "Distance:")
       within_fieldset("Resource details") { check "Distance and walking time" }
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
-      include_extra_printout_details
       click_button "Generate printout"
 
       expect(page).to have_link("Open printout", href: /\Ablob:/)
@@ -931,7 +914,6 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("919 Pandora Ave")
 
       expect(page).to have_text("We can't check 919 Pandora Ave right now")
-      include_extra_printout_details
       click_button "Generate printout"
 
       expect(page).to have_link("Open printout", href: /\Ablob:/)
@@ -973,7 +955,6 @@ RSpec.describe "Live resource guide builder", type: :system do
       click_button "Skip distances"
       click_button "Add distances"
       continue_with_place("919 Pandora Ave")
-      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       click_button "919 Pandora Ave"
@@ -989,7 +970,6 @@ RSpec.describe "Live resource guide builder", type: :system do
       continue_with_place("535 Ellice St")
 
       expect(page).to have_button("535 Ellice St")
-      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+2\.2 km/)
     end
 
@@ -1007,7 +987,6 @@ RSpec.describe "Live resource guide builder", type: :system do
       JAVASCRIPT
 
       continue_with_place("919 Pandora Ave")
-      open_alpha_details
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km/)
 
       urls = page.evaluate_script("window.previewUrls")
@@ -1073,12 +1052,10 @@ RSpec.describe "Live resource guide builder", type: :system do
           find("button[aria-label='Close filters']").click
         end
         clear_mobile_emulation
-        open_alpha_details
         expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
         expect(find("[data-flyer-builder-target='lat']", visible: :all).value).to eq("48.420")
         expect(find("[data-flyer-builder-target='lng']", visible: :all).value).to eq("-123.360")
 
-        include_extra_printout_details
         click_button "Generate printout"
         expect(page).to have_link("Open printout", href: /\Ablob:/)
         expect(printed_text).to include("Distances are from your location", "Distance: 1.1 km")
