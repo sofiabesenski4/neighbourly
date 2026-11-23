@@ -207,20 +207,8 @@ RSpec.describe "Live resource guide builder", type: :system do
       choose "No"
       expect(page).to have_checked_field("No")
     end
-    within_fieldset("Colour map") do
-      expect(page).to have_checked_field("No", disabled: true)
-    end
-    within_fieldset("Include map") { choose "Yes" }
-    within_fieldset("Colour map") do
-      expect(page).to have_checked_field("No")
-      choose "Yes"
-      expect(page).to have_checked_field("Yes")
-    end
-    within_fieldset("Colour resource cards") do
-      expect(page).to have_checked_field("No")
-      choose "Yes"
-      expect(page).to have_checked_field("Yes")
-    end
+    expect(page).to have_no_css("legend", text: /Colour map|Colour resource cards/)
+    expect(page).to have_no_text("Colour choices do not affect the PDF yet.")
     expect(page).to have_select("Text size", options: %w[Small Medium Large], selected: "Medium")
     expect(page).to have_no_field("Notes")
 

@@ -31,9 +31,7 @@ export default class extends Controller {
     "status",
     "generate",
     "generateLabel",
-    "includeMap",
     "printSettings",
-    "mapColourSettings",
     "previewError",
     "previewErrorMessage",
     "printError",
@@ -87,7 +85,6 @@ export default class extends Controller {
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
-    this.updateMapColourSettings();
     this.updateResourceDetails();
     if (this.fromQuestionnaireValue) {
       this.showBuilderStep(
@@ -103,20 +100,10 @@ export default class extends Controller {
     }
   }
 
-  updateMapColourSettings() {
-    const selected = this.includeMapTargets.find((input) => input.checked);
-    this.mapColourSettingsTarget.disabled = selected?.value === "no";
-  }
-
   closePrintSettingsOutside(event) {
     const settings = this.printSettingsTarget;
     if (settings.open && !settings.contains(event.target))
       settings.open = false;
-  }
-
-  mapSettingChanged() {
-    this.updateMapColourSettings();
-    this.discardPrintout();
   }
 
   disconnect() {
