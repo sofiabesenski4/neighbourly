@@ -1,0 +1,43 @@
+# The questions asked by "Find help for myself" (/find-help/myself), in order.
+#
+# This file is the only place a question is described. Questionnaire loads it, and the
+# views draw each question from its `type` without knowing which question it is. So
+# rewording a question, or adding an option, is an edit here and nowhere else.
+#
+# Each question has:
+#   key      names its answers in the form. Never shown. Changing it is safe, because
+#            answers are never saved.
+#   title    the question, as people read it.
+#   hint     optional: a short line of help under the title.
+#   type     how it's asked. Only "checkboxes" so far.
+#   filter   which filter class turns the answer into part of the search. Must be listed
+#            in Questionnaire::FILTERS.
+#   options  the choices. Each has a key, the label people read, and whatever its filter
+#            needs. CategoryFilter needs `categories`: the names of the service
+#            categories it stands for, exactly as in db/category_names.yml. Names are
+#            used because IDs differ between databases.
+#
+# The labels and groups are a first draft and are expected to change.
+#
+# "Health" lists only Health Care. If categories get parents (PR #85), Mental Health
+# Support is to sit under Health Care, so "Health" will then return mental health services
+# too. The team accepted that. See docs/questionnaire-notes.md.
+questions:
+  - key: categories
+    title: What do you need help with?
+    hint: Choose as many as you like.
+    type: checkboxes
+    filter: CategoryFilter
+    options:
+      - { key: food, label: Food, categories: [Meals, Food Banks] }
+      - { key: shelter, label: A place to stay, categories: [Shelters, Housing Services] }
+      - { key: health, label: Health, categories: [Health Care] }
+      - { key: mental_health, label: Mental health, categories: [Mental Health Support] }
+      - key: substance_use
+        label: Drug and alcohol support
+        categories: [Harm Reduction Resources, Supervised Consumption, Substance Use Support]
+      - { key: hygiene, label: Showers and clothing, categories: [Showers, Clothing] }
+      - { key: legal, label: Legal help, categories: [Legal Support] }
+      - { key: work, label: Jobs and computers, categories: [Employment Support, Computer & Internet] }
+      - { key: youth, label: Youth services, categories: [Youth Services] }
+      - { key: indigenous, label: Indigenous services, categories: [Indigenous Support] }
