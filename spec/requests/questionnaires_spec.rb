@@ -408,4 +408,14 @@ RSpec.describe "Questionnaires", type: :request do
     post find_help_for_myself_path, params: {questionnaire: {step: "age", answers: {categories: ["food"], age: ["under_19"]}}}
     expect(response.body).to eq("Soup kitchen")
   end
+
+  it "counts a question as a step only while a service has the details it requires" do
+    use_age_question(requires: "age_range")
+    get find_help_for_myself_path
+    expect(page_of(response).at_css("#question-progress").text).to eq("Question 1 of 2")
+
+    source.services.create!(name: "Adult kitchen", categories: [meals], additional_details: {"ages" => "19+"})
+    get find_help_for_myself_path
+    expect(page_of(response).at_css("#question-progress").text).to eq("Question 1 of 3")
+  end
 end

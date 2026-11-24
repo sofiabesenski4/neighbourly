@@ -461,4 +461,91 @@ RSpec.describe Questionnaire do
         .to eq(["Youth meals", "Adult meals", "Anyone's meals", "Unclear meals", "Young adult meals"])
     end
   end
+
+  describe "a question that requires details" do
+    let(:keys) { described_class.new.questions.map(&:key) }
+
+    def add_ages
+      service("Adult meals", meals, additional_details: {"ages" => "19+"})
+    end
+
+    it "is hidden while no service has them" do
+      use_age_question(requires: "age_range")
+      service("Meals", meals, additional_details: {"ages" => "youth"})
+
+      expect(keys).to eq(%w[categories location])
+    end
+
+    it "appears once one visible service has them" do
+      use_age_question(requires: "age_range")
+      add_ages
+
+      expect(keys).to eq(%w[categories location age])
+    end
+
+    it "isn't hidden by what someone answers" do
+      use_age_question(requires: "age_range")
+      add_ages
+
+      # Nothing in the chosen category has ages.
+      expect(described_class.new(answers: {"categories" => ["shelter"]}).questions.map(&:key)).to include("age")
+    end
+
+    it "finishes after the last question that isn't hidden" do
+      use_age_question(requires: "age_range")
+      questionnaire = described_class.new(step: "location")
+      questionnaire.move("skip")
+
+      expect(questionnaire).to be_finished
+    end
+
+    it "ignores an answer to a question that has been hidden, and keeps the others" do
+      use_age_question(requires: "age_range")
+      service("Meals", meals)
+      service("Shelter", shelters)
+
+      [["under_19"], ["unknown"], "x"].each do |age|
+        hidden = described_class.new(answers: {"categories" => ["food"], "age" => age}, step: "location")
+        expect(hidden).to be_valid
+        expect(hidden.services.map(&:name)).to eq(["Meals"])
+      end
+    end
+
+    it "goes to the first question when the one someone was on has been hidden, keeping answers" do
+      use_age_question(requires: "age_range")
+      questionnaire = described_class.new(answers: {"categories" => ["food"], "age" => ["under_19"]}, step: "age")
+      questionnaire.move("next")
+
+      expect(questionnaire.question.key).to eq("categories")
+      expect(questionnaire).not_to be_finished
+      expect(questionnaire.answer_to(questionnaire.question).options.map(&:key)).to eq(["food"])
+    end
+
+    it "is asked next when it appears partway through" do
+      use_age_question(requires: "age_range")
+      add_ages
+      questionnaire = described_class.new(answers: {"categories" => ["food"]}, step: "location")
+      questionnaire.move("skip")
+
+      expect(questionnaire.question.key).to eq("age")
+      expect(questionnaire).not_to be_finished
+    end
+
+    it "must name something that can be read" do
+      expect { use_age_question(requires: "shoe_size") }.to raise_error(KeyError, /shoe_size/)
+    end
+
+    it "can't be the only kind of question" do
+      entry = AgeQuestion::ENTRY.merge("requires" => "age_range", "filter" => "CategoryFilter",
+        "options" => [{"key" => "a", "label" => "A"}])
+
+      expect { questions_from({"questions" => [entry]}.to_yaml) }.to raise_error(ArgumentError, /every question/)
+    end
+
+    it "looks at no services when no question requires anything" do
+      expect(Service).not_to receive(:visible)
+
+      described_class.new
+    end
+  end
 end

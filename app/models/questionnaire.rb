@@ -34,6 +34,8 @@ class Questionnaire
   def self.questions_from(path = CONFIG_PATH)
     questions = YAML.safe_load_file(path).fetch("questions").map { |entry| Question.from_config(entry) }
     reject_clashing_filters(questions)
+    raise ArgumentError, "every question has `requires`, so there could be none to ask" if questions.all?(&:requires)
+
     questions
   end
 
@@ -52,13 +54,17 @@ class Questionnaire
   # are ignored, because each question looks up only its own.
   #
   # `step` is the key of the question the person was on. Without one, it's the first.
+  #
+  # Questions that no service has data for are left out, which makes their answers unknown
+  # keys. This looks at every visible service and never at the answers, so what someone
+  # answers can't hide a later question.
   def initialize(answers: {}, step: nil, questions: self.class.questions_from)
-    @questions = questions
+    @questions = questions.select(&:askable?)
     @submitted = answers.is_a?(Hash) ? answers : {}
     @malformed = !answers.is_a?(Hash)
-    @question = step.nil? ? questions.first : questions.find { |question| question.key == step }
+    @question = step.nil? ? @questions.first : @questions.find { |question| question.key == step }
     @unknown_step = @question.nil?
-    @question ||= questions.first
+    @question ||= @questions.first
     @finished = false
   end
 
@@ -66,7 +72,7 @@ class Questionnaire
   # than "back" or "skip" counts as "next", which is what Enter submits.
   #
   # A step that isn't a question leaves the person on the first one, with their answers.
-  # It may have been removed from the config while they had the page open.
+  # It may have been removed from the config, or hidden, while they had the page open.
   #
   # Going forward looks up a place typed on this question. `lookup: false` goes on without.
   def move(direction, lookup: true)

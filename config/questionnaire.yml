@@ -14,6 +14,9 @@
 #   filter   which filter class turns the answer into part of the search. Must be listed
 #            in Questionnaire::FILTERS. Two questions can't both use CategoryFilter: the
 #            second would replace the first instead of narrowing it.
+#   requires optional: something ResourceAttributes can read, like age_range. The question is
+#            hidden, and not counted as a step, until a visible service has it. At least one
+#            question must not have this.
 #   options  the choices, for any type but location. Each has a key, the label people
 #            read, and whatever its filter needs. CategoryFilter needs `categories`: the
 #            names of the service categories it stands for, exactly as in

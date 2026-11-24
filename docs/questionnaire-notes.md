@@ -27,6 +27,9 @@ and anything we may need to revisit. Remove entries once they're resolved.
   before one that suits one. Ties keep their order: nearest first, then by name.
 - **Ages are read now, though no question asks for them yet.** They're saved in clear formats,
   `"15-25"`, `"19+"` and `{"min": 19}`. Gender isn't read, because it's saved only as free text.
+- **A question with `requires` appears once one visible service has the data.** Until then its
+  answer couldn't change anything. One is enough because nothing appears until someone adds
+  the question to the YAML, so the team already chooses when.
 - **Two questions can't set the same part of the search.** Their options are merged, so the
   second would replace the first. The config is refused when it loads.
 - **"Start over" is a link, not a button.** It's a plain GET, which holds no answers. A button
@@ -60,6 +63,8 @@ and anything we may need to revisit. Remove entries once they're resolved.
 
 ## Known limits
 
+- **`requires` reads services one at a time,** on each screen, until it finds one with the
+  data. No question uses it yet. With thousands of services and no data, it would be slow.
 - **Of the 20 seeded services, 3 have ages and none has gender.** An age question would hide
   few services until there's more data. Importing a changed row again replaces these details.
 - **Landmarks like "Central Library" usually aren't found.** The address service needs a
@@ -72,6 +77,8 @@ and anything we may need to revisit. Remove entries once they're resolved.
 - **Options match categories by name.** Renaming a category in the database takes its
   services out of an option, and an option with none left is hidden. A warning is logged:
   `[Questionnaire] missing categories`.
+- **A detail saved under a name we don't look for is unknown,** with no error, so its question
+  may stay hidden and filter nothing. Imports must use the names in `docs/service-details.md`.
 - **A service with no category isn't shown once someone chooses one.**
 - **If PR #85 merges first**, its "Food and meals" category needs adding to
   `db/category_names.yml` and to an option.
