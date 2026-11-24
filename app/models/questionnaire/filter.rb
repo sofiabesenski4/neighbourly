@@ -11,6 +11,12 @@ class Questionnaire
       options
     end
 
+    # The names of the CategorySearch arguments that search_options sets. Two questions can't
+    # set the same one, and Questionnaire checks that when it loads the config.
+    def self.search_keys
+      []
+    end
+
     # The options the person chose. Never empty: an unanswered question has no filter.
     def initialize(options)
       @options = options

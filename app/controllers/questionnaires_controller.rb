@@ -1,8 +1,10 @@
 # The guided questionnaire for someone seeking services for themselves.
 #
-# Architecture: GET shows the question. POST reads the answers through Questionnaire, which
-# runs the search. The results page is being built separately, so for now the POST returns
-# a plain list of service names, only to check that the search works.
+# Architecture: GET shows the first question, with no answers. Each POST submits the question
+# shown, the button pressed and every answer so far. Questionnaire works out where that
+# leads: another question, or past the last one to the search. The results page is being
+# built separately, so for now the search returns a plain list of service names, only to
+# check that it works.
 #
 # Privacy: answers may come to include gender, Indigenous identity, disability and mental
 # health, and are often entered on shared computers. So they arrive only in the body of a
@@ -24,8 +26,10 @@ class QuestionnairesController < ApplicationController
   end
 
   def create
-    @questionnaire = Questionnaire.new(answers: submitted_answers)
+    @questionnaire = submitted_questionnaire
+    @questionnaire.move(submitted(:move))
     return render_question(NOT_UNDERSTOOD, status: :unprocessable_content) unless @questionnaire.valid?
+    return render :show unless @questionnaire.finished?
 
     # Temporary, until the results page exists. ResourceCard supplies the names because it
     # has a fallback for a service without one.
@@ -38,12 +42,23 @@ class QuestionnairesController < ApplicationController
   RATE_LIMITED = "We've had a lot of requests from this connection. Your answers are still here. Please try again later."
   private_constant :NOT_UNDERSTOOD, :RATE_LIMITED
 
-  # Shows the question again with what was chosen still ticked. Redirecting, as the app's
-  # shared rate limit handler does, would lose the answers.
+  # Shows a question with a message, and what was chosen still ticked. Over the rate limit
+  # that's the question the person was on. Redirecting, as the app's shared rate limit
+  # handler does, would lose the answers.
   def render_question(message, status:)
-    @questionnaire ||= Questionnaire.new(answers: submitted_answers)
+    @questionnaire ||= submitted_questionnaire
     @message = message
     render :show, status: status
+  end
+
+  def submitted_questionnaire
+    Questionnaire.new(answers: submitted_answers, step: submitted(:step))
+  end
+
+  # A submitted value other than the answers, or nil.
+  def submitted(name)
+    input = params[:questionnaire]
+    input[name] if input.is_a?(ActionController::Parameters)
   end
 
   # The submitted answers as a plain hash. Anything else is passed on unchanged, for

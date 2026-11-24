@@ -9,9 +9,10 @@
 #            answers are never saved.
 #   title    the question, as people read it.
 #   hint     optional: a short line of help under the title.
-#   type     how it's asked. Only "checkboxes" so far.
+#   type     how it's asked: "checkboxes" for any number of options, "radio" for one.
 #   filter   which filter class turns the answer into part of the search. Must be listed
-#            in Questionnaire::FILTERS.
+#            in Questionnaire::FILTERS. Two questions can't both use CategoryFilter: the
+#            second would replace the first instead of narrowing it.
 #   options  the choices. Each has a key, the label people read, and whatever its filter
 #            needs. CategoryFilter needs `categories`: the names of the service
 #            categories it stands for, exactly as in db/category_names.yml. Names are

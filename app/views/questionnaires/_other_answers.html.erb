@@ -1,0 +1,9 @@
+<%# Carries the answers to every other question along with this one, since nothing is saved
+    between screens. Includes later questions, so going back keeps their answers too.
+    Only options the question recognised are carried.
+    Locals: questionnaire (Questionnaire). %>
+<% questionnaire.questions.without(questionnaire.question).each do |question| %>
+  <% questionnaire.chosen(question).each do |option| %>
+    <%= hidden_field_tag "questionnaire[answers][#{question.key}][]", option.key, id: nil, autocomplete: "off" %>
+  <% end %>
+<% end %>
