@@ -1,10 +1,13 @@
 require "rails_helper"
+require "support/two_question_questionnaire"
 
 # Covers the questionnaire's rules: what the config must contain, how submitted answers are
-# read, and which services they find. The HTTP side is in
+# read, how people move between questions, and which services the answers find. The HTTP side is in
 # spec/requests/questionnaires_spec.rb, and turning categories into IDs is in
 # spec/models/questionnaire/category_filter_spec.rb.
 RSpec.describe Questionnaire do
+  include TwoQuestionQuestionnaire
+
   let(:source) { Source.create!(name: "Local guide", source_type: "csv") }
   let!(:meals) { Category.create!(name: "Meals") }
   let!(:food_banks) { Category.create!(name: "Food Banks") }
@@ -83,6 +86,14 @@ RSpec.describe Questionnaire do
     it "rejects a type that isn't supported" do
       expect { questions_from(yaml.sub("checkboxes", "slider")) }.to raise_error(KeyError, /slider/)
     end
+  end
+
+  # Two category questions would both set `categories`, and the second would win.
+  it "rejects two questions that set the same part of the search" do
+    entry = YAML.safe_load_file(described_class::CONFIG_PATH)["questions"].first
+    yaml = {"questions" => [entry, entry.deep_dup.merge("key" => "more")]}.to_yaml
+
+    expect { questions_from(yaml) }.to raise_error(ArgumentError, /categories/)
   end
 
   describe "#services" do
@@ -166,6 +177,121 @@ RSpec.describe Questionnaire do
         expect(described_class.new(answers: {"categories" => value})).not_to be_valid
       end
       expect(described_class.new(answers: "food")).not_to be_valid
+    end
+  end
+
+  describe "several questions" do
+    # These replace the categories created above, which use the same names.
+    before do
+      Category.destroy_all
+      use_two_questions
+    end
+
+    def questionnaire(step: "needs", **answers)
+      described_class.new(answers: answers.transform_keys(&:to_s), step: step)
+    end
+
+    def keys(questionnaire)
+      questionnaire.questions.to_h { |question| [question.key, questionnaire.chosen(question).map(&:key)] }
+    end
+
+    def moved(direction, **options)
+      questionnaire(**options).tap { |moved| moved.move(direction) }
+    end
+
+    it "starts at the first question" do
+      first = described_class.new
+
+      expect(first.question.key).to eq("needs")
+      expect(first).to be_first
+      expect(first.position).to eq(1)
+    end
+
+    it "narrows the search with every answer" do
+      found = questionnaire(needs: ["food"], who: ["our_place"]).services
+
+      expect(found.map(&:name)).to eq(["Our Place meals"])
+    end
+
+    it "finds the same services whatever order the questions were answered in" do
+      forward = described_class.new(answers: {"needs" => ["food"], "who" => ["our_place"]})
+      backward = described_class.new(answers: {"who" => ["our_place"], "needs" => ["food"]})
+
+      expect(forward.services).to eq(backward.services)
+    end
+
+    it "goes forward with Next, keeping answers, and finishes after the last question" do
+      second = moved("next", needs: ["food"])
+      expect(second.question.key).to eq("who")
+      expect(second).not_to be_finished
+      expect(second).not_to be_first
+      expect(keys(second)).to eq("needs" => ["food"], "who" => [])
+
+      expect(moved("next", step: "who", needs: ["food"], who: ["our_place"])).to be_finished
+    end
+
+    it "treats a missing or unknown button as Next" do
+      [nil, "sideways", ["next"]].each do |direction|
+        expect(moved(direction).question.key).to eq("who")
+      end
+    end
+
+    it "goes back with every answer, including the current one" do
+      first = moved("back", step: "who", needs: ["food"], who: ["our_place"])
+
+      expect(first.question.key).to eq("needs")
+      expect(keys(first)).to eq("needs" => ["food"], "who" => ["our_place"])
+    end
+
+    it "stays on the first question when going back from it" do
+      expect(moved("back").question.key).to eq("needs")
+    end
+
+    it "clears only the current question with Skip" do
+      second = moved("skip", needs: ["food"], who: ["our_place"])
+      expect(second.question.key).to eq("who")
+      expect(keys(second)).to eq("needs" => [], "who" => ["our_place"])
+
+      done = moved("skip", step: "who", needs: ["food"], who: ["our_place"])
+      expect(done).to be_finished
+      expect(keys(done)).to eq("needs" => ["food"], "who" => [])
+    end
+
+    it "finds every service when every question is skipped" do
+      everything = CategorySearch.call(categories: [], sort: "asc").flat_map(&:resources)
+
+      expect(moved("skip", step: "who").services).to eq(everything)
+      expect(everything.size).to eq(4)
+    end
+
+    it "asks an earlier question again when its answer can't be read" do
+      again = moved("next", step: "who", needs: ["unknown"], who: ["our_place"])
+
+      expect(again.question.key).to eq("needs")
+      expect(again).not_to be_valid
+      expect(again).not_to be_finished
+    end
+
+    it "lets an answer that can't be read be skipped, or left behind by going back" do
+      expect(moved("skip", needs: ["unknown"])).to be_valid
+
+      first = moved("back", step: "who", needs: ["food"], who: ["unknown"])
+      expect(first).to be_valid
+      expect(keys(first)).to eq("needs" => ["food"], "who" => [])
+    end
+
+    it "goes to the first question, with answers kept, when the step is unknown" do
+      ["gone", ["who"], "2"].each do |step|
+        first = moved("next", step: step, who: ["our_place"])
+
+        expect(first.question.key).to eq("needs")
+        expect(first).not_to be_finished
+        expect(keys(first)).to include("who" => ["our_place"])
+      end
+    end
+
+    it "rejects more than one answer to a radio question" do
+      expect(questionnaire(who: %w[our_place the_mustard_seed])).not_to be_valid
     end
   end
 end

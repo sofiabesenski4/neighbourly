@@ -3,17 +3,30 @@
 
     Turbo is off for the form because Turbo expects a redirect after a POST, and these
     answers can't be carried through one. Turbo's page cache is off so that a page showing
-    someone's answers isn't kept in the browser. %>
-<% content_for :title, "Find help" %>
+    someone's answers isn't kept in the browser. Autocomplete is off for the same reason:
+    otherwise the browser's Back button ticks the first question's answers again, which the
+    next person at a shared computer could see. %>
+<% question = @questionnaire.question %>
+<% total = @questionnaire.questions.size %>
+<% progress = "Question #{@questionnaire.position} of #{total}" if total > 1 %>
+<%# Says where someone is, for screen readers and browser tabs. Never what they answered. %>
+<% content_for :title, [progress, "Find help"].compact.join(" - ") %>
 <% content_for :head do %>
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
-<% question = @questionnaire.question %>
+<% secondary_classes = "inline-flex min-h-11 cursor-pointer items-center rounded-lg px-4 py-2 font-medium text-sage-800 underline hover:bg-sage-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" %>
 
 <div class="mx-auto max-w-2xl rounded-xl border border-stone-200 bg-white p-4 sm:p-6">
-  <%= form_with url: find_help_for_myself_path, data: {turbo: false} do %>
+  <%= form_with url: find_help_for_myself_path, data: {turbo: false}, html: {autocomplete: "off"} do %>
+    <%= hidden_field_tag "questionnaire[step]", question.key, id: nil, autocomplete: "off" %>
+    <%= render "other_answers", questionnaire: @questionnaire %>
+
     <% if @message %>
       <p id="question-message" role="alert" class="mb-5 rounded-lg bg-red-50 px-4 py-3 text-red-700"><%= @message %></p>
+    <% end %>
+
+    <% if progress %>
+      <p id="question-progress" class="mb-1 text-sm text-stone-600"><%= progress %></p>
     <% end %>
 
     <%# min-w-0 because a fieldset otherwise refuses to be narrower than its content. %>
@@ -23,7 +36,7 @@
             question. tabindex lets a heading take focus without adding a Tab stop. %>
         <%= tag.h1 question.title, tabindex: -1, autofocus: true,
               class: "text-xl font-semibold tracking-tight text-stone-900 focus:outline-none sm:text-2xl",
-              aria: {describedby: ("question-message" if @message)} %>
+              aria: {describedby: [("question-message" if @message), ("question-progress" if progress)].compact.join(" ").presence} %>
         <% if question.hint %>
           <span class="mt-1 block text-stone-600"><%= question.hint %></span>
         <% end %>
@@ -32,6 +45,17 @@
       <%= render question.type, question: question, chosen: @questionnaire.chosen(question) %>
     </fieldset>
 
-    <button type="submit" class="mt-6 min-h-11 w-full cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600">Next</button>
+    <%# Next comes first because Enter presses a form's first button. %>
+    <button type="submit" name="questionnaire[move]" value="next"
+            class="mt-6 min-h-11 w-full cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600">Next</button>
+    <div class="mt-2 flex flex-wrap gap-2">
+      <% unless @questionnaire.first? %>
+        <button type="submit" name="questionnaire[move]" value="back" class="<%= secondary_classes %>">Back</button>
+      <% end %>
+      <button type="submit" name="questionnaire[move]" value="skip" class="<%= secondary_classes %>">Skip</button>
+      <%# A link, because it submits nothing: a plain GET is the questionnaire with no answers.
+          Not a button in this form, which could put the answers in the URL. %>
+      <%= link_to "Start over", find_help_for_myself_path, data: {turbo: false}, class: "#{secondary_classes} ml-auto" %>
+    </div>
   <% end %>
 </div>

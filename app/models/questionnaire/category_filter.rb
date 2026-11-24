@@ -19,6 +19,10 @@ class Questionnaire
       options.select { |option| option.categories.intersect?(existing) }
     end
 
+    def self.search_keys
+      [:categories]
+    end
+
     def search_options
       {categories: category_ids}
     end

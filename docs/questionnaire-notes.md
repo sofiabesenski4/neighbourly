@@ -17,9 +17,22 @@ and anything we may need to revisit. Remove entries once they're resolved.
   with that name exists, before the questionnaire is ready to be linked to.
 - **An answer with no option we know is refused, not ignored.** Ignoring it would mean
   searching for everything.
+- **Answers travel with the question's key, not a step number.** Hiding a question would
+  renumber the rest. A key that's no longer a question leads to the first one.
+- **Going back with an answer that can't be read drops it.** The person comes to that
+  question again on the way forward, so nothing is skipped without them seeing it.
+- **Two questions can't set the same part of the search.** Their options are merged, so the
+  second would replace the first. The config is refused when it loads.
+- **"Start over" is a link, not a button.** It's a plain GET, which holds no answers. A button
+  inside the form could put the answers in the URL.
 
 ## Known limits
 
+- **The browser's own Back and Reload buttons lose the answers.** Tried in headless Chrome:
+  both ask for the URL with a plain GET, because Turbo rewrites the history entry. So people
+  see a fresh first question, and never a "resubmit" or expired page. The Back button in the
+  page keeps answers. Not tried: Safari, Firefox, or with JavaScript off, where Turbo isn't
+  running and the browser may ask to resubmit.
 - **Options match categories by name.** Renaming a category in the database takes its
   services out of an option, and an option with none left is hidden. A warning is logged:
   `[Questionnaire] missing categories`.

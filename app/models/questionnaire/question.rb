@@ -25,8 +25,9 @@ class Questionnaire
       filter.available(all_options)
     end
 
-    # Turns what was submitted into an Answer. A checkbox group submits a list of option
-    # keys, or nothing at all when none is ticked.
+    # Turns what was submitted into an Answer. Checkboxes and radio buttons both submit a
+    # list of option keys, or nothing at all when none is chosen. A radio question's list
+    # has one, so more than one can't have come from the form.
     #
     # Unknown keys are ignored as long as at least one is known. That covers an option that
     # was removed while someone had the page open. When nothing that was submitted is
@@ -38,10 +39,12 @@ class Questionnaire
 
       keys = submitted.compact_blank
       selected = keys.empty? ? [] : options.select { |option| keys.include?(option.key) }
+      return Answer.new(options: [], valid: false) if type == "radio" && selected.many?
+
       Answer.new(options: selected, valid: keys.empty? || selected.any?)
     end
   end
 
   # How a question can be asked. Each has a partial: app/views/questionnaires/_<type>.html.erb
-  Question::TYPES = %w[checkboxes].freeze
+  Question::TYPES = %w[checkboxes radio].freeze
 end
