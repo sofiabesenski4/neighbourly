@@ -1,47 +1,65 @@
-# The place someone typed, and where it is once that's been looked up.
+# Where someone is: a place they typed, with its location once that's been looked up, or
+# their device's location.
 #
 # Architecture: Question#read builds one from a submitted value. Pressing Next on the
-# question calls #resolve, which looks the place up through FlyerOrigin. Its text and
-# coordinates then travel in hidden fields, so later screens don't look it up again.
+# question calls #resolve, which looks a typed place up through FlyerOrigin. The answer then
+# travels in hidden fields, so later screens don't look it up again. A device's location
+# arrives with its coordinates, from device_location_controller.js, and is never looked up.
 #
-# - `text`: what they typed, or nil for a skipped question.
+# - `text`: what they typed. Nil for a device location or a skipped question.
 # - `point`: where it is, as a GeoPoint. Nil until it's looked up, or if that failed.
 # - `checked`: whether `text` has been looked up. With no point, the address service was
 #   down, and the person carries on without distances.
+# - `device`: whether this is the device's location.
 # - `problem`: why the answer can't be used, or nil.
 #
 # Privacy: this may be someone's home. Coordinates are rounded to 3 decimals, about 100 m,
-# and nothing is saved.
+# and nothing is saved. The browser rounds a device's location too, so rounding it here only
+# matters for a request that didn't come from our page.
 class Questionnaire
-  LocationAnswer = Data.define(:text, :point, :checked, :problem) do
-    def initialize(text: nil, point: nil, checked: false, problem: nil)
+  LocationAnswer = Data.define(:text, :point, :checked, :device, :problem) do
+    def initialize(text: nil, point: nil, checked: false, device: false, problem: nil)
       super
     end
 
-    # Reads the form's fields: `near`, what they typed, and from a place already looked up,
-    # `checked`, the text it was for, with `lat` and `lng`.
+    # Reads the form's fields: `near`, what they typed; `lat` and `lng`; and what those
+    # coordinates are for. That's the typed text in `checked`, or the device if `device` is set.
     #
-    # The coordinates only count while the text is the one they're for. Typing another place
-    # makes them out of date, and it's looked up afresh.
+    # Coordinates only count while the text is the one they're for. Typing another place makes
+    # them out of date, and it's looked up afresh. Typed text also wins over the device.
     def self.read(submitted)
       return new if submitted.nil?
       return new(problem: :unreadable) unless submitted.is_a?(Hash) && submitted.values.all?(String)
 
       text = submitted["near"].to_s.strip.presence
-      return new if text.nil?
+      return read_device(submitted) if text.nil?
       return new(text: text, problem: :too_long) if text.length > self::LIMIT
       return new(text: text) unless submitted["checked"] == text
 
-      # Flyer already knows which submitted coordinates are usable, and rounds them.
-      new(text: text, point: Flyer.new(lat: submitted["lat"], lng: submitted["lng"]).coordinates, checked: true)
+      new(text: text, point: point_from(submitted), checked: true)
     end
+
+    # Nothing was typed, so this is the device's location or a skipped question.
+    def self.read_device(submitted)
+      return new if submitted["device"].blank?
+
+      point = point_from(submitted)
+      point ? new(point: point, checked: true, device: true) : new(problem: :device)
+    end
+    private_class_method :read_device
+
+    # Flyer already knows which submitted coordinates are usable, and rounds them.
+    def self.point_from(submitted)
+      Flyer.new(lat: submitted["lat"], lng: submitted["lng"]).coordinates
+    end
+    private_class_method :point_from
 
     def valid?
       problem.nil?
     end
 
     def answered?
-      text.present?
+      device || text.present?
     end
 
     def located?
@@ -51,21 +69,14 @@ class Questionnaire
     # What LocationFilter is built with. An origin with no point means the same here as it
     # does to printouts: the place is known only by name.
     def value
-      FlyerOrigin.new(label: text, point: point)
+      device ? FlyerOrigin.from_coordinates(point) : FlyerOrigin.new(label: text, point: point)
     end
 
     def fields
       return [] unless answered?
 
-      [["[near]", text], *lookup_fields]
-    end
-
-    # The fields from the lookup, without what was typed. The question's own page has a text
-    # box for that. A lookup that failed is left out there, so pressing Next tries again.
-    def lookup_fields
-      return [] unless checked
-
-      [["[checked]", text], *([["[lat]", point.lat], ["[lng]", point.lng]] if located?)]
+      source = device ? [["[device]", "1"]] : [["[near]", text], *([["[checked]", text]] if checked)]
+      source + (located? ? [["[lat]", point.lat], ["[lng]", point.lng]] : [])
     end
 
     def lookup_needed?

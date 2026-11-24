@@ -52,6 +52,7 @@ class QuestionnairesController < ApplicationController
   PROBLEMS = {
     unreadable: "We couldn't read your answer. Please try again, or press Skip.",
     not_found: "We couldn't find that place. Check the spelling, try a street address or intersection nearby, or press Skip.",
+    device: "We couldn't read your device's location. Please try again, type a nearby place, or press Skip.",
     too_long: "That's too long for us to look up. Please type a shorter address, or press Skip."
   }.freeze
   NO_DISTANCES = "We can't look up places right now, so these services aren't sorted by distance."

@@ -4,7 +4,7 @@
 # Architecture: Question#read builds one from a submitted value. `options` is empty both for
 # a skipped question, which is valid, and for an answer that couldn't be understood.
 #
-# LocationAnswer is the same for a typed place. Both respond to everything below, so
+# LocationAnswer is the same for a location question. Both respond to everything below, so
 # Questionnaire and the views needn't know which they have.
 class Questionnaire
   Answer = Data.define(:options, :valid) do

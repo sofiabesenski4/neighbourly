@@ -32,6 +32,14 @@ and anything we may need to revisit. Remove entries once they're resolved.
   `Questionnaire#missing_distances?` says when it applies.
 - **A place is looked up once.** Its text and rounded coordinates travel in hidden fields.
   Changing the text looks it up again, and so does pressing Next after a failed lookup.
+- **The device's location waits for Next.** The printout moves on by itself. Here people see
+  how accurate it is first, since a laptop's can be off by kilometres.
+- **A typed place wins over the device's location,** and each replaces the other on the page.
+- **Asking the browser is shared with the printout** in `app/javascript/lib/device_location.js`.
+  PR #85 changes lines beside the ones that moved, so expect a small conflict there. Its
+  `flyer_builder_controller.js` should keep calling the shared code.
+- **The page says the browser may use Google's or Apple's location service,** as the printout
+  does, because outside companies are involved.
 - **The page doesn't say who does the lookup.** It's the BC government's address service, as
   for printouts, which don't say so either.
 - **The "not found" wording isn't shared with the printout.** The printout's is private to
