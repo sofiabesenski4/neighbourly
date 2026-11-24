@@ -148,4 +148,69 @@ RSpec.describe CategorySearch do
 
     expect(described_class.call(categories: [meals.id.to_s]).first.resources).to eq([listing])
   end
+
+  # The questionnaire's filters are in spec/models/questionnaire_spec.rb. These are stand-ins.
+  describe "filters" do
+    # Keeps services whose name doesn't include `hides`, and puts ones that include `first` first.
+    def filter(hides: nil, first: nil)
+      instance_double(Questionnaire::Filter).tap do |filter|
+        allow(filter).to receive(:keep?) { |service| hides.nil? || !service.name.include?(hides) }
+        allow(filter).to receive(:rank) { |service| (first && service.name.include?(first)) ? -1 : 0 }
+      end
+    end
+
+    def names(**options)
+      described_class.call(categories: [], **options).map { |section| section.resources.map(&:name) }
+    end
+
+    it "changes nothing when there are none" do
+      resource("Beta", [meals])
+      resource("Alpha", [meals, shelters])
+
+      expect(names(filters: [])).to eq(names)
+      expect(names(sort: "asc", filters: [])).to eq([%w[Alpha Beta]])
+    end
+
+    it "leaves out services that any filter doesn't keep, in either layout" do
+      resource("Alpha", [meals])
+      resource("Beta", [meals])
+      resource("Gamma", [meals])
+      filters = [filter(hides: "Alpha"), filter(hides: "Beta")]
+
+      expect(names(sort: "asc", filters: filters)).to eq([["Gamma"]])
+      expect(described_class.call(categories: [meals.id.to_s], filters: filters).map { |section| section.resources.map(&:name) })
+        .to eq([["Gamma"]])
+    end
+
+    it "puts lower ranks first, and otherwise keeps the order asked for" do
+      resource("Alpha", [meals])
+      resource("Beta", [meals])
+      resource("Gamma", [meals])
+
+      expect(names(sort: "asc", filters: [filter(first: "Beta")])).to eq([%w[Beta Alpha Gamma]])
+      expect(names(sort: "desc", filters: [filter(first: "Beta")])).to eq([%w[Beta Gamma Alpha]])
+      expect(described_class.call(categories: [meals.id.to_s], filters: [filter(first: "Beta")]).first.resources.map(&:name))
+        .to eq(%w[Beta Alpha Gamma])
+    end
+
+    it "adds ranks up, so a service that suits two filters comes first" do
+      resource("Alpha red", [meals])
+      resource("Beta red blue", [meals])
+      resource("Delta", [meals])
+      resource("Gamma blue", [meals])
+
+      expect(names(sort: "asc", filters: [filter(first: "red"), filter(first: "blue")]))
+        .to eq([["Beta red blue", "Alpha red", "Gamma blue", "Delta"]])
+    end
+
+    it "ranks before distance, and sorts by distance within a rank" do
+      origin = FlyerOrigin.new(label: "Here", point: GeoPoint.new(lat: 48.42, lng: -123.36))
+      resource("Near", [meals], address_attributes: {lat: 48.421, lng: -123.36})
+      resource("Far first", [meals], address_attributes: {lat: 48.50, lng: -123.36})
+      resource("Middle first", [meals], address_attributes: {lat: 48.45, lng: -123.36})
+
+      expect(names(sort: "distance", origin: origin, filters: [filter(first: "first")]))
+        .to eq([["Middle first", "Far first", "Near"]])
+    end
+  end
 end

@@ -1,9 +1,11 @@
 require "rails_helper"
+require "support/age_question"
 require "support/two_question_questionnaire"
 
 # Covers what the questionnaire's URL returns, and the privacy rules for every response.
 # Which services an answer finds is covered in spec/models/questionnaire_spec.rb.
 RSpec.describe "Questionnaires", type: :request do
+  include AgeQuestion
   include TwoQuestionQuestionnaire
 
   let(:source) { Source.create!(name: "Local guide", source_type: "csv") }
@@ -391,5 +393,19 @@ RSpec.describe "Questionnaires", type: :request do
 
       expect(response.body).to eq("Near kitchen\nFar kitchen")
     end
+  end
+
+  # Added by config and a filter alone. Which services it hides is in the model spec.
+  it "asks and answers a question about a service's details with no view of its own" do
+    use_age_question
+    source.services.create!(name: "Adult kitchen", categories: [meals], additional_details: {"ages" => "19+"})
+
+    post find_help_for_myself_path, params: {questionnaire: {step: "location", answers: {categories: ["food"]}}}
+    expect(page_of(response).at_css("#question-progress").text).to eq("Question 3 of 3")
+    expect(page_of(response).at_css("h1").text).to eq("How old are you?")
+    expect(page_of(response).css("fieldset label").map { |label| label.text.strip }).to eq(["Under 19", "19 or older"])
+
+    post find_help_for_myself_path, params: {questionnaire: {step: "age", answers: {categories: ["food"], age: ["under_19"]}}}
+    expect(response.body).to eq("Soup kitchen")
   end
 end

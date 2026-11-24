@@ -5,8 +5,8 @@
 # builds a Questionnaire from what was submitted, calls #move with the button pressed, and
 # shows either the question it lands on or, once #finished?, the results. Each answered
 # question becomes one filter, the filters' search options are merged, and CategorySearch
-# runs the search. That is the same search printouts use, so the two always agree about
-# which services match.
+# runs the search, asking the filters about each service. That is the same search printouts
+# use, so the two always agree about which services are in a category.
 #
 # Answers across questions narrow the search. An unanswered question adds no filter, so
 # answering nothing finds every visible service. The order of answering makes no difference.
@@ -126,7 +126,7 @@ class Questionnaire
 
   # The matching services, each once.
   def services
-    CategorySearch.call(**search_options).flat_map(&:resources)
+    CategorySearch.call(**search_options, filters: filters).flat_map(&:resources)
   end
 
   private

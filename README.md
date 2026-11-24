@@ -164,6 +164,38 @@ bundle exec rspec
 
 Before you submit PRs or push a branch, make sure all tests pass. Don't just use Claude to stub out specs that were failing. We need to make sure regressions do not occur.
 
+## Adding a Questionnaire Question
+
+The guided questionnaire at `/find-help/myself` is described in `config/questionnaire.yml`. To change the wording of a question or add an option, edit that file.
+
+To add a question:
+
+1. Add it to `config/questionnaire.yml`. The comments there explain each setting.
+2. If it's about a service's details, such as the ages it serves, add a method to `ResourceAttributes` that reads them. Return `nil` when a value is missing or unclear, and don't guess from free text.
+3. If no filter in `app/models/questionnaire` fits, add one and register it in `Questionnaire::FILTERS`:
+
+   ```ruby
+   class Questionnaire
+     class AgeFilter < Filter
+       BRACKETS = {"under_19" => 0..18, "19_up" => 19..}.freeze
+
+       # Hides a service only when its ages are known and don't overlap the answer.
+       def keep?(service)
+         ages = ResourceAttributes.new(service).age_range
+         ages.nil? || options.any? { |option| ages.overlap?(BRACKETS.fetch(option.key)) }
+       end
+     end
+   end
+   ```
+
+   - `keep?` hides services. It must keep one whose details are unknown.
+   - `rank` sorts them instead, and hides nothing. Lower comes first. When several filters rank a service, their ranks are added.
+   - `search_options` is for anything `CategorySearch` takes as an argument. List its names in `search_keys` too.
+
+4. Add specs for the filter and any new `ResourceAttributes` method.
+
+A question of an existing type needs no view changes. `docs/questionnaire-notes.md` records the decisions behind the questionnaire, including its privacy rules.
+
 ## Libraries
 
 - Devise for authentication

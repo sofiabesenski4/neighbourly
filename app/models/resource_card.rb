@@ -105,9 +105,7 @@ class ResourceCard
   end
 
   def details
-    @details ||= service.additional_details.each_with_object({}) do |(key, value), found|
-      found[ContentPipeline::Parsers::Csv.header_key(key.to_s)] ||= value
-    end
+    @details ||= service.details_by_header
   end
 
   # The resource form saves the range as numbers. An import keeps whatever its

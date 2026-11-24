@@ -1,4 +1,5 @@
 require "rails_helper"
+require "support/age_question"
 require "support/two_question_questionnaire"
 
 # Covers the questionnaire's rules: what the config must contain, how submitted answers are
@@ -6,6 +7,7 @@ require "support/two_question_questionnaire"
 # spec/requests/questionnaires_spec.rb, and turning categories into IDs is in
 # spec/models/questionnaire/category_filter_spec.rb.
 RSpec.describe Questionnaire do
+  include AgeQuestion
   include TwoQuestionQuestionnaire
 
   let(:source) { Source.create!(name: "Local guide", source_type: "csv") }
@@ -411,6 +413,52 @@ RSpec.describe Questionnaire do
       expect(described_class.new(answers: {"location" => place}, step: "categories").lookup_needed?("next")).to be(false)
       unreadable = {"categories" => ["unknown"], "location" => place}
       expect(described_class.new(answers: unreadable, step: "location").lookup_needed?("next")).to be(false)
+    end
+  end
+
+  # The age question is only in specs. It proves one can be added with config and a filter.
+  describe "a question about a service's details" do
+    before do
+      use_age_question
+      service("Youth meals", meals, additional_details: {"age_range" => {"min" => 13, "max" => 18}})
+      service("Adult meals", meals, additional_details: {"Ages" => "19+"})
+      service("Young adult meals", meals, additional_details: {"ages" => "15-25"})
+      service("Anyone's meals", meals)
+      service("Unclear meals", meals, additional_details: {"ages" => "some ages"})
+      service("Adult shelter", shelters, additional_details: {"ages" => "19+"})
+    end
+
+    it "hides only services whose known ages rule the person out" do
+      expect(names("categories" => ["food"], "age" => ["under_19"]))
+        .to eq(["Anyone's meals", "Unclear meals", "Young adult meals", "Youth meals"])
+      expect(names("categories" => ["food"], "age" => ["19_up"]))
+        .to eq(["Adult meals", "Anyone's meals", "Unclear meals", "Young adult meals"])
+    end
+
+    it "hides nothing when skipped" do
+      expect(names("categories" => ["food"])).to eq(names("categories" => ["food"], "age" => []))
+      expect(names("categories" => ["food"]).size).to eq(5)
+    end
+
+    it "combines with every other answer, in any order" do
+      place = {"device" => "1", "lat" => "48.42", "lng" => "-123.36"}
+      Service.find_by!(name: "Youth meals").update!(address_attributes: {lat: 48.42, lng: -123.36})
+
+      expected = ["Youth meals", "Anyone's meals", "Unclear meals", "Young adult meals"]
+      expect(names("categories" => ["food"], "location" => place, "age" => ["under_19"])).to eq(expected)
+      expect(names("age" => ["under_19"], "location" => place, "categories" => ["food"])).to eq(expected)
+    end
+
+    it "lets an answer put services first instead of hiding them" do
+      ranking = Class.new(Questionnaire::Filter) do
+        def rank(service)
+          (ResourceAttributes.new(service).age_range == (13..18)) ? -1 : 0
+        end
+      end
+      use_age_question(filter: ranking)
+
+      expect(names("categories" => ["food"], "age" => ["under_19"]))
+        .to eq(["Youth meals", "Adult meals", "Anyone's meals", "Unclear meals", "Young adult meals"])
     end
   end
 end
