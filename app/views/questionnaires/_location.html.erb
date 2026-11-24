@@ -1,0 +1,19 @@
+<%# A question answered by typing a place.
+    Locals: question (Questionnaire::Question), answer (Questionnaire::LocationAnswer).
+
+    The hidden fields say where the place is if it's been looked up, so that pressing Next
+    again without changing it doesn't repeat the lookup. %>
+<% name = "questionnaire[answers][#{question.key}]" %>
+<% field_id = "#{question.key}_near" %>
+<div class="mt-4">
+  <%= label_tag field_id, "Enter a place", class: "font-medium text-stone-900" %>
+  <p id="<%= field_id %>_hint" class="mt-1 mb-2 text-sm text-stone-600">A street address or intersection, like 919 Pandora Ave or Douglas St and Yates St.</p>
+  <%= text_field_tag "#{name}[near]", answer.text, id: field_id, maxlength: Questionnaire::LocationAnswer::LIMIT, autocomplete: "off",
+        aria: {describedby: ["#{field_id}_hint", ("question-message" if @message)].compact.join(" ")},
+        class: "block min-h-11 w-full rounded-[7px] border border-stone-400 px-3 py-2 text-base text-stone-900 focus:outline-sage-600" %>
+  <% if answer.located? %>
+    <% answer.lookup_fields.each do |suffix, value| %>
+      <%= hidden_field_tag "#{name}#{suffix}", value, id: nil, autocomplete: "off" %>
+    <% end %>
+  <% end %>
+</div>

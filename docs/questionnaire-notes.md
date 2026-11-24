@@ -25,9 +25,22 @@ and anything we may need to revisit. Remove entries once they're resolved.
   second would replace the first. The config is refused when it loads.
 - **"Start over" is a link, not a button.** It's a plain GET, which holds no answers. A button
   inside the form could put the answers in the URL.
+- **Location sorts and never filters.** Services with no known location come last.
+- **When the address service is down, people carry on.** Services are in name order, and a
+  message says they aren't sorted by distance. The same goes for a connection that has used
+  up its 60 lookups an hour. Whoever builds the results page needs to keep that message:
+  `Questionnaire#missing_distances?` says when it applies.
+- **A place is looked up once.** Its text and rounded coordinates travel in hidden fields.
+  Changing the text looks it up again, and so does pressing Next after a failed lookup.
+- **The page doesn't say who does the lookup.** It's the BC government's address service, as
+  for printouts, which don't say so either.
+- **The "not found" wording isn't shared with the printout.** The printout's is private to
+  its controller, and PR #85 changes that file.
 
 ## Known limits
 
+- **Landmarks like "Central Library" usually aren't found.** The address service needs a
+  street address or intersection.
 - **The browser's own Back and Reload buttons lose the answers.** Tried in headless Chrome:
   both ask for the URL with a plain GET, because Turbo rewrites the history entry. So people
   see a fresh first question, and never a "resubmit" or expired page. The Back button in the
@@ -51,3 +64,6 @@ and anything we may need to revisit. Remove entries once they're resolved.
   `data_collection`, whose own defaults do collect parameters and request bodies. So don't
   remove the line without turning those off. Sentry isn't loaded in tests, so no spec guards
   this.
+- **Sentry doesn't record the place being looked up,** for the same reason. The lookup's URL
+  holds the place, and Sentry notes outgoing requests, but leaves the query off. Checked by
+  hand with Sentry 7.2: turning `send_default_pii` on does record it.

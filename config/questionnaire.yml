@@ -9,14 +9,15 @@
 #            answers are never saved.
 #   title    the question, as people read it.
 #   hint     optional: a short line of help under the title.
-#   type     how it's asked: "checkboxes" for any number of options, "radio" for one.
+#   type     how it's asked: "checkboxes" for any number of options, "radio" for one, or
+#            "location" for typing a place.
 #   filter   which filter class turns the answer into part of the search. Must be listed
 #            in Questionnaire::FILTERS. Two questions can't both use CategoryFilter: the
 #            second would replace the first instead of narrowing it.
-#   options  the choices. Each has a key, the label people read, and whatever its filter
-#            needs. CategoryFilter needs `categories`: the names of the service
-#            categories it stands for, exactly as in db/category_names.yml. Names are
-#            used because IDs differ between databases.
+#   options  the choices, for any type but location. Each has a key, the label people
+#            read, and whatever its filter needs. CategoryFilter needs `categories`: the
+#            names of the service categories it stands for, exactly as in
+#            db/category_names.yml. Names are used because IDs differ between databases.
 #
 # The labels and groups are a first draft and are expected to change.
 #
@@ -42,3 +43,8 @@ questions:
       - { key: work, label: Jobs and computers, categories: [Employment Support, Computer & Internet] }
       - { key: youth, label: Youth services, categories: [Youth Services] }
       - { key: indigenous, label: Indigenous services, categories: [Indigenous Support] }
+  - key: location
+    title: Where are you?
+    hint: We'll show the closest services first. This is optional, and it isn't saved.
+    type: location
+    filter: LocationFilter

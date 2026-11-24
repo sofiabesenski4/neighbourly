@@ -17,7 +17,8 @@ class Questionnaire
       []
     end
 
-    # The options the person chose. Never empty: an unanswered question has no filter.
+    # The answer's value: for most questions, the options the person chose. Never empty,
+    # because an unanswered question has no filter.
     def initialize(options)
       @options = options
     end

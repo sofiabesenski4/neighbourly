@@ -1,10 +1,10 @@
 <%# A question where people choose one option. A chosen radio button can't be unchosen, so
     Skip is how to clear it. It's submitted as a list of one, like checkboxes.
-    Locals: question (Questionnaire::Question), chosen (a list of the chosen option, if any). %>
+    Locals: question (Questionnaire::Question), answer (Questionnaire::Answer). %>
 <div class="mt-4 grid gap-1 sm:grid-cols-2">
   <% question.options.each do |option| %>
     <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] p-2.5 text-base text-stone-800 hover:bg-sage-50 has-checked:bg-sage-100">
-      <%= radio_button_tag "questionnaire[answers][#{question.key}][]", option.key, chosen.include?(option),
+      <%= radio_button_tag "questionnaire[answers][#{question.key}][]", option.key, answer.options.include?(option),
             id: "#{question.key}_#{option.key}",
             class: "h-5 w-5 shrink-0 border-stone-400 accent-sage-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" %>
       <span class="min-w-0 break-words"><%= option.label %></span>
