@@ -171,7 +171,7 @@ The guided questionnaire at `/find-help/myself` is described in `config/question
 To add a question:
 
 1. Add it to `config/questionnaire.yml`. The comments there explain each setting.
-2. If it's about a service's details, such as the ages it serves, add a method to `ResourceAttributes` that reads them. Return `nil` when a value is missing or unclear, and don't guess from free text.
+2. If it's about a service's details, such as the ages it serves, add a method to `ResourceAttributes` that reads them, and its name to `NAMES`. Return `nil` when a value is missing or unclear, and don't guess from free text. Then set `requires` to that name, so the question stays hidden until a visible service has the detail. Services must save the detail under a name the method looks for. `docs/service-details.md` lists them, so add yours there.
 3. If no filter in `app/models/questionnaire` fits, add one and register it in `Questionnaire::FILTERS`:
 
    ```ruby

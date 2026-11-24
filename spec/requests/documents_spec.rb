@@ -162,6 +162,16 @@ RSpec.describe "Documents", type: :request do
         )
       end
 
+      # Questions filter on these ages, so they have to be saved the way they're looked for.
+      # See docs/service-details.md.
+      it "saves ages where questions look for them" do
+        {["19", ""] => 19.., ["13", "18"] => 13..18, ["", "18"] => 0..18, ["", ""] => nil}.each do |(minimum, maximum), ages|
+          post documents_path, params: valid_params.deep_merge(document: {age_min: minimum, age_max: maximum})
+
+          expect(ResourceAttributes.new(Document.last.service).age_range).to eq(ages)
+        end
+      end
+
       it "saves neither the resource nor its service when the service is invalid" do
         expect { post documents_path, params: valid_params.deep_merge(document: {title: ""}) }
           .not_to change(Document, :count)

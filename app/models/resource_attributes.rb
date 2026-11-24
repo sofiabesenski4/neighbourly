@@ -8,9 +8,27 @@
 # text. Callers must treat nil as "unknown", which never rules a service out. Someone missing
 # a service they could use is worse than someone seeing one they can't.
 #
-# Add a method here for each new kind of detail a question needs. The formats below are the
-# ones saved today, and an agreed format may replace them. See docs/questionnaire-notes.md.
+# docs/service-details.md lists the names and formats that are found, for anyone saving
+# services. A detail under any other name is unknown here, with no error.
+#
+# Add a method here, and to NAMES, for each new kind of detail a question needs. The formats
+# below are the ones saved today, and an agreed format may replace them. See
+# docs/questionnaire-notes.md.
 class ResourceAttributes
+  # The details a question can require. A name in the config is looked up here, so it can only
+  # ever call these. Add each new method's name.
+  NAMES = {"age_range" => :age_range}.freeze
+
+  # Where ages may be saved, best first. ResourceCard shows the first of these too.
+  AGE_HEADERS = ["age range", "ages", "age"].freeze
+
+  # Whether any service that people can see has a clear value for one of NAMES. Stops at the
+  # first that does, so it's only slow when none has, and each is read in turn.
+  def self.any_known?(name)
+    attribute = NAMES.fetch(name)
+    Service.visible.select(:id, :additional_details).find_each.any? { |service| !new(service).public_send(attribute).nil? }
+  end
+
   # "15-25" or "15 to 25", and "19+".
   AGES_BETWEEN = /\A(\d{1,3})\s*(?:-|–|to)\s*(\d{1,3})\z/
   AGES_FROM = /\A(\d{1,3})\s*\+\z/
@@ -25,7 +43,7 @@ class ResourceAttributes
   # Uses the first of these details that's filled in, the same one the card shows. If that
   # one is unclear the answer is nil, even when another is clear, because they disagree.
   def age_range
-    value = @details.values_at("age range", "ages", "age").find { |detail| filled_in?(detail) }
+    value = @details.values_at(*AGE_HEADERS).find { |detail| filled_in?(detail) }
     value.is_a?(Hash) ? range_from_form(value) : range_from_text(value)
   end
 

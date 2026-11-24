@@ -7,11 +7,86 @@ RSpec.describe ResourceAttributes do
     described_class.new(Service.new(name: "Drop-in", additional_details: details)).age_range
   end
 
+  # docs/service-details.md is what people saving services read.
+  it "documents every name it looks under" do
+    documentation = Rails.root.join("docs/service-details.md").read
+
+    described_class::NAMES.each_key { |name| expect(documentation).to include("`#{name}`") }
+    described_class::AGE_HEADERS.each { |header| expect(documentation).to include("`#{header.titleize}`") }
+  end
+
+  describe ".any_known?" do
+    let(:source) { Source.create!(name: "Local guide", source_type: "csv") }
+
+    def service(details, **attributes)
+      source.services.create!(name: "Drop-in", additional_details: details, **attributes)
+    end
+
+    it "is false with no services, or none that say" do
+      expect(described_class.any_known?("age_range")).to be(false)
+
+      service({})
+      service({"ages" => "youth"})
+      expect(described_class.any_known?("age_range")).to be(false)
+    end
+
+    it "is false when the only services that say are closed or were removed" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
+      row = source.documents.create!(title: "Removed", content: "Removed")
+      row.reports.create!(reason: "out of date", status: "valid")
+      service({"ages" => "19+"}, document: row)
+      service({"ages" => "19+"}, closed: true)
+
+      expect(described_class.any_known?("age_range")).to be(false)
+    end
+
+    it "is true once one visible service says" do
+      service({"ages" => "youth"})
+      service({"ages" => "19+"})
+
+      expect(described_class.any_known?("age_range")).to be(true)
+    end
+
+    it "reads only the details it lists" do
+      expect { described_class.any_known?("destroy") }.to raise_error(KeyError)
+    end
+
+    it "lists every detail it can read" do
+      expect(described_class::NAMES.values).to match_array(described_class.public_instance_methods(false))
+    end
+  end
+
+  # What imports really save, so a change to the importer can't quietly break this. The
+  # resource form is in spec/requests/documents_spec.rb.
+  describe "a CSV import" do
+    def imported_ages(header, value)
+      allow_any_instance_of(ContentPipeline::Fetcher).to receive(:call).and_return("id,Name,#{header}\n1,Drop-in,#{value}\n")
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
+      source = Source.create!(name: "#{header} list", url: "https://example.com/list.csv", source_type: "csv")
+      ContentPipeline::Ingester.new(source).call
+      described_class.new(source.services.sole).age_range
+    end
+
+    it "is found under each documented column name, however it's written" do
+      ["Ages", "Age", "Age Range", "AGE_RANGE", "age-range"].each do |header|
+        expect(imported_ages(header, "15-25")).to eq(15..25), "for #{header}"
+      end
+    end
+
+    it "isn't found under any other column name" do
+      ["Age Group", "Ages Served", "Min Age", "Notes"].each do |header|
+        expect(imported_ages(header, "15-25")).to be_nil, "for #{header}"
+      end
+    end
+  end
+
   describe "#age_range" do
     it "reads the resource form's numbers" do
       expect(ages("age_range" => {"min" => 13, "max" => 18})).to eq(13..18)
       expect(ages("age_range" => {"min" => 19, "max" => nil})).to eq(19..)
       expect(ages("age_range" => {"min" => nil, "max" => 18})).to eq(0..18)
+      expect(ages("age_range" => {"min" => 19})).to eq(19..)
+      expect(ages("age_range" => {"max" => 18})).to eq(0..18)
       expect(ages("age_range" => {"min" => 0, "max" => 5})).to eq(0..5)
       expect(ages("age_range" => {"min" => "13", "max" => "18"})).to eq(13..18)
       expect(ages("age_range" => {"min" => "", "max" => "18"})).to eq(0..18)
@@ -38,7 +113,7 @@ RSpec.describe ResourceAttributes do
 
     it "is nil when the text is unclear, without guessing" do
       ["youth", "all ages", "19", "adults 19+", "19+ (some exceptions)", "13-18, 25+", "1990-2000", "25-15", "-5", "19.5+",
-        "about 19+", "about 15-25"].each do |text|
+        "about 19+", "about 15-25", "19 and over", "under 19", "varies"].each do |text|
         expect(ages("ages" => text)).to be_nil, "for #{text}"
       end
     end

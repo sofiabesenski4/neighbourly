@@ -3,11 +3,14 @@
 # Architecture: Questionnaire holds a list of these. The views draw a question using its
 # `type` as the name of a partial, so a new question of an existing type needs no new view.
 class Questionnaire
-  Question = Data.define(:key, :title, :hint, :type, :filter, :all_options) do
+  Question = Data.define(:key, :title, :hint, :type, :filter, :all_options, :requires) do
     # Builds a question from one entry of the config.
     def self.from_config(entry)
       type = entry.fetch("type")
       raise KeyError, "unknown question type: #{type}" unless self::TYPES.include?(type)
+
+      requires = entry["requires"]
+      raise KeyError, "unknown attribute: #{requires}" unless requires.nil? || ResourceAttributes::NAMES.key?(requires)
 
       new(
         key: entry.fetch("key"),
@@ -15,8 +18,15 @@ class Questionnaire
         hint: entry["hint"],
         type: type,
         filter: FILTERS.fetch(entry.fetch("filter")),
-        all_options: ((type == "location") ? [] : entry.fetch("options")).map { |option| Option.from_config(option) }
+        all_options: ((type == "location") ? [] : entry.fetch("options")).map { |option| Option.from_config(option) },
+        requires: requires
       )
+    end
+
+    # Whether there's any point in asking. When no service says what this question is about,
+    # the answer couldn't change the results, and it may be something personal to ask.
+    def askable?
+      requires.nil? || ResourceAttributes.any_known?(requires)
     end
 
     # The options people can choose. The filter leaves out any it couldn't search for.

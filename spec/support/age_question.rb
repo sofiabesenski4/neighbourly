@@ -4,7 +4,7 @@
 # AgeFilter is the example in the README. Keep the two the same.
 #
 # Include the module and call use_age_question, which adds it after the real questions. Pass
-# a filter to use another one for it.
+# a filter to use another one for it, and other settings to change its config entry.
 module AgeQuestion
   class AgeFilter < Questionnaire::Filter
     BRACKETS = {"under_19" => 0..18, "19_up" => 19..}.freeze
@@ -24,12 +24,12 @@ module AgeQuestion
     "options" => [{"key" => "under_19", "label" => "Under 19"}, {"key" => "19_up", "label" => "19 or older"}]
   }.freeze
 
-  def use_age_question(filter: AgeFilter)
+  def use_age_question(filter: AgeFilter, **settings)
     stub_const("Questionnaire::FILTERS", Questionnaire::FILTERS.merge("AgeFilter" => filter))
     # It may already be replaced by an earlier call.
     allow(Questionnaire).to receive(:questions_from).and_call_original
     config = YAML.safe_load_file(Questionnaire::CONFIG_PATH)
-    config["questions"] << ENTRY
+    config["questions"] << ENTRY.merge(settings.stringify_keys)
     questions = Tempfile.create(["questionnaire", ".yml"]) do |file|
       file.write(config.to_yaml)
       file.flush
