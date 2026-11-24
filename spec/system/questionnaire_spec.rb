@@ -49,6 +49,32 @@ RSpec.describe "Questionnaire", type: :system do
       expect(page.current_url).to end_with("/find-help/myself")
     end
 
+    it "goes from the home page to the results" do
+      visit root_path
+      click_link "For myself"
+      expect_question 1
+      expect(page).to have_css("h1:focus", text: "What do you need help with?")
+      check "Food"
+      click_button "Next"
+      expect_question 2
+      fill_in "Enter a place", with: "919 Pandora Ave"
+      click_button "Next"
+
+      expect_results
+      expect(page).to have_content(/Near kitchen\s+Far kitchen/)
+      expect(page).not_to have_content("Shelter")
+    end
+
+    it "sends someone looking for another person from the home page to chat" do
+      visit root_path
+      click_link "For someone else"
+      expect(page).to have_title("Find help for someone else", exact: true)
+      click_link "Ask in chat"
+
+      expect(page).to have_current_path(new_chat_path)
+      expect(page).to have_content("Guest chat")
+    end
+
     it "starts at the question, and can be answered with the keyboard" do
       visit find_help_for_myself_path
       expect(page).to have_css("h1:focus", text: "What do you need help with?")

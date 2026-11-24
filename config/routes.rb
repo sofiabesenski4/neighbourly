@@ -46,6 +46,8 @@ Rails.application.routes.draw do
   # The guided questionnaire. GET and POST share one URL, which never holds an answer.
   get "find-help/myself", to: "questionnaires#show", as: :find_help_for_myself
   post "find-help/myself", to: "questionnaires#create"
+  # Only says it isn't ready. Point this at the real flow once there is one.
+  get "find-help/someone-else", to: "pages#find_help_for_someone_else", as: :find_help_for_someone_else
 
   # Keep existing builder and HTML preview bookmarks working.
   get "flyers/new", to: "flyers#preview"

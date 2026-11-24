@@ -173,6 +173,28 @@ RSpec.describe "Landing question composer", type: :system do
     expect(page).to have_content("Find a meal near downtown")
   end
 
+  # Both choices act alike. The questionnaire couldn't keep the conversation: its answers
+  # load whole new pages, and only the open page holds the key to a guest's conversation.
+  ["For myself", "For someone else"].each do |choice|
+    it "lets go of a guest conversation when someone looks for help #{choice.downcase}" do
+      visit root_path
+      fill_in "What are you looking for?", with: "Find a meal near downtown"
+      click_button "Start chat", exact: true
+      expect(page).to have_content("Find a meal near downtown")
+      conversation = guest_chat_path(Chat.last)
+
+      navigation = "nav[aria-label='Main navigation']"
+      find(navigation).click_link "neighbourly", exact: true
+      expect(find(navigation)).to have_link("Chat", href: conversation)
+      click_link choice
+      expect(page).to have_css("body[data-guest-support-page='false']", visible: :all)
+      find(navigation).click_link "Chat", exact: true
+
+      expect(page).to have_current_path(new_chat_path)
+      expect(page).to have_no_content("Find a meal near downtown")
+    end
+  end
+
   it "keeps the signed-in visitor's question editable after a failed start" do
     login_as(user, scope: :user)
     allow(RubyLLM.config).to receive(:anthropic_api_key).and_return(nil)
