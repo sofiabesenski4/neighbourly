@@ -21,6 +21,12 @@ and anything we may need to revisit. Remove entries once they're resolved.
   renumber the rest. A key that's no longer a question leads to the first one.
 - **Going back with an answer that can't be read drops it.** The person comes to that
   question again on the way forward, so nothing is skipped without them seeing it.
+- **Unknown details never hide a service.** Most services don't say what ages or genders they
+  serve, so hiding the unknown ones would hide nearly everything. Categories are the exception.
+- **Ranks add up** when several answers rank a service, so one that suits two answers comes
+  before one that suits one. Ties keep their order: nearest first, then by name.
+- **Ages are read now, though no question asks for them yet.** They're saved in clear formats,
+  `"15-25"`, `"19+"` and `{"min": 19}`. Gender isn't read, because it's saved only as free text.
 - **Two questions can't set the same part of the search.** Their options are merged, so the
   second would replace the first. The config is refused when it loads.
 - **"Start over" is a link, not a button.** It's a plain GET, which holds no answers. A button
@@ -45,8 +51,17 @@ and anything we may need to revisit. Remove entries once they're resolved.
 - **The "not found" wording isn't shared with the printout.** The printout's is private to
   its controller, and PR #85 changes that file.
 
+## Open questions
+
+- **The format for demographics isn't agreed with Sofia.** `ResourceAttributes#age_range`
+  reads today's formats and may need to change. PR #96 writes ages as text like `"19+"`.
+- **Whether "Do any of these apply to you?" sorts or filters.** The plan is to sort, with
+  `rank`, unless the team decides otherwise.
+
 ## Known limits
 
+- **Of the 20 seeded services, 3 have ages and none has gender.** An age question would hide
+  few services until there's more data. Importing a changed row again replaces these details.
 - **Landmarks like "Central Library" usually aren't found.** The address service needs a
   street address or intersection.
 - **The browser's own Back and Reload buttons lose the answers.** Tried in headless Chrome:

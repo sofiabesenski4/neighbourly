@@ -159,4 +159,11 @@ RSpec.describe Service, type: :model do
       expect { created.destroy! }.to change(Address, :count).by(-1)
     end
   end
+
+  # ResourceCard and ResourceAttributes both find details this way.
+  it "gives its details by header, however it was written, keeping the first that says something" do
+    service = described_class.new(additional_details: {"Intake_Info" => "Call first", "INTAKE INFO" => "Walk in", "Ages" => nil, "ages" => "19+"})
+
+    expect(service.details_by_header).to eq("intake info" => "Call first", "ages" => "19+")
+  end
 end

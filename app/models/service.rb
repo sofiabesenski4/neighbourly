@@ -98,6 +98,14 @@ class Service < ApplicationRecord
     categories.map(&:name)
   end
 
+  # Additional details by their header as imports compare them, so "Intake Info",
+  # "intake_info" and "INTAKE INFO" are all "intake info". The first of several wins.
+  def details_by_header
+    additional_details.each_with_object({}) do |(key, value), found|
+      found[ContentPipeline::Parsers::Csv.header_key(key.to_s)] ||= value
+    end
+  end
+
   # A GeoPoint, or nil when there is no address or its location isn't known.
   def coordinates
     address&.coordinates
