@@ -50,6 +50,39 @@ RSpec.describe "Pages", type: :request do
         expect(hero.text).to include("Find food, shelter, health care, and everyday support nearby.")
       end
 
+      it "asks who the help is for, between the heading and the chat box" do
+        get root_path
+
+        document = Nokogiri::HTML(response.body)
+        section = document.at_css("section[aria-labelledby='find-help-heading']")
+        expect(section.at_css("h2#find-help-heading").text).to eq("Who are you looking for help for?")
+        expect(section.css("a").map { |link| [link.text.squish, link["href"]] })
+          .to eq([["For myself", "/find-help/myself"], ["For someone else", "/find-help/someone-else"]])
+        expect(document.css("main section").map { |item| item["aria-labelledby"] || item["aria-label"] })
+          .to eq(["home-heading", "find-help-heading", "Start a chat", "printout-heading", "community-heading"])
+      end
+
+      # "For myself" means little in a screen reader's list of links without the question.
+      it "describes each choice with the question, and loads it as a whole new page" do
+        get root_path
+
+        links = Nokogiri::HTML(response.body).css("section[aria-labelledby='find-help-heading'] a")
+        expect(links.map { |link| link["aria-describedby"] }).to eq(["find-help-heading"] * 2)
+        expect(links.map { |link| link["data-turbo"] }).to eq(["false"] * 2)
+      end
+
+      it "leads to a page for each choice" do
+        get root_path
+
+        links = Nokogiri::HTML(response.body).css("section[aria-labelledby='find-help-heading'] a")
+        headings = links.map do |link|
+          get link["href"]
+          expect(response).to have_http_status(:ok)
+          Nokogiri::HTML(response.body).at_css("main h1").text
+        end
+        expect(headings).to eq(["What do you need help with?", "Find help for someone else"])
+      end
+
       it "describes community features without claiming verification" do
         get root_path
 
@@ -114,6 +147,27 @@ RSpec.describe "Pages", type: :request do
         expect(sign_out_form.at_css("input[name='_method']")["value"]).to eq("delete")
         expect(sign_out_form.at_css("button").text.squish).to eq("Sign out")
       end
+    end
+  end
+
+  describe "GET /find-help/someone-else" do
+    it "says it isn't ready, and offers chat, the printout and home instead" do
+      get "/find-help/someone-else"
+
+      document = Nokogiri::HTML(response.body)
+      expect(document.at_css("title").text).to eq("Find help for someone else")
+      expect(document.css("main h1").map(&:text)).to eq(["Find help for someone else"])
+      expect(document.at_css("main").text)
+        .to include("Finding help for someone else isn't ready yet. You can ask in chat, or make a printout to give them.")
+      expect(document.css("main a").map { |link| [link.text, link["href"]] })
+        .to eq([["Ask in chat", new_chat_path], ["Make a printout", new_flyer_path], ["Back to home", root_path]])
+    end
+
+    it "opens the printout without Turbo, like every other link to it" do
+      get find_help_for_someone_else_path
+
+      links = Nokogiri::HTML(response.body).css("a[href='#{new_flyer_path}']")
+      expect(links.map { |link| link["data-turbo"] }).to eq(["false", "false"])
     end
   end
 

@@ -117,6 +117,38 @@ RSpec.describe "Landing page", type: :system do
     page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
   end
 
+  it "shows both choices side by side on desktop, and reaches them before the chat box" do
+    page.current_window.resize_to(1280, 900)
+    visit root_path
+
+    links = find("section[aria-labelledby='find-help-heading']").all("a", count: 2)
+    expect(links.map { |link| link.evaluate_script("this.getBoundingClientRect().top") }.uniq.length).to eq(1)
+
+    find("nav[aria-label='Main navigation']").find_link("Sign in").send_keys(:tab)
+    focused = 3.times.map do
+      name = page.evaluate_script("document.activeElement.id || document.activeElement.textContent.trim()")
+      page.active_element.send_keys(:tab)
+      name
+    end
+    expect(focused).to eq(["For myself", "For someone else", "chat_prompt"])
+  end
+
+  it "stacks both choices on a narrow phone screen, easy to press and visible without scrolling" do
+    page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride",
+      width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
+    visit root_path
+
+    links = find("section[aria-labelledby='find-help-heading']").all("a", count: 2)
+    boxes = links.map { |link| link.evaluate_script("this.getBoundingClientRect().toJSON()") }
+    expect(boxes.first["bottom"]).to be < boxes.last["top"]
+    expect(boxes.map { |box| box["height"] }).to all(be >= 44)
+    expect(boxes.map { |box| box["left"] }).to all(be >= 0)
+    expect(boxes.map { |box| box["right"] }).to all(be <= 320)
+    expect(boxes.last["bottom"]).to be <= page.evaluate_script("window.innerHeight")
+  ensure
+    page.driver.browser.execute_cdp("Emulation.clearDeviceMetricsOverride")
+  end
+
   it "presents three readable feature columns on desktop" do
     page.current_window.resize_to(1280, 900)
     visit root_path

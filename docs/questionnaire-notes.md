@@ -15,6 +15,11 @@ and anything we may need to revisit. Remove entries once they're resolved.
   `POST /printout/from-questionnaire`. That work will fit itself to this one later.
 - **The route isn't named `new_questionnaire`.** PR #85 turns on a link as soon as a route
   with that name exists, before the questionnaire is ready to be linked to.
+- **The home page asks who the help is for.** A separate screen for it would be one more step.
+  "For myself" opens the questionnaire. "For someone else" opens a page saying it isn't ready.
+  To replace that page, point its route at the real flow, then delete the page and its action.
+- **The navigation bar has no link to the questionnaire.** It's tight on small phones, its exact
+  links are checked by an admin spec, and other open PRs change it.
 - **An answer with no option we know is refused, not ignored.** Ignoring it would mean
   searching for everything.
 - **Answers travel with the question's key, not a step number.** Hiding a question would
@@ -80,6 +85,11 @@ and anything we may need to revisit. Remove entries once they're resolved.
   see a fresh first question, and never a "resubmit" or expired page. The Back button in the
   page keeps answers. Not tried: Safari, Firefox, or with JavaScript off, where Turbo isn't
   running and the browser may ask to resubmit.
+- **A guest with an open chat can't get back to it after choosing either one on the home page.**
+  Only the open page holds the key to a guest's conversation, so that the next person at a
+  shared computer can't read it. Each answer loads a whole new page, which loses the key. The
+  "someone else" page could have kept it, but one rule for both is simpler. Keeping it would
+  mean changing how answers are submitted.
 - **Options match categories by name.** Renaming a category in the database takes its
   services out of an option, and an option with none left is hidden. A warning is logged:
   `[Questionnaire] missing categories`.
