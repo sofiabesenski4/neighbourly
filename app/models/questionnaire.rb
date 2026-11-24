@@ -23,7 +23,7 @@ class Questionnaire
 
   # The filters a question may use. The name in the config is looked up here instead of
   # being turned straight into a class, so the config can only ever reach these.
-  FILTERS = {"CategoryFilter" => CategoryFilter}.freeze
+  FILTERS = {"CategoryFilter" => CategoryFilter, "LocationFilter" => LocationFilter}.freeze
 
   # The order when no filter asks for another. It also makes CategorySearch return one
   # flat list: its default sort groups by category and repeats a service in each.
@@ -67,15 +67,23 @@ class Questionnaire
   #
   # A step that isn't a question leaves the person on the first one, with their answers.
   # It may have been removed from the config while they had the page open.
-  def move(direction)
+  #
+  # Going forward looks up a place typed on this question. `lookup: false` goes on without.
+  def move(direction, lookup: true)
     if @unknown_step
       ask_unreadable_again
     elsif direction == "back"
       go_back
     else
       discard(question) if direction == "skip"
-      go_forward
+      go_forward(lookup)
     end
+  end
+
+  # Whether #move would call the address service, so that the controller can limit how often
+  # that happens. Back and Skip never do, and nor does a place already looked up.
+  def lookup_needed?(direction)
+    !@unknown_step && !%w[back skip].include?(direction) && valid? && answer_to(question).lookup_needed?
   end
 
   # True once the person has moved past the last question.
@@ -92,15 +100,28 @@ class Questionnaire
     position == 1
   end
 
-  # The chosen options for a question. Empty when it was skipped.
-  def chosen(question)
-    answer_to(question).options
+  # What was answered to a question, as an Answer or LocationAnswer. Each is read once,
+  # since reading one can look up which options are available.
+  def answer_to(question)
+    @answers ||= {}
+    @answers[question.key] ||= question.read(@submitted[question.key])
   end
 
   # False when something was submitted that can't be understood. Searching anyway would
   # treat it as no answer and show every service, which isn't what the person asked for.
   def valid?
     !@malformed && unreadable.empty?
+  end
+
+  # Why the current question has to be asked again, for choosing what to tell the person.
+  def problem
+    answer_to(question).problem || :unreadable
+  end
+
+  # True when a place was given but couldn't be looked up, so the services aren't sorted by
+  # distance as the person asked. They should be told.
+  def missing_distances?
+    answered.any? { |question| question.type == "location" && !answer_to(question).located? }
   end
 
   # The matching services, each once.
@@ -118,8 +139,13 @@ class Questionnaire
     @question = questions[questions.index(question) - 1] unless first?
   end
 
-  def go_forward
+  # The lookup comes after the check, so a place is only looked up when nothing else needs
+  # fixing first. Not finding the place then makes the answer invalid.
+  def go_forward(lookup)
     return ask_unreadable_again unless valid?
+
+    @answers[question.key] = answer_to(question).resolve(lookup: lookup)
+    return unless valid?
 
     following = questions[questions.index(question) + 1]
     following ? @question = following : @finished = true
@@ -140,20 +166,15 @@ class Questionnaire
     @answers&.delete(question.key)
   end
 
-  # Each answer is read once, since reading it looks up which options are available.
-  def answer_to(question)
-    @answers ||= {}
-    @answers[question.key] ||= question.read(@submitted[question.key])
-  end
-
   def search_options
     filters.map(&:search_options).reduce(DEFAULT_SEARCH, :merge)
   end
 
   def filters
-    questions.filter_map do |question|
-      options = chosen(question)
-      question.filter.new(options) if options.any?
-    end
+    answered.map { |question| question.filter.new(answer_to(question).value) }
+  end
+
+  def answered
+    questions.select { |question| answer_to(question).answered? }
   end
 end

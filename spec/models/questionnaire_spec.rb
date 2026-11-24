@@ -156,7 +156,7 @@ RSpec.describe Questionnaire do
       questionnaire = described_class.new(answers: {"categories" => %w[food unknown]})
 
       expect(questionnaire).to be_valid
-      expect(questionnaire.chosen(questionnaire.question).map(&:key)).to eq(["food"])
+      expect(questionnaire.answer_to(questionnaire.question).options.map(&:key)).to eq(["food"])
     end
 
     it "ignores questions it doesn't have" do
@@ -192,7 +192,7 @@ RSpec.describe Questionnaire do
     end
 
     def keys(questionnaire)
-      questionnaire.questions.to_h { |question| [question.key, questionnaire.chosen(question).map(&:key)] }
+      questionnaire.questions.to_h { |question| [question.key, questionnaire.answer_to(question).options.map(&:key)] }
     end
 
     def moved(direction, **options)
@@ -292,6 +292,117 @@ RSpec.describe Questionnaire do
 
     it "rejects more than one answer to a radio question" do
       expect(questionnaire(who: %w[our_place the_mustard_seed])).not_to be_valid
+    end
+  end
+
+  # Uses the real config, whose second question is the location. How a typed place is read is
+  # in spec/models/questionnaire/location_answer_spec.rb.
+  describe "the location question" do
+    let(:place) { {"near" => "919 Pandora Ave"} }
+    let(:located) { place.merge("checked" => "919 Pandora Ave", "lat" => "48.42", "lng" => "-123.36") }
+
+    before do
+      service("Far meals", meals, address_attributes: {lat: 48.50, lng: -123.36})
+      service("Unknown meals", meals)
+      service("Near meals", meals, address_attributes: {lat: 48.421, lng: -123.36})
+      service("Near shelter", shelters, address_attributes: {lat: 48.42, lng: -123.36})
+      allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.4200001, lng: -123.3600001))
+    end
+
+    def moved(direction, step: "location", lookup: true, **answers)
+      described_class.new(answers: answers.transform_keys(&:to_s), step: step).tap { |moved| moved.move(direction, lookup: lookup) }
+    end
+
+    it "puts the closest services first and ones with no known location last" do
+      expect(moved("next", categories: ["food"], location: place).services.map(&:name))
+        .to eq(["Near meals", "Far meals", "Unknown meals"])
+    end
+
+    it "never hides a service" do
+      expect(moved("next", location: place).services).to match_array(Service.all)
+    end
+
+    it "finds the same services in the same order whichever was answered first" do
+      forward = described_class.new(answers: {"categories" => ["food"], "location" => located})
+      backward = described_class.new(answers: {"location" => located, "categories" => ["food"]})
+
+      expect(forward.services).to eq(backward.services)
+    end
+
+    it "looks the place up when going forward from it, and finishes" do
+      done = moved("next", location: place)
+
+      expect(done).to be_finished
+      expect(done).not_to be_missing_distances
+      expect(Geocoder).to have_received(:locate).once
+    end
+
+    it "doesn't look anything up for Back, Skip, an empty place or another question" do
+      moved("back", location: place)
+      moved("skip", location: place)
+      moved("next", location: {"near" => " "})
+      moved("next", step: "categories", location: place)
+
+      expect(Geocoder).not_to have_received(:locate)
+    end
+
+    it "doesn't repeat a lookup, until the place changes" do
+      moved("next", location: located)
+      expect(Geocoder).not_to have_received(:locate)
+
+      moved("next", location: located.merge("near" => "1 Fort St"))
+      expect(Geocoder).to have_received(:locate).with("1 Fort St, Victoria, BC")
+    end
+
+    it "doesn't look a place up when another answer has to be fixed first" do
+      again = moved("next", categories: ["unknown"], location: place)
+
+      expect(again.question.key).to eq("categories")
+      expect(Geocoder).not_to have_received(:locate)
+    end
+
+    it "asks again when the place isn't found, keeping what was typed" do
+      allow(Geocoder).to receive(:locate).and_return(nil)
+      again = moved("next", location: place)
+
+      expect(again).not_to be_valid
+      expect(again).not_to be_finished
+      expect(again.question.key).to eq("location")
+      expect(again.problem).to eq(:not_found)
+      expect(again.answer_to(again.question).text).to eq("919 Pandora Ave")
+    end
+
+    it "goes on in name order, each service once, when the address service is down" do
+      allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable)
+      service("Both", meals, food_banks)
+      done = moved("next", categories: ["food"], location: place)
+
+      expect(done).to be_finished
+      expect(done).to be_missing_distances
+      expect(done.services.map(&:name)).to eq(["Both", "Far meals", "Near meals", "Unknown meals"])
+    end
+
+    it "goes on in name order without calling the address service when lookups aren't allowed" do
+      done = moved("next", location: place, lookup: false)
+
+      expect(done).to be_finished
+      expect(done).to be_missing_distances
+      expect(Geocoder).not_to have_received(:locate)
+    end
+
+    it "isn't missing distances when the place was skipped" do
+      expect(moved("skip", location: place)).not_to be_missing_distances
+    end
+
+    it "says when a move would look a place up" do
+      asked = described_class.new(answers: {"location" => place}, step: "location")
+
+      expect(["next", nil].map { |direction| asked.lookup_needed?(direction) }).to eq([true, true])
+      expect(%w[back skip].map { |direction| asked.lookup_needed?(direction) }).to eq([false, false])
+      expect(described_class.new(answers: {"location" => located}, step: "location").lookup_needed?("next")).to be(false)
+      expect(described_class.new(answers: {"location" => place}, step: "categories").lookup_needed?("next")).to be(false)
+      unreadable = {"categories" => ["unknown"], "location" => place}
+      expect(described_class.new(answers: unreadable, step: "location").lookup_needed?("next")).to be(false)
     end
   end
 end

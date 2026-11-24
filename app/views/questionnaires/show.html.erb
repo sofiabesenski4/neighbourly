@@ -9,8 +9,10 @@
 <% question = @questionnaire.question %>
 <% total = @questionnaire.questions.size %>
 <% progress = "Question #{@questionnaire.position} of #{total}" if total > 1 %>
-<%# Says where someone is, for screen readers and browser tabs. Never what they answered. %>
-<% content_for :title, [progress, "Find help"].compact.join(" - ") %>
+<%# Says where someone is, for screen readers and browser tabs. Never what they answered.
+    "Problem" because the same question again would otherwise have the same title, and a
+    screen reader would announce nothing new. %>
+<% content_for :title, [("Problem" if @message), progress, "Find help"].compact.join(" - ") %>
 <% content_for :head do %>
   <meta name="turbo-cache-control" content="no-cache">
 <% end %>
@@ -42,7 +44,7 @@
         <% end %>
       </legend>
 
-      <%= render question.type, question: question, chosen: @questionnaire.chosen(question) %>
+      <%= render question.type, question: question, answer: @questionnaire.answer_to(question) %>
     </fieldset>
 
     <%# Next comes first because Enter presses a form's first button. %>

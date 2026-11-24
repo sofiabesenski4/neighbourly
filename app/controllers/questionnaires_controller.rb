@@ -21,38 +21,55 @@ class QuestionnairesController < ApplicationController
     with: -> { render_question(RATE_LIMITED, status: :too_many_requests) },
     only: :create
 
+  # Each lookup calls the address service for an anonymous visitor, so this also stops the
+  # site being used as a free way into it. Only requests that need a lookup count. Over the
+  # limit, people carry on without distances: this renders nothing, so the action still runs.
+  rate_limit to: 60, within: 1.hour, name: "lookup",
+    by: -> { request.remote_ip },
+    with: -> { @lookups_used_up = true },
+    only: :create, if: -> { submitted_questionnaire.lookup_needed?(submitted(:move)) }
+
   def show
     @questionnaire = Questionnaire.new
   end
 
   def create
     @questionnaire = submitted_questionnaire
-    @questionnaire.move(submitted(:move))
-    return render_question(NOT_UNDERSTOOD, status: :unprocessable_content) unless @questionnaire.valid?
+    @questionnaire.move(submitted(:move), lookup: !@lookups_used_up)
+    return render_question(PROBLEMS.fetch(@questionnaire.problem), status: :unprocessable_content) unless @questionnaire.valid?
     return render :show unless @questionnaire.finished?
 
     # Temporary, until the results page exists. ResourceCard supplies the names because it
     # has a fallback for a service without one.
-    render plain: @questionnaire.services.map { |service| ResourceCard.new(service).title }.join("\n")
+    names = @questionnaire.services.map { |service| ResourceCard.new(service).title }
+    names.unshift(NO_DISTANCES, "") if @questionnaire.missing_distances?
+    render plain: names.join("\n")
   end
 
   private
 
-  NOT_UNDERSTOOD = "We couldn't read your answer. Choose from the options below, or continue without choosing any."
+  # What to say when a question has to be asked again, by its answer's problem.
+  PROBLEMS = {
+    unreadable: "We couldn't read your answer. Please try again, or press Skip.",
+    not_found: "We couldn't find that place. Check the spelling, try a street address or intersection nearby, or press Skip.",
+    too_long: "That's too long for us to look up. Please type a shorter address, or press Skip."
+  }.freeze
+  NO_DISTANCES = "We can't look up places right now, so these services aren't sorted by distance."
   RATE_LIMITED = "We've had a lot of requests from this connection. Your answers are still here. Please try again later."
-  private_constant :NOT_UNDERSTOOD, :RATE_LIMITED
+  private_constant :PROBLEMS, :NO_DISTANCES, :RATE_LIMITED
 
   # Shows a question with a message, and what was chosen still ticked. Over the rate limit
   # that's the question the person was on. Redirecting, as the app's shared rate limit
   # handler does, would lose the answers.
   def render_question(message, status:)
-    @questionnaire ||= submitted_questionnaire
+    @questionnaire = submitted_questionnaire
     @message = message
     render :show, status: status
   end
 
+  # Memoized, because a rate limit above may need it before the action does.
   def submitted_questionnaire
-    Questionnaire.new(answers: submitted_answers, step: submitted(:step))
+    @submitted_questionnaire ||= Questionnaire.new(answers: submitted_answers, step: submitted(:step))
   end
 
   # A submitted value other than the answers, or nil.

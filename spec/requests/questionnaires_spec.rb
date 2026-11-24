@@ -15,8 +15,9 @@ RSpec.describe "Questionnaires", type: :request do
     source.services.create!(name: "Shelter", categories: [shelters])
   end
 
+  # Answers the first question from the last one, so that the response is the results.
   def answer(value)
-    post find_help_for_myself_path, params: {questionnaire: {answers: {categories: value}}}
+    post find_help_for_myself_path, params: {questionnaire: {step: "location", answers: {categories: value}}}
   end
 
   def page_of(response)
@@ -72,7 +73,7 @@ RSpec.describe "Questionnaires", type: :request do
     end
 
     it "lists every service when nothing is chosen" do
-      post find_help_for_myself_path
+      post find_help_for_myself_path, params: {questionnaire: {step: "location"}}
 
       expect(response.body).to eq("Shelter\nSoup kitchen")
     end
@@ -92,7 +93,11 @@ RSpec.describe "Questionnaires", type: :request do
         {questionnaire: {answers: ["food"]}},
         {questionnaire: {answers: {categories: "food"}}},
         {questionnaire: {answers: {categories: {a: "food"}}}},
-        {questionnaire: {answers: {categories: [{a: "food"}]}}}
+        {questionnaire: {answers: {categories: [{a: "food"}]}}},
+        {questionnaire: {answers: {location: "food"}}},
+        {questionnaire: {answers: {location: ["food"]}}},
+        {questionnaire: {answers: {location: {near: ["food"]}}}},
+        {questionnaire: {answers: {location: {near: {a: "food"}}}}}
       ].each do |params|
         post find_help_for_myself_path, params: params
 
@@ -138,7 +143,7 @@ RSpec.describe "Questionnaires", type: :request do
   describe "rate limit" do
     it "keeps the answers on the page, and doesn't store the response" do
       300.times { post find_help_for_myself_path, params: {questionnaire: "x"} }
-      answer(["food"])
+      post find_help_for_myself_path, params: {questionnaire: {step: "categories", answers: {categories: ["food"]}}}
 
       expect(response).to have_http_status(:too_many_requests)
       expect(page_of(response).at_css("[role='alert']").text).to include("Your answers are still here")
@@ -252,5 +257,104 @@ RSpec.describe "Questionnaires", type: :request do
     expect(page_of(response).at_css("title").text).to eq("Find help")
     expect(page_of(response).at_css("#question-progress")).to be_nil
     expect(page_of(response).css("main form button").map(&:text)).to eq(%w[Next Skip])
+  end
+
+  describe "the location question" do
+    before do
+      Service.destroy_all
+      source.services.create!(name: "Far kitchen", categories: [meals], address_attributes: {lat: 48.50, lng: -123.36})
+      source.services.create!(name: "Near kitchen", categories: [meals], address_attributes: {lat: 48.421, lng: -123.36})
+      allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
+    end
+
+    def submit_place(near, move: "next", **fields)
+      post find_help_for_myself_path, params: {
+        questionnaire: {step: "location", move: move, answers: {categories: ["food"], location: {near: near, **fields}}}
+      }
+    end
+
+    it "lists the closest services first" do
+      submit_place("919 Pandora Ave")
+
+      expect(response.body).to eq("Near kitchen\nFar kitchen")
+    end
+
+    it "asks again when the place isn't found, with what was typed and the other answers" do
+      allow(Geocoder).to receive(:locate).and_return(nil)
+      submit_place("Central Library")
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(page_of(response).at_css("[role='alert']").text).to include("We couldn't find that place")
+      expect(page_of(response).at_css("title").text).to eq("Problem - Question 2 of 2 - Find help")
+      field = page_of(response).at_css("input[type='text']")
+      expect(field["value"]).to eq("Central Library")
+      expect(field["aria-describedby"]).to include("question-message")
+      expect(page_of(response).at_css("input[name='questionnaire[answers][categories][]']")["value"]).to eq("food")
+    end
+
+    it "says when a place is too long" do
+      submit_place("a" * 201)
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(page_of(response).at_css("[role='alert']").text).to include("That's too long")
+    end
+
+    it "says so and carries on when the address service is down" do
+      allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable)
+      submit_place("919 Pandora Ave")
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body)
+        .to eq("We can't look up places right now, so these services aren't sorted by distance.\n\nFar kitchen\nNear kitchen")
+    end
+
+    it "doesn't mention distances to someone who skipped the question" do
+      submit_place("919 Pandora Ave", move: "skip")
+
+      expect(response.body).to eq("Far kitchen\nNear kitchen")
+    end
+
+    it "keeps a place that has been looked up when returning to it" do
+      post find_help_for_myself_path, params: {questionnaire: {step: "categories", answers: {
+        location: {near: "919 Pandora Ave", checked: "919 Pandora Ave", lat: "48.42", lng: "-123.36"}
+      }}}
+
+      expect(page_of(response).at_css("input[type='text']")["value"]).to eq("919 Pandora Ave")
+      hidden = page_of(response).css("input[type='hidden'][name*='[location]']").to_h { |input| [input["name"][/\w+(?=\]\z)/], input["value"]] }
+      expect(hidden).to eq("checked" => "919 Pandora Ave", "lat" => "48.42", "lng" => "-123.36")
+    end
+
+    it "leaves the location as a hidden field on other questions" do
+      submit_place("919 Pandora Ave", move: "back")
+
+      expect(page_of(response).at_css("h1").text).to eq("What do you need help with?")
+      expect(page_of(response).at_css("input[type='hidden'][name='questionnaire[answers][location][near]']")["value"]).to eq("919 Pandora Ave")
+    end
+
+    it "hides the place from the logs, and from a report that the address service is down" do
+      allow(Geocoder).to receive(:locate).and_raise(Geocoder::Unavailable)
+      expect(Rails.error).to receive(:report).with(instance_of(Geocoder::Unavailable), context: {feature: "flyer_origin"})
+
+      submit_place("919 Pandora Ave")
+
+      expect(request.filtered_parameters["questionnaire"]).to eq("[FILTERED]")
+    end
+
+    it "stops looking places up after 60 in an hour, and carries on without distances" do
+      60.times { submit_place("919 Pandora Ave") }
+      expect(response.body).to eq("Near kitchen\nFar kitchen")
+
+      submit_place("919 Pandora Ave")
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("We can't look up places right now")
+      expect(Geocoder).to have_received(:locate).exactly(60).times
+    end
+
+    it "doesn't count requests that look nothing up" do
+      60.times { submit_place("919 Pandora Ave", move: "skip") }
+      submit_place("919 Pandora Ave")
+
+      expect(response.body).to eq("Near kitchen\nFar kitchen")
+    end
   end
 end
