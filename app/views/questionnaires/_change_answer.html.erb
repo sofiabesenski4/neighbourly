@@ -1,0 +1,18 @@
+<%# A button that goes back to a question from the results, with every answer kept. For the
+    results page to show beside each answer:
+
+      render "questionnaires/change_answer", results: @results, answer: answer
+
+    Locals: results (QuestionnaireResults), answer (one of its answers).
+
+    It's a form because the answers have to travel in a POST, never in a link. Turbo is off
+    and autocomplete too, for the reasons in show.html.erb. The hidden words tell screen
+    reader users which answer each button changes. %>
+<%= form_with url: find_help_for_myself_path, data: {turbo: false}, html: {autocomplete: "off"} do %>
+  <%= hidden_field_tag "questionnaire[step]", answer.key, id: nil, autocomplete: "off" %>
+  <% results.hidden_fields.each do |name, value| %>
+    <%= hidden_field_tag name, value, id: nil, autocomplete: "off" %>
+  <% end %>
+  <button type="submit" name="questionnaire[move]" value="show"
+          class="inline-flex min-h-11 cursor-pointer items-center rounded-lg px-4 py-2 font-medium text-sage-800 underline hover:bg-sage-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600">Change<span class="sr-only"> your answer to: <%= answer.title %></span></button>
+<% end %>

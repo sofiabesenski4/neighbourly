@@ -22,6 +22,11 @@ class Questionnaire
       options.any?
     end
 
+    # The answer in words, for the results page.
+    def labels
+      options.map(&:label)
+    end
+
     # What the question's filter is built with.
     def value
       options

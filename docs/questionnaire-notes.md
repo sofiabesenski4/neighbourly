@@ -37,8 +37,14 @@ and anything we may need to revisit. Remove entries once they're resolved.
 - **Location sorts and never filters.** Services with no known location come last.
 - **When the address service is down, people carry on.** Services are in name order, and a
   message says they aren't sorted by distance. The same goes for a connection that has used
-  up its 60 lookups an hour. Whoever builds the results page needs to keep that message:
-  `Questionnaire#missing_distances?` says when it applies.
+  up its 60 lookups an hour. The results page needs to keep that message:
+  `@results.missing_distances?` says when it applies.
+- **The results page gets `@results` and nothing else.** `docs/questionnaire-results.md` is the
+  agreement. Tell whoever builds the page before changing it.
+- **After changing an answer, Next goes through the later questions again.** Going straight back
+  to the results would need a flag on every screen, to save one press.
+- **A skipped question can't be reopened from the results,** because skipped ones aren't in
+  `answers`. It's a small change if the page needs it.
 - **A place is looked up once.** Its text and rounded coordinates travel in hidden fields.
   Changing the text looks it up again, and so does pressing Next after a failed lookup.
 - **The device's location waits for Next.** The printout moves on by itself. Here people see

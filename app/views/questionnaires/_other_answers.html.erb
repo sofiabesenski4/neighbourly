@@ -2,8 +2,6 @@
     between screens. Includes later questions, so going back keeps their answers too.
     Only what the question recognised is carried.
     Locals: questionnaire (Questionnaire). %>
-<% questionnaire.questions.without(questionnaire.question).each do |question| %>
-  <% questionnaire.answer_to(question).fields.each do |suffix, value| %>
-    <%= hidden_field_tag "questionnaire[answers][#{question.key}]#{suffix}", value, id: nil, autocomplete: "off" %>
-  <% end %>
+<% questionnaire.hidden_fields(except: questionnaire.question).each do |name, value| %>
+  <%= hidden_field_tag name, value, id: nil, autocomplete: "off" %>
 <% end %>
