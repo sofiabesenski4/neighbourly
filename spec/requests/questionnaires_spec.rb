@@ -321,7 +321,7 @@ RSpec.describe "Questionnaires", type: :request do
 
       expect(page_of(response).at_css("input[type='text']")["value"]).to eq("919 Pandora Ave")
       hidden = page_of(response).css("input[type='hidden'][name*='[location]']").to_h { |input| [input["name"][/\w+(?=\]\z)/], input["value"]] }
-      expect(hidden).to eq("checked" => "919 Pandora Ave", "lat" => "48.42", "lng" => "-123.36")
+      expect(hidden).to eq("device" => nil, "checked" => "919 Pandora Ave", "lat" => "48.42", "lng" => "-123.36")
     end
 
     it "leaves the location as a hidden field on other questions" do
@@ -338,6 +338,41 @@ RSpec.describe "Questionnaires", type: :request do
       submit_place("919 Pandora Ave")
 
       expect(request.filtered_parameters["questionnaire"]).to eq("[FILTERED]")
+    end
+
+    it "offers the device's location as something JavaScript has to reveal" do
+      post find_help_for_myself_path, params: {questionnaire: {step: "categories"}}
+
+      offer = page_of(response).at_css("[data-device-location-target='offer']")
+      expect(offer["hidden"]).not_to be_nil
+      expect(offer.at_css("button")["type"]).to eq("button")
+      expect(offer.text).to include("such as Google's or Apple's")
+    end
+
+    it "sorts by distance from the device's location" do
+      submit_place("", device: "1", checked: "", lat: "48.42", lng: "-123.36")
+
+      expect(response.body).to eq("Near kitchen\nFar kitchen")
+      expect(Geocoder).not_to have_received(:locate)
+    end
+
+    it "shows that the device's location is in use when returning to the question" do
+      post find_help_for_myself_path, params: {questionnaire: {step: "categories", answers: {
+        location: {device: "1", lat: "48.42", lng: "-123.36"}
+      }}}
+
+      status = page_of(response).at_css("[role='status']")
+      expect(status.text).to eq("Using your location.")
+      expect(status["hidden"]).to be_nil
+      expect(page_of(response).at_css("input[name='questionnaire[answers][location][device]']")["value"]).to eq("1")
+      expect(page_of(response).at_css("input[name='questionnaire[answers][location][lat]']")["value"]).to eq("48.42")
+    end
+
+    it "asks again when the device's location can't be read" do
+      submit_place("", device: "1", lat: "north", lng: "-123.36")
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(page_of(response).at_css("[role='alert']").text).to include("We couldn't read your device's location")
     end
 
     it "stops looking places up after 60 in an hour, and carries on without distances" do

@@ -1,4 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
+import {
+  deviceLocationSupported,
+  describeAccuracy,
+  requestDeviceLocation,
+} from "../lib/device_location.js";
 
 const DEFAULT_SORT = "default";
 const DISTANCE_SORT = "distance";
@@ -63,8 +68,9 @@ export default class extends Controller {
     this.generating = false;
     this.excludedServiceIds = new Set();
     this.locationRequest = 0;
+    // Only the questionnaire handoff should retain the submitted coordinates.
     if (!this.fromQuestionnaireValue) this.forgetLocationChoice();
-    const supported = Boolean(navigator.geolocation);
+    const supported = deviceLocationSupported();
     this.useLocationTarget.hidden = !supported;
     this.locationNoteTarget.hidden = !supported;
     this.confirmPlaceButtonTarget.hidden = false;
@@ -236,50 +242,37 @@ export default class extends Controller {
     this.printErrorTarget.hidden = true;
   }
 
-  // Asks the browser where the device is. The browser shows its own permission prompt
-  // the first time, so the answer can take a while, or never come. Only a button press
-  // starts this: asking when the page loads would prompt people for no clear reason.
+  // Asks the browser where the device is, and moves on once it's known.
   useMyLocation() {
     this.forgetLocationChoice();
     const request = this.locationRequest;
     this.showLocationStatus("Finding your location…");
-    navigator.geolocation.getCurrentPosition(
+    requestDeviceLocation(
       (position) => {
         // The person typed a place or cleared this while the browser was working.
         if (request !== this.locationRequest) return;
-        this.applyDevicePosition(position.coords);
+        this.applyDevicePosition(position);
       },
-      (error) => {
+      (message) => {
         if (request !== this.locationRequest) return;
-        this.showLocationStatus(
-          // 1 is the Geolocation API's PERMISSION_DENIED.
-          error.code === 1
-            ? "Location access is turned off for this site. You can type a nearby place instead."
-            : "We couldn't find your location. You can try again or type a nearby place instead.",
-        );
+        this.showLocationStatus(message);
       },
-      // A rough, recent position is enough, and much faster than waiting for GPS.
-      { timeout: 10000, maximumAge: 60000 },
     );
   }
 
-  // Rounds to 3 decimal places, about 100 m, before the position leaves the browser.
-  applyDevicePosition({ latitude, longitude, accuracy }) {
-    this.latTarget.value = latitude.toFixed(3);
-    this.lngTarget.value = longitude.toFixed(3);
+  applyDevicePosition({ lat, lng, accuracy }) {
+    this.latTarget.value = lat;
+    this.lngTarget.value = lng;
     this.nearTarget.value = "";
     this.locationStatusTarget.hidden = true;
     this.showBuilderStep(this.deviceLocationMessage(accuracy));
   }
 
-  // Laptops estimate their position from nearby Wi-Fi and can be far off. Saying how
-  // accurate it is lets someone spot that before relying on the distances.
   deviceLocationMessage(accuracy) {
-    if (accuracy >= 1000) {
-      const km = Math.round(accuracy / 1000);
-      return `Distances from your location, which may be off by about ${km} km. If that's too far, change it to a nearby place.`;
-    }
-    return `Distances from your location (accurate to about ${Math.round(accuracy)} m).`;
+    const { rough, text } = describeAccuracy(accuracy);
+    return rough
+      ? `Distances from your location, which ${text}. If that's too far, change it to a nearby place.`
+      : `Distances from your location (${text}).`;
   }
 
   // Clears whichever location was chosen, along with any messages about it. Moving on

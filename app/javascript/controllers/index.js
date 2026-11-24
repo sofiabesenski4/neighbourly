@@ -15,6 +15,10 @@ application.register("dialog", DialogController);
 
 import FlyerBuilderController from "./flyer_builder_controller";
 application.register("flyer-builder", FlyerBuilderController);
+
+import DeviceLocationController from "./device_location_controller";
+application.register("device-location", DeviceLocationController);
+
 import FlashController from "./flash_controller";
 application.register("flash", FlashController);
 

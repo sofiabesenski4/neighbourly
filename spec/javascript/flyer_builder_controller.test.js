@@ -25,6 +25,7 @@ function locationController() {
   controller.clearPrintout = () => {};
   controller.updateFilterControls = () => {};
   controller.refresh = () => {};
+  controller.organizationTargets = [];
   return controller;
 }
 

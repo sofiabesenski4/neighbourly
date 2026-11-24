@@ -394,6 +394,14 @@ RSpec.describe Questionnaire do
       expect(moved("skip", location: place)).not_to be_missing_distances
     end
 
+    it "sorts by distance from a device's location, without looking anything up" do
+      done = moved("next", categories: ["food"], location: {"device" => "1", "lat" => "48.42", "lng" => "-123.36"})
+
+      expect(done.services.map(&:name)).to eq(["Near meals", "Far meals", "Unknown meals"])
+      expect(done).not_to be_missing_distances
+      expect(Geocoder).not_to have_received(:locate)
+    end
+
     it "says when a move would look a place up" do
       asked = described_class.new(answers: {"location" => place}, step: "location")
 

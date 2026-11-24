@@ -10,7 +10,7 @@
 #   title    the question, as people read it.
 #   hint     optional: a short line of help under the title.
 #   type     how it's asked: "checkboxes" for any number of options, "radio" for one, or
-#            "location" for typing a place.
+#            "location" for typing a place or using the device's location.
 #   filter   which filter class turns the answer into part of the search. Must be listed
 #            in Questionnaire::FILTERS. Two questions can't both use CategoryFilter: the
 #            second would replace the first instead of narrowing it.

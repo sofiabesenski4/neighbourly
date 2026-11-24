@@ -59,6 +59,44 @@ RSpec.describe Questionnaire::LocationAnswer do
     end
   end
 
+  # What device_location_controller.js fills in.
+  describe "a device's location" do
+    let(:device) { {"near" => "", "device" => "1", "checked" => "", "lat" => "48.42011", "lng" => "-123.3601"} }
+
+    it "uses the coordinates, rounded to about 100 m, with no lookup" do
+      answer = described_class.read(device)
+
+      expect(answer).to be_answered
+      expect(answer.point).to eq(GeoPoint.new(lat: 48.42, lng: -123.36))
+      expect(answer).not_to be_lookup_needed
+      expect(FlyerOrigin).not_to receive(:locate)
+      expect(answer.resolve).to eq(answer)
+    end
+
+    it "is called your location" do
+      expect(described_class.read(device).value)
+        .to eq(FlyerOrigin.new(label: "your location", point: GeoPoint.new(lat: 48.42, lng: -123.36)))
+    end
+
+    it "gives way to a typed place, and its coordinates aren't used for it" do
+      answer = described_class.read(device.merge("near" => "919 Pandora Ave"))
+
+      expect(answer.device).to be(false)
+      expect(answer).not_to be_located
+      expect(answer).to be_lookup_needed
+    end
+
+    it "is refused when the coordinates aren't usable" do
+      [{"lat" => "north"}, {"lat" => "91"}, {"lng" => ""}, {"lng" => "NaN"}].each do |bad|
+        expect(described_class.read(device.merge(bad)).problem).to eq(:device), "for #{bad}"
+      end
+    end
+
+    it "is skipped when the coordinates come without saying what they're for" do
+      expect(described_class.read(device.merge("device" => ""))).not_to be_answered
+    end
+  end
+
   describe "#resolve" do
     let(:typed) { described_class.read("near" => "919 Pandora Ave") }
 
@@ -93,6 +131,12 @@ RSpec.describe Questionnaire::LocationAnswer do
 
     it "carries a place that has been looked up" do
       answer = described_class.read(looked_up)
+
+      expect(described_class.read(resubmitted(answer))).to eq(answer)
+    end
+
+    it "carries a device's location" do
+      answer = described_class.read("device" => "1", "lat" => "48.42", "lng" => "-123.36")
 
       expect(described_class.read(resubmitted(answer))).to eq(answer)
     end
