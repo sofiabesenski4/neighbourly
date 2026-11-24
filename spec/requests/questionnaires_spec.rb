@@ -418,4 +418,71 @@ RSpec.describe "Questionnaires", type: :request do
     get find_help_for_myself_path
     expect(page_of(response).at_css("#question-progress").text).to eq("Question 1 of 3")
   end
+
+  # The results page isn't built yet, so this draws the button on its own, as that page will,
+  # and then submits what it holds.
+  describe "the change button" do
+    let(:answers) { {categories: ["food"], location: {device: "1", lat: "48.42", lng: "-123.36"}} }
+
+    let(:results) do
+      questionnaire = Questionnaire.new(answers: answers.deep_stringify_keys, step: "location")
+      questionnaire.move("next")
+      questionnaire.results
+    end
+
+    def button_for(key)
+      answer = results.answers.find { |candidate| candidate.key == key }
+      Nokogiri::HTML(ApplicationController.render(partial: "questionnaires/change_answer", locals: {results: results, answer: answer}))
+    end
+
+    # Every name and value the browser would send, including the button's own.
+    def press(form)
+      controls = form.css("input[name^='questionnaire'], button")
+      post form.at_css("form")["action"], params: URI.encode_www_form(controls.map { |control| [control["name"], control["value"]] })
+    end
+
+    it "opens its question with that answer filled in, and the others carried" do
+      press(button_for("categories"))
+
+      expect(response).to have_http_status(:ok)
+      expect(page_of(response).at_css("h1").text).to eq("What do you need help with?")
+      expect(page_of(response).css("input[checked]").map { |box| box["value"] }).to eq(["food"])
+      expect(page_of(response).at_css("input[name='questionnaire[answers][location][lat]']")["value"]).to eq("48.42")
+
+      press(button_for("location"))
+
+      expect(page_of(response).at_css("h1").text).to eq("Where are you?")
+      expect(page_of(response).at_css("[role='status']").text).to eq("Using your location.")
+      expect(page_of(response).at_css("input[name='questionnaire[answers][categories][]']")["value"]).to eq("food")
+    end
+
+    it "sends answers in the body of a regular POST, never in the URL" do
+      form = button_for("categories").at_css("form")
+
+      expect(form["method"]).to eq("post")
+      expect(form["action"]).to eq("/find-help/myself")
+      expect(form["data-turbo"]).to eq("false")
+      expect(form["autocomplete"]).to eq("off")
+    end
+
+    it "says which answer it changes" do
+      expect(button_for("location").at_css("button").text.squish).to eq("Change your answer to: Where are you?")
+    end
+
+    it "keeps answers out of logs, the session and stored responses" do
+      press(button_for("categories"))
+
+      expect(request.filtered_parameters["questionnaire"]).to eq("[FILTERED]")
+      expect(session.to_hash.to_s).not_to include("food")
+      expect(response.headers["Cache-Control"]).to eq("no-store")
+    end
+
+    it "escapes what someone typed" do
+      allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
+      answers[:location] = {near: %("><script>alert(1)</script>)}
+
+      expect(button_for("location").css("script")).to be_empty
+      expect(button_for("location").at_css("input[name$='[near]']")["value"]).to eq(%("><script>alert(1)</script>))
+    end
+  end
 end

@@ -68,8 +68,9 @@ class Questionnaire
     @finished = false
   end
 
-  # Moves on from the current question, according to the button pressed. Anything other
-  # than "back" or "skip" counts as "next", which is what Enter submits.
+  # Moves on from the current question, according to the button pressed. "show" stays on it,
+  # for changing an answer from the results. Anything other than "show", "back" or "skip"
+  # counts as "next", which is what Enter submits.
   #
   # A step that isn't a question leaves the person on the first one, with their answers.
   # It may have been removed from the config, or hidden, while they had the page open.
@@ -78,7 +79,10 @@ class Questionnaire
   def move(direction, lookup: true)
     if @unknown_step
       ask_unreadable_again
+    elsif direction == "show"
+      discard_unreadable
     elsif direction == "back"
+      discard_unreadable
       go_back
     else
       discard(question) if direction == "skip"
@@ -87,9 +91,9 @@ class Questionnaire
   end
 
   # Whether #move would call the address service, so that the controller can limit how often
-  # that happens. Back and Skip never do, and nor does a place already looked up.
+  # that happens. Only going forward does, and only for a place not looked up already.
   def lookup_needed?(direction)
-    !@unknown_step && !%w[back skip].include?(direction) && valid? && answer_to(question).lookup_needed?
+    !@unknown_step && !%w[show back skip].include?(direction) && valid? && answer_to(question).lookup_needed?
   end
 
   # True once the person has moved past the last question.
@@ -130,6 +134,29 @@ class Questionnaire
     answered.any? { |question| question.type == "location" && !answer_to(question).located? }
   end
 
+  # What was found, for the results page. Call this once #finished?, because only then has
+  # every answer been checked.
+  def results
+    QuestionnaireResults.new(
+      services: services,
+      origin: origin,
+      answers: answered.map { |question|
+        QuestionnaireResults::Answer.new(key: question.key, title: question.title, labels: answer_to(question).labels)
+      },
+      missing_distances: missing_distances?,
+      hidden_fields: hidden_fields
+    )
+  end
+
+  # The name and value of every hidden field needed to carry the answers to another screen,
+  # since nothing is saved. A question's own page leaves itself out with `except`, because its
+  # inputs are there to see.
+  def hidden_fields(except: nil)
+    questions.without(except).flat_map do |question|
+      answer_to(question).fields.map { |suffix, value| ["questionnaire[answers][#{question.key}]#{suffix}", value] }
+    end
+  end
+
   # The matching services, each once.
   def services
     CategorySearch.call(**search_options, filters: filters).flat_map(&:resources)
@@ -137,11 +164,14 @@ class Questionnaire
 
   private
 
-  # Going back isn't a reason to complain about an answer that can't be read. It's dropped,
-  # and the person comes to that question again on the way forward.
-  def go_back
+  # Going back, or to change an answer, isn't a reason to complain about one that can't be
+  # read. It's dropped, and the person comes to that question again on the way forward.
+  def discard_unreadable
     @malformed = false
     unreadable.each { |question| discard(question) }
+  end
+
+  def go_back
     @question = questions[questions.index(question) - 1] unless first?
   end
 
@@ -170,6 +200,12 @@ class Questionnaire
   def discard(question)
     @submitted = @submitted.except(question.key)
     @answers&.delete(question.key)
+  end
+
+  # Where distances are measured from. Nil when no location was given.
+  def origin
+    located = answered.find { |question| question.type == "location" }
+    answer_to(located).value if located
   end
 
   def search_options

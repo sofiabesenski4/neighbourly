@@ -66,6 +66,11 @@ class Questionnaire
       point.present?
     end
 
+    # The answer in words, for the results page. Never the coordinates.
+    def labels
+      answered? ? [value.label] : []
+    end
+
     # What LocationFilter is built with. An origin with no point means the same here as it
     # does to printouts: the place is known only by name.
     def value

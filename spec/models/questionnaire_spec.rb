@@ -245,6 +245,24 @@ RSpec.describe Questionnaire do
       expect(keys(first)).to eq("needs" => ["food"], "who" => ["our_place"])
     end
 
+    it "shows a question without moving, keeping every answer, for changing one from the results" do
+      %w[needs who].each do |step|
+        shown = moved("show", step: step, needs: ["food"], who: ["our_place"])
+
+        expect(shown.question.key).to eq(step)
+        expect(shown).not_to be_finished
+        expect(keys(shown)).to eq("needs" => ["food"], "who" => ["our_place"])
+      end
+    end
+
+    it "shows a question even if an answer can't be read, dropping that one" do
+      shown = moved("show", step: "who", needs: ["unknown"], who: ["our_place"])
+
+      expect(shown).to be_valid
+      expect(shown.question.key).to eq("who")
+      expect(keys(shown)).to eq("needs" => [], "who" => ["our_place"])
+    end
+
     it "stays on the first question when going back from it" do
       expect(moved("back").question.key).to eq("needs")
     end
@@ -341,6 +359,7 @@ RSpec.describe Questionnaire do
 
     it "doesn't look anything up for Back, Skip, an empty place or another question" do
       moved("back", location: place)
+      moved("show", location: place)
       moved("skip", location: place)
       moved("next", location: {"near" => " "})
       moved("next", step: "categories", location: place)
@@ -408,7 +427,7 @@ RSpec.describe Questionnaire do
       asked = described_class.new(answers: {"location" => place}, step: "location")
 
       expect(["next", nil].map { |direction| asked.lookup_needed?(direction) }).to eq([true, true])
-      expect(%w[back skip].map { |direction| asked.lookup_needed?(direction) }).to eq([false, false])
+      expect(%w[show back skip].map { |direction| asked.lookup_needed?(direction) }).to all(be(false))
       expect(described_class.new(answers: {"location" => located}, step: "location").lookup_needed?("next")).to be(false)
       expect(described_class.new(answers: {"location" => place}, step: "categories").lookup_needed?("next")).to be(false)
       unreadable = {"categories" => ["unknown"], "location" => place}
