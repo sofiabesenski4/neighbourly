@@ -32,7 +32,7 @@ RSpec.describe "Questionnaire", type: :system do
   end
 
   def result_names
-    all("main article h3").map(&:text)
+    all("main article h4").map(&:text)
   end
 
   context "in Chrome" do
@@ -270,14 +270,25 @@ RSpec.describe "Questionnaire", type: :system do
     expect_results
     expect(result_names).to eq(["Near kitchen", "Far kitchen", "Shelter"])
     find("article", text: "Shelter").uncheck("Include")
-    check "Include extra details in printout"
+    expect(page).to have_no_field("Include extra details in printout")
     click_button "Generate printout"
 
     expect(page.response_headers["Content-Type"]).to include("application/pdf")
     pdf = PDF::Reader.new(StringIO.new(page.body))
-    listings = pdf.pages.fetch(2).text
-    expect(listings.scan(/\d+\.\s+(Near kitchen|Far kitchen|Shelter)\b/).flatten).to eq(["Near kitchen", "Far kitchen"])
-    expect(listings).to include("Distance:")
+    listings = pdf.pages.fetch(2)
+    expect(listings.text.scan(/\d+\.\s+(Near kitchen|Far kitchen|Shelter)\b/).flatten).to eq(["Near kitchen", "Far kitchen"])
+    expect(listings.text).to include("Meals")
+    expect(listings.text).not_to include("Distance:")
+    expect(pdf.pages.last.text).to include("Map", "OpenStreetMap contributors")
+
+    visit new_flyer_path
+    check "Meals"
+    click_button "Generate printout"
+    custom_listings = PDF::Reader.new(StringIO.new(page.body)).pages.fetch(2)
+    colour_commands = /(?:\d+(?:\.\d+)? ){3}(?:rg|scn)\b/
+    custom_colours = custom_listings.raw_content.scan(colour_commands).uniq
+    expect(custom_colours.size).to be > 1
+    expect(listings.raw_content.scan(colour_commands).uniq).to eq(custom_colours)
   end
 
   context "with several questions" do
@@ -308,7 +319,7 @@ RSpec.describe "Questionnaire", type: :system do
       go_through_the_chain
 
       expect(result_names)
-        .to eq(["Our Place beds", "Our Place meals", "The Mustard Seed beds", "The Mustard Seed meals"])
+        .to eq(["Our Place beds", "The Mustard Seed beds", "Our Place meals", "The Mustard Seed meals"])
     end
 
     context "in Chrome" do

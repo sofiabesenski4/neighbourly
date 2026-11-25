@@ -4,8 +4,8 @@ The questionnaire gathers answers and runs the search. The results page shows wh
 They meet at `@results`, a `QuestionnaireResults`.
 
 `app/views/questionnaires/results.html.erb` shows the guided printout preview directly in
-the response to the last question's form. The PDF form submits only checked service IDs,
-print settings, and any rounded coordinates needed for distances.
+the response to the last question's form. The PDF form submits checked service IDs, their
+category filter, default print settings, and any rounded coordinates needed for the map.
 
 ## What's in `@results`
 
@@ -21,7 +21,7 @@ A location's label is the place that was typed, or "your location".
 
 ## What the page must do
 
-- **Keep the order of `services`.**
+- **Keep the order of `services` within each category.** Sections follow the order of their first matching resource.
 - **Build cards with `ResourceCard.new(service, origin: @results.origin)`,** so that distances
   agree with the order. Use `card.title`, because a service's name may be blank once PR #96
   merges. `card.distance_km` can be nil, and so can `service.description`.

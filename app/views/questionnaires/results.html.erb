@@ -14,7 +14,11 @@
   <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
         data: {turbo: false, flyer_builder_target: "form", action: "submit->flyer-builder#generate"} do |form| %>
     <%= form.hidden_field :sort %>
+    <%= form.hidden_field :detail_level %>
     <%= hidden_field_tag "flyer[service_ids][]", "", id: nil %>
+    <% @flyer.categories.each do |id| %>
+      <%= hidden_field_tag "flyer[categories][]", id, id: nil %>
+    <% end %>
     <% if @results.origin&.located? %>
       <%= form.hidden_field :lat, value: @results.origin.point.lat, autocomplete: "off", data: {flyer_builder_target: "lat"} %>
       <%= form.hidden_field :lng, value: @results.origin.point.lng, autocomplete: "off", data: {flyer_builder_target: "lng"} %>
@@ -22,11 +26,21 @@
 
     <%= render layout: "flyers/preview", locals: {form: form, guided_count: @results.services.size} do %>
       <% if @results.services.any? %>
-        <div class="grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2">
-          <% @results.services.each do |service| %>
-            <%= render "resource_card", card: ResourceCard.new(service, origin: @results.origin) %>
-          <% end %>
-        </div>
+        <% tree = CategoryTree.new %>
+        <% groups = @results.category_groups(tree: tree) %>
+        <% palette = FlyerCategoryPalette.new(groups.keys, tree: tree) %>
+        <% groups.each do |name, services| %>
+          <section class="flyer-category-group mt-7 first:mt-0 sm:mt-9" data-flyer-builder-target="categoryGroup" data-category-colour="<%= palette.colour_for(name) %>">
+            <h3 class="mb-2 text-sm font-semibold text-stone-900 sm:mb-3 sm:text-lg">
+              <%= name %> <span class="ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm"><%= pluralize(services.size, "card") %></span>
+            </h3>
+            <div class="grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2">
+              <% services.each do |service| %>
+                <%= render "resource_card", card: ResourceCard.new(service, origin: @results.origin) %>
+              <% end %>
+            </div>
+          </section>
+        <% end %>
       <% else %>
         <p class="rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600">No resources match your answers.</p>
       <% end %>

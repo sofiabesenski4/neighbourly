@@ -137,8 +137,10 @@ class Questionnaire
   # What was found, for the results page. Call this once #finished?, because only then has
   # every answer been checked.
   def results
+    options = search_options
     QuestionnaireResults.new(
-      services: services,
+      services: services(options),
+      category_ids: options.fetch(:categories),
       origin: origin,
       answers: answered.map { |question|
         QuestionnaireResults::Answer.new(key: question.key, title: question.title, labels: answer_to(question).labels)
@@ -158,8 +160,8 @@ class Questionnaire
   end
 
   # The matching services, each once.
-  def services
-    CategorySearch.call(**search_options, filters: filters).flat_map(&:resources)
+  def services(options = search_options)
+    CategorySearch.call(**options, filters: filters).flat_map(&:resources)
   end
 
   private

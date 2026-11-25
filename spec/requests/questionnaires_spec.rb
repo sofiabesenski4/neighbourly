@@ -27,7 +27,7 @@ RSpec.describe "Questionnaires", type: :request do
   end
 
   def result_names
-    page_of(response).css("main article h3").map(&:text)
+    page_of(response).css("main article h4").map(&:text)
   end
 
   describe "GET /find-help/myself" do
@@ -74,12 +74,16 @@ RSpec.describe "Questionnaires", type: :request do
       expect(response.media_type).to eq("text/html")
       expect(result_names).to eq(["Soup kitchen"])
       document = page_of(response)
-      expect(document.at_css('nav[aria-label="Printout view"] [aria-current="page"]').text).to include("Answer a few questions")
+      guided_link = document.at_css('nav[aria-label="Printout view"] a[aria-current="page"]')
+      expect(guided_link.text).to include("Answer a few questions")
+      expect(guided_link["href"]).to eq(find_help_for_myself_path)
       expect(document.at_css('nav[aria-label="Printout view"] a[href="/printout"]').text).to include("Build my own guide")
       expect(document.at_css("aside[aria-label='Resource filters']")).to be_nil
       expect(document.at_css("dialog#flyer-filters")).to be_nil
       expect(document.at_css("input[type='checkbox'][name='flyer[service_ids][]'][checked]")).to be_present
-      expect(document.at_css("input[type='checkbox'][name='flyer[detail_level]']")).to be_present
+      expect(document.at_css("input[type='checkbox'][name='flyer[detail_level]']")).to be_nil
+      expect(document.at_css("input[type='hidden'][name='flyer[detail_level]']")["value"]).to eq("summary")
+      expect(document.css("input[type='hidden'][name='flyer[categories][]']").map { |input| input["value"] }).to eq([meals.id.to_s])
       expect(document.at_css("button[type='submit'][data-flyer-builder-target='generate']").text).to include("Generate printout")
     end
 
@@ -87,6 +91,19 @@ RSpec.describe "Questionnaires", type: :request do
       answer(%w[food shelter])
 
       expect(result_names).to eq(["Shelter", "Soup kitchen"])
+    end
+
+    it "groups matches by category without listing a service twice" do
+      clothing = Category.create!(name: "Clothing")
+      Service.find_by!(name: "Soup kitchen").update!(categories: [clothing, meals, shelters])
+      source.services.create!(name: "Breakfast club", categories: [meals])
+
+      answer(%w[food shelter])
+
+      sections = page_of(response).css("section.flyer-category-group")
+      expect(sections.map { |section| section.at_css("h3").text.squish }).to eq(["Meals 2 cards", "Shelters 1 card"])
+      expect(sections.first["data-category-colour"]).to eq(FlyerCategoryPalette::COLOURS.second)
+      expect(result_names).to eq(["Breakfast club", "Soup kitchen", "Shelter"])
     end
 
     it "lists every service when nothing is chosen" do

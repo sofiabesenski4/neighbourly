@@ -27,10 +27,12 @@
   </div>
 
   <div class="sm:col-span-2 sm:row-start-2 sm:mt-6">
-    <label class="mb-3 flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-stone-700">
-      <%= form.check_box :detail_level, {checked: @flyer.detail_level == "detailed", class: "size-4 accent-sage-600", data: {action: "flyer-builder#discardPrintout"}}, "detailed", "summary" %>
-      Include extra details in printout
-    </label>
+    <% unless guided %>
+      <label class="mb-3 flex min-h-11 w-fit cursor-pointer items-center gap-2 text-sm text-stone-700">
+        <%= form.check_box :detail_level, {checked: @flyer.detail_level == "detailed", class: "size-4 accent-sage-600", data: {action: "flyer-builder#discardPrintout"}}, "detailed", "summary" %>
+        Include extra details in printout
+      </label>
+    <% end %>
     <div class="mb-5 rounded-lg bg-red-50 px-4 py-3 text-red-700" data-flyer-builder-target="previewError" role="alert" hidden>
       <p data-flyer-builder-target="previewErrorMessage"></p>
       <button type="button" class="mt-2 min-h-11 cursor-pointer font-medium underline" data-action="flyer-builder#refresh">Try again</button>

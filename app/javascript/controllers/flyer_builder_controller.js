@@ -7,6 +7,7 @@ export default class extends Controller {
     "form",
     "category",
     "categoryMarker",
+    "categoryGroup",
     "organization",
     "toolbar",
     "sidebar",
@@ -71,6 +72,20 @@ export default class extends Controller {
 
   categoryMarkerTargetConnected(marker) {
     marker.style.backgroundColor = `#${marker.dataset.categoryColour}`;
+  }
+
+  categoryGroupTargetConnected(section) {
+    this.applyCategoryColour(
+      section,
+      section.querySelector("h3"),
+      section.dataset.categoryColour,
+    );
+  }
+
+  applyCategoryColour(section, heading, colour) {
+    const hex = `#${colour}`;
+    section.style.setProperty("--flyer-category-colour", hex);
+    heading.style.color = hex;
   }
 
   beforeCache() {
@@ -338,10 +353,8 @@ export default class extends Controller {
         "mb-2 text-sm font-semibold text-stone-900 sm:mb-3 sm:text-lg";
       heading.textContent = category.name;
       if (category.colour) {
-        const colour = `#${category.colour}`;
         section.className += " flyer-category-group";
-        section.style.setProperty("--flyer-category-colour", colour);
-        heading.style.color = colour;
+        this.applyCategoryColour(section, heading, category.colour);
       }
       const count = document.createElement("span");
       count.className =

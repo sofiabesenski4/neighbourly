@@ -9,7 +9,8 @@
         </svg>
       </span>
     <% end %>
-    <% link_classes = "#{view_classes} border-stone-200 bg-white text-stone-900 transition-colors hover:border-sage-400 hover:bg-sage-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" %>
+    <% focus_classes = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" %>
+    <% link_classes = "#{view_classes} border-stone-200 bg-white text-stone-900 transition-colors hover:border-sage-400 hover:bg-sage-50 #{focus_classes}" %>
     <% selected_classes = "#{view_classes} border-sage-500 bg-sage-50 text-sage-900" %>
     <% guided_choice = capture do %>
       <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-600" aria-hidden="true">
@@ -36,11 +37,12 @@
       </span>
       <%= selected_mark unless guided %>
     <% end %>
+    <%= link_to guided_choice, find_help_for_myself_path,
+          class: (guided ? "#{selected_classes} hover:bg-sage-100 #{focus_classes}" : link_classes),
+          aria: {current: ("page" if guided)}, data: {turbo: false} %>
     <% if guided %>
-      <%= tag.div guided_choice, class: selected_classes, aria: {current: "page"} %>
       <%= link_to custom_choice, new_flyer_path, class: link_classes %>
     <% else %>
-      <%= link_to guided_choice, find_help_for_myself_path, class: link_classes %>
       <%= tag.div custom_choice, class: selected_classes, aria: {current: "page"} %>
     <% end %>
   </nav>
