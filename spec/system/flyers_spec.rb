@@ -11,7 +11,7 @@ RSpec.describe "Flyers", type: :system do
     driven_by(:rack_test)
   end
 
-  it "shows both printout paths in the header and links to the questionnaire when available" do
+  it "shows both printout paths in the header and links to the questionnaire" do
     visit new_flyer_path
 
     expect(page).to have_css("h1", text: "Choose how to build your printout")
@@ -19,12 +19,7 @@ RSpec.describe "Flyers", type: :system do
       expect(page).to have_css('[aria-current="page"]', text: "Build my own guide")
       expect(page).to have_text("Get a tailored list after a short questionnaire.")
       expect(page).to have_text("Choose resources, filters, and print settings.")
-      routes = Rails.application.routes.url_helpers
-      if routes.respond_to?(:new_questionnaire_path)
-        expect(page).to have_link("Answer a few questions", href: routes.new_questionnaire_path)
-      else
-        expect(page).to have_button("Answer a few questions", disabled: true)
-      end
+      expect(page).to have_link("Answer a few questions", href: find_help_for_myself_path)
     end
   end
 

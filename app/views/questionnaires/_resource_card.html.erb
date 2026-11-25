@@ -1,0 +1,21 @@
+<% summary_fields, detail_fields = card.fields.partition { |field| ResourceCard::SUMMARY_LABELS.include?(field[:label]) } %>
+<article class="min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2">
+  <header class="flex items-center justify-between gap-2 px-3 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4">
+    <h3 class="min-w-0 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base"><%= card.title %></h3>
+    <label class="flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 text-sm">
+      <%= check_box_tag "flyer[service_ids][]", card.service.id, true, id: nil, class: "size-4 accent-sage-700",
+            aria: {label: "Include #{card.title} in printout"},
+            data: {flyer_builder_target: "includeResource", action: "change->flyer-builder#toggleResource"} %>
+      Include
+    </label>
+  </header>
+  <% if summary_fields.any? %>
+    <div class="px-3 pt-2 sm:px-4"><%= render "resource_fields", fields: summary_fields %></div>
+  <% end %>
+  <% if detail_fields.any? %>
+    <details class="px-3 pb-2 sm:px-4">
+      <summary class="min-h-11 cursor-pointer py-3 text-sm font-medium text-sage-700 focus-visible:outline-sage-600">See details</summary>
+      <%= render "resource_fields", fields: detail_fields %>
+    </details>
+  <% end %>
+</article>

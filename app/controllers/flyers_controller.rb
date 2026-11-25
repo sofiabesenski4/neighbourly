@@ -2,7 +2,7 @@ class FlyersController < ApplicationController
   # The printout opens in its own tab rather than in a frame on this page, so this
   # screen keeps the app-wide policy that blocks all embedded content.
 
-  before_action :prevent_preview_caching, only: [:from_questionnaire, :preview], if: -> { request.post? }
+  before_action :prevent_preview_caching, only: [:create, :from_questionnaire, :preview], if: -> { request.post? }
   before_action :reject_malformed_selection
 
   # Flyers are open to anonymous users so outreach workers and neighbours can
@@ -66,7 +66,7 @@ class FlyersController < ApplicationController
     end
 
     origin = coordinates_origin
-    @sections = CategorySearch.call(**@flyer.filters, origin: origin)
+    @sections = CategorySearch.call(**@flyer.filters, origin: origin, service_ids: @flyer.service_ids)
     respond_to do |format|
       format.json do
         palette = FlyerCategoryPalette.new(@sections.reject(&:label).map(&:name))

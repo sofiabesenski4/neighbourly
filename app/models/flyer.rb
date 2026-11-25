@@ -8,6 +8,7 @@ class Flyer
 
   DEFAULT_SORT = "default"
   DISTANCE_SORT = "distance"
+  SELECTION_SORT = "selection"
   SORT_OPTIONS = {"Category" => DEFAULT_SORT, "Name (A–Z)" => "asc", "Name (Z–A)" => "desc", "Distance" => DISTANCE_SORT}.freeze
   QUERY_LIMIT = 160
   DETAIL_LEVELS = %w[summary detailed].freeze
@@ -36,7 +37,7 @@ class Flyer
   validate :organizations_are_available
   validate :coordinates_are_usable
   validates :query, length: {maximum: QUERY_LIMIT}
-  validates :sort, inclusion: {in: SORT_OPTIONS.values}
+  validates :sort, inclusion: {in: SORT_OPTIONS.values + [SELECTION_SORT]}
   validates :detail_level, inclusion: {in: DETAIL_LEVELS}
 
   # Use the same persisted categories as the resource form. String IDs match
@@ -124,9 +125,9 @@ class Flyer
   end
 
   def service_ids_are_usable
-    return if service_ids.nil?
+    return if service_ids.nil? && sort != SELECTION_SORT
 
-    if service_ids.empty?
+    if service_ids.blank?
       errors.add(:base, "Choose at least one resource to include in your printout.")
     elsif service_ids.any? { |id| !id.match?(/\A[1-9][0-9]{0,18}\z/) || id.to_i > 2**63 - 1 }
       errors.add(:base, "The selected resources could not be read.")

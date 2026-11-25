@@ -41,6 +41,13 @@ class CategorySearch
 
     resources.select! { |resource| filters.all? { |filter| filter.keep?(resource) } }
 
+    if selection.sort == Flyer::SELECTION_SORT
+      # The questionnaire already ranked these cards. Keep their submitted order.
+      by_id = resources.index_by { |resource| resource.id.to_s }
+      ordered = selection.service_ids.filter_map { |id| by_id[id] }
+      return [Section.new(category: nil, resources: ordered, label: "Resources")]
+    end
+
     by_distance = selection.sort == Flyer::DISTANCE_SORT
     if selection.sort != Flyer::DEFAULT_SORT && (!by_distance || origin&.located?)
       resources.sort_by! do |resource|

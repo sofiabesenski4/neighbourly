@@ -1,0 +1,8 @@
+<dl class="grid gap-1 text-sm">
+  <% fields.each do |field| %>
+    <div class="[overflow-wrap:anywhere]">
+      <dt class="inline font-semibold"><%= field[:label] %>:</dt>
+      <dd class="m-0 inline whitespace-pre-line"><%= field[:value] %></dd>
+    </div>
+  <% end %>
+</dl>

@@ -40,6 +40,7 @@ export default class extends Controller {
     previewUrl: String,
     summaryLabels: Array,
     fromQuestionnaire: Boolean,
+    guided: Boolean,
   };
 
   connect() {
@@ -47,6 +48,16 @@ export default class extends Controller {
     this.hasResults = false;
     this.generating = false;
     this.excludedServiceIds = new Set();
+    if (this.guidedValue) {
+      this.resourceIds = new Set(
+        this.includeResourceTargets.map((input) => input.value),
+      );
+      this.includeResourceTargets.forEach((input) => {
+        if (!input.checked) this.excludedServiceIds.add(input.value);
+      });
+      this.updateIncludedResources();
+      return;
+    }
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
@@ -67,7 +78,7 @@ export default class extends Controller {
     clearTimeout(this.debounce);
     this.previewRequest?.abort();
     this.printRequest?.abort();
-    this.closeFilters();
+    if (this.hasFilterDialogTarget) this.closeFilters();
     this.clearPrintout();
     if (this.hasLatTarget) {
       this.latTarget.value = "";
@@ -488,9 +499,11 @@ export default class extends Controller {
     this.printRequest = new AbortController();
     const { signal } = this.printRequest;
     const body = new FormData(this.formTarget);
-    this.selectedServiceIds().forEach((id) =>
-      body.append("flyer[service_ids][]", id),
-    );
+    if (!this.guidedValue) {
+      this.selectedServiceIds().forEach((id) =>
+        body.append("flyer[service_ids][]", id),
+      );
+    }
     // Open from the click, before the asynchronous PDF request can lose user activation.
     const tab = window.open("about:blank", "_blank");
     this.pendingPrintoutTab = tab;

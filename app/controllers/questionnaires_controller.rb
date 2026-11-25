@@ -2,9 +2,8 @@
 #
 # Architecture: GET shows the first question, with no answers. Each POST submits the question
 # shown, the button pressed and every answer so far. Questionnaire works out where that
-# leads: another question, or past the last one to the results, which go to the page as
-# @results. That page is being built separately, so for now they're a plain list of service
-# names, only to check that the search works. See docs/questionnaire-results.md.
+# leads: another question, or past the last one to the guided printout preview. See
+# docs/questionnaire-results.md.
 #
 # Privacy: answers may come to include gender, Indigenous identity, disability and mental
 # health, and are often entered on shared computers. So they arrive only in the body of a
@@ -40,8 +39,8 @@ class QuestionnairesController < ApplicationController
     return render :show unless @questionnaire.finished?
 
     @results = @questionnaire.results
-    # Becomes `render :results` when the results page exists.
-    render plain: temporary_list
+    @flyer = Flyer.new(sort: Flyer::SELECTION_SORT, detail_level: "summary")
+    render :results
   end
 
   private
@@ -53,17 +52,8 @@ class QuestionnairesController < ApplicationController
     device: "We couldn't read your device's location. Please try again, type a nearby place, or press Skip.",
     too_long: "That's too long for us to look up. Please type a shorter address, or press Skip."
   }.freeze
-  NO_DISTANCES = "We can't look up places right now, so these services aren't sorted by distance."
   RATE_LIMITED = "We've had a lot of requests from this connection. Your answers are still here. Please try again later."
-  private_constant :PROBLEMS, :NO_DISTANCES, :RATE_LIMITED
-
-  # Stands in for the results page, using only what that page will have. ResourceCard supplies
-  # the names because it has a fallback for a service without one.
-  def temporary_list
-    names = @results.services.map { |service| ResourceCard.new(service, origin: @results.origin).title }
-    names.unshift(NO_DISTANCES, "") if @results.missing_distances?
-    names.join("\n")
-  end
+  private_constant :PROBLEMS, :RATE_LIMITED
 
   # Shows a question with a message, and what was chosen still ticked. Over the rate limit
   # that's the question the person was on. Redirecting, as the app's shared rate limit

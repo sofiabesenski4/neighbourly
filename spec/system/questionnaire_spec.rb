@@ -1,4 +1,5 @@
 require "rails_helper"
+require "pdf/reader"
 require "support/two_question_questionnaire"
 
 # Covers answering the questionnaire as a person does: in Chrome, at phone width, and
@@ -25,9 +26,13 @@ RSpec.describe "Questionnaire", type: :system do
     expect(page).to have_title("Question #{number} of 2 - Find help", exact: true)
   end
 
-  # The temporary plain list has no title.
   def expect_results
-    expect(page).to have_title("", exact: true)
+    expect(page).to have_title("Printout", exact: true)
+    expect(page).to have_css('nav[aria-label="Printout view"] [aria-current="page"]', text: "Answer a few questions")
+  end
+
+  def result_names
+    all("main article h3").map(&:text)
   end
 
   context "in Chrome" do
@@ -57,7 +62,9 @@ RSpec.describe "Questionnaire", type: :system do
     end
 
     it "finds services for the chosen need, closest first, keeping the answers out of the URL" do
-      visit find_help_for_myself_path
+      visit new_flyer_path
+      click_link "Answer a few questions"
+      expect_question 1
       check "Food and meals"
       click_button "Next"
       expect_question 2
@@ -65,9 +72,17 @@ RSpec.describe "Questionnaire", type: :system do
       click_button "Next"
 
       expect_results
-      expect(page).to have_content(/Near kitchen\s+Far kitchen/)
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
       expect(page).not_to have_content("Shelter")
       expect(page.current_url).to end_with("/find-help/myself")
+      find("article", text: "Far kitchen").uncheck("Include")
+      find("article", text: "Near kitchen").uncheck("Include")
+      expect(page).to have_button("Generate printout", disabled: true)
+      find("article", text: "Near kitchen").check("Include")
+      printout = window_opened_by { click_button "Generate printout" }
+      expect(page).to have_link("Open printout", href: /\Ablob:/)
+    ensure
+      printout&.close
     end
 
     it "goes from the home page to the results" do
@@ -82,7 +97,7 @@ RSpec.describe "Questionnaire", type: :system do
       click_button "Next"
 
       expect_results
-      expect(page).to have_content(/Near kitchen\s+Far kitchen/)
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
       expect(page).not_to have_content("Shelter")
     end
 
@@ -109,7 +124,7 @@ RSpec.describe "Questionnaire", type: :system do
       # Past the "Use my location" button, to the text box.
       page.active_element.send_keys(:tab, :tab, "919 Pandora Ave", :enter)
       expect_results
-      expect(page).to have_content(/Near kitchen\s+Far kitchen/)
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
     end
 
     # Uses Chrome's real location API and permission system. Chrome's developer tools set the
@@ -149,7 +164,7 @@ RSpec.describe "Questionnaire", type: :system do
         click_button "Next"
 
         expect_results
-        expect(page).to have_content(/Near kitchen\s+Far kitchen/)
+        expect(result_names).to eq(["Near kitchen", "Far kitchen", "Shelter"])
         expect(page.current_url).to end_with("/find-help/myself")
       end
 
@@ -182,7 +197,7 @@ RSpec.describe "Questionnaire", type: :system do
         expect(page).to have_no_css("[role='status']")
         click_button "Next"
         expect_results
-        expect(page).to have_content(/Near kitchen\s+Far kitchen/)
+        expect(result_names).to eq(["Near kitchen", "Far kitchen", "Shelter"])
       end
 
       it "is replaced by a typed place" do
@@ -196,7 +211,7 @@ RSpec.describe "Questionnaire", type: :system do
         expect(hidden_value(:device)).to eq("")
         click_button "Next"
         expect_results
-        expect(page).to have_content(/Far kitchen\s+Near kitchen/)
+        expect(result_names).to eq(["Far kitchen", "Near kitchen", "Shelter"])
       end
     end
 
@@ -252,7 +267,17 @@ RSpec.describe "Questionnaire", type: :system do
     expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
     click_button "Next"
 
-    expect(page.body.lines(chomp: true)).to eq(["Near kitchen", "Far kitchen", "Shelter"])
+    expect_results
+    expect(result_names).to eq(["Near kitchen", "Far kitchen", "Shelter"])
+    find("article", text: "Shelter").uncheck("Include")
+    check "Include extra details in printout"
+    click_button "Generate printout"
+
+    expect(page.response_headers["Content-Type"]).to include("application/pdf")
+    pdf = PDF::Reader.new(StringIO.new(page.body))
+    listings = pdf.pages.fetch(2).text
+    expect(listings.scan(/\d+\.\s+(Near kitchen|Far kitchen|Shelter)\b/).flatten).to eq(["Near kitchen", "Far kitchen"])
+    expect(listings).to include("Distance:")
   end
 
   context "with several questions" do
@@ -282,7 +307,7 @@ RSpec.describe "Questionnaire", type: :system do
       driven_by(:rack_test)
       go_through_the_chain
 
-      expect(page.body.lines(chomp: true))
+      expect(result_names)
         .to eq(["Our Place beds", "Our Place meals", "The Mustard Seed beds", "The Mustard Seed meals"])
     end
 

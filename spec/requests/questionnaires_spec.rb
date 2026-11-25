@@ -26,6 +26,10 @@ RSpec.describe "Questionnaires", type: :request do
     Nokogiri::HTML(response.body)
   end
 
+  def result_names
+    page_of(response).css("main article h3").map(&:text)
+  end
+
   describe "GET /find-help/myself" do
     it "asks the question without signing in, offering only options that can find something" do
       get "/find-help/myself"
@@ -67,20 +71,37 @@ RSpec.describe "Questionnaires", type: :request do
     it "lists services for one option" do
       answer(["food"])
 
-      expect(response.media_type).to eq("text/plain")
-      expect(response.body).to eq("Soup kitchen")
+      expect(response.media_type).to eq("text/html")
+      expect(result_names).to eq(["Soup kitchen"])
+      document = page_of(response)
+      expect(document.at_css('nav[aria-label="Printout view"] [aria-current="page"]').text).to include("Answer a few questions")
+      expect(document.at_css('nav[aria-label="Printout view"] a[href="/printout"]').text).to include("Build my own guide")
+      expect(document.at_css("aside[aria-label='Resource filters']")).to be_nil
+      expect(document.at_css("dialog#flyer-filters")).to be_nil
+      expect(document.at_css("input[type='checkbox'][name='flyer[service_ids][]'][checked]")).to be_present
+      expect(document.at_css("input[type='checkbox'][name='flyer[detail_level]']")).to be_present
+      expect(document.at_css("button[type='submit'][data-flyer-builder-target='generate']").text).to include("Generate printout")
     end
 
     it "lists services for several options" do
       answer(%w[food shelter])
 
-      expect(response.body).to eq("Shelter\nSoup kitchen")
+      expect(result_names).to eq(["Shelter", "Soup kitchen"])
     end
 
     it "lists every service when nothing is chosen" do
       post find_help_for_myself_path, params: {questionnaire: {step: "location"}}
 
-      expect(response.body).to eq("Shelter\nSoup kitchen")
+      expect(result_names).to eq(["Shelter", "Soup kitchen"])
+    end
+
+    it "disables printing when there are no matching resources" do
+      Service.find_by!(name: "Soup kitchen").destroy!
+      answer(["food"])
+
+      expect(result_names).to be_empty
+      expect(response.body).to include("No resources match your answers.")
+      expect(page_of(response).at_css("button[data-flyer-builder-target='generate'][disabled]")).to be_present
     end
 
     it "asks again when no submitted option is known" do
@@ -125,6 +146,7 @@ RSpec.describe "Questionnaires", type: :request do
 
       answer(["food"])
       expect(response.headers["Cache-Control"]).to eq("no-store")
+      expect(page_of(response).at_css("meta[name='turbo-cache-control']")["content"]).to eq("no-cache")
 
       answer(["unknown"])
       expect(response.headers["Cache-Control"]).to eq("no-store")
@@ -208,7 +230,7 @@ RSpec.describe "Questionnaires", type: :request do
     it "lists the services matching every answer after the last question" do
       submit(step: "who", needs: ["food"], who: ["our_place"])
 
-      expect(response.body).to eq("Our Place meals")
+      expect(result_names).to eq(["Our Place meals"])
     end
 
     it "starts over with a plain link that holds no answers" do
@@ -281,7 +303,7 @@ RSpec.describe "Questionnaires", type: :request do
     it "lists the closest services first" do
       submit_place("919 Pandora Ave")
 
-      expect(response.body).to eq("Near kitchen\nFar kitchen")
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
     end
 
     it "asks again when the place isn't found, with what was typed and the other answers" do
@@ -309,14 +331,14 @@ RSpec.describe "Questionnaires", type: :request do
       submit_place("919 Pandora Ave")
 
       expect(response).to have_http_status(:ok)
-      expect(response.body)
-        .to eq("We can't look up places right now, so these services aren't sorted by distance.\n\nFar kitchen\nNear kitchen")
+      expect(response.body).to include("We can't look up places right now, so these services aren't sorted by distance.")
+      expect(result_names).to eq(["Far kitchen", "Near kitchen"])
     end
 
     it "doesn't mention distances to someone who skipped the question" do
       submit_place("919 Pandora Ave", move: "skip")
 
-      expect(response.body).to eq("Far kitchen\nNear kitchen")
+      expect(result_names).to eq(["Far kitchen", "Near kitchen"])
     end
 
     it "keeps a place that has been looked up when returning to it" do
@@ -357,7 +379,7 @@ RSpec.describe "Questionnaires", type: :request do
     it "sorts by distance from the device's location" do
       submit_place("", device: "1", checked: "", lat: "48.42", lng: "-123.36")
 
-      expect(response.body).to eq("Near kitchen\nFar kitchen")
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
       expect(Geocoder).not_to have_received(:locate)
     end
 
@@ -382,7 +404,7 @@ RSpec.describe "Questionnaires", type: :request do
 
     it "stops looking places up after 60 in an hour, and carries on without distances" do
       60.times { submit_place("919 Pandora Ave") }
-      expect(response.body).to eq("Near kitchen\nFar kitchen")
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
 
       submit_place("919 Pandora Ave")
       expect(response).to have_http_status(:ok)
@@ -394,7 +416,7 @@ RSpec.describe "Questionnaires", type: :request do
       60.times { submit_place("919 Pandora Ave", move: "skip") }
       submit_place("919 Pandora Ave")
 
-      expect(response.body).to eq("Near kitchen\nFar kitchen")
+      expect(result_names).to eq(["Near kitchen", "Far kitchen"])
     end
   end
 
@@ -409,7 +431,7 @@ RSpec.describe "Questionnaires", type: :request do
     expect(page_of(response).css("fieldset label").map { |label| label.text.strip }).to eq(["Under 19", "19 or older"])
 
     post find_help_for_myself_path, params: {questionnaire: {step: "age", answers: {categories: ["food"], age: ["under_19"]}}}
-    expect(response.body).to eq("Soup kitchen")
+    expect(result_names).to eq(["Soup kitchen"])
   end
 
   it "counts a question as a step only while a service has the details it requires" do

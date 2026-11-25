@@ -3,15 +3,9 @@
 The questionnaire gathers answers and runs the search. The results page shows what it found.
 They meet at `@results`, a `QuestionnaireResults`.
 
-## Connecting the page
-
-1. Put the page in `app/views/questionnaires/results.html.erb`.
-2. In `QuestionnairesController#create`, change `render plain: temporary_list` to
-   `render :results`. Then delete `temporary_list` and `NO_DISTANCES`, which nothing else uses.
-3. Update the specs that read the temporary list.
-
-Nothing else needs to change. The page is the response to the last question's form, so it
-can't be a redirect or have a link of its own.
+`app/views/questionnaires/results.html.erb` shows the guided printout preview directly in
+the response to the last question's form. The PDF form submits only checked service IDs,
+print settings, and any rounded coordinates needed for distances.
 
 ## What's in `@results`
 
@@ -32,8 +26,7 @@ A location's label is the place that was typed, or "your location".
   agree with the order. Use `card.title`, because a service's name may be blank once PR #96
   merges. `card.distance_km` can be nil, and so can `service.description`.
 - **Say so when `missing_distances?` is true.** The address service is down, or this
-  connection has used up its lookups, so the services are in name order instead. The temporary
-  list says "We can't look up places right now, so these services aren't sorted by distance."
+  connection has used up its lookups, so the services are in name order instead.
 - **Keep answers out of URLs, the session, cookies and browser storage.** People may be on
   shared computers, and these answers can be sensitive.
 - **Turn off Turbo's page cache,** as `show.html.erb` does:

@@ -1,0 +1,47 @@
+<header class="mb-5 max-w-2xl pt-2 sm:mb-7 sm:pt-0">
+  <h1 class="mb-3 text-base font-semibold tracking-tight text-stone-900 sm:text-lg">Choose how to build your printout</h1>
+  <nav aria-label="Printout view" class="grid min-w-0 gap-2.5 min-[520px]:grid-cols-2">
+    <% view_classes = "flex min-h-16 min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 text-left sm:px-4 sm:py-3" %>
+    <% selected_mark = capture do %>
+      <span class="grid size-5 shrink-0 place-items-center rounded-full bg-sage-700 text-white" aria-hidden="true">
+        <svg class="size-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m3 8 3 3 7-7" />
+        </svg>
+      </span>
+    <% end %>
+    <% link_classes = "#{view_classes} border-stone-200 bg-white text-stone-900 transition-colors hover:border-sage-400 hover:bg-sage-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" %>
+    <% selected_classes = "#{view_classes} border-sage-500 bg-sage-50 text-sage-900" %>
+    <% guided_choice = capture do %>
+      <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-stone-100 text-stone-600" aria-hidden="true">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 5H8a4 4 0 0 0-4 4v1a4 4 0 0 0 2 3.5V17l3-3h2" />
+          <path d="M16 9h-2a4 4 0 0 0-4 4v1a4 4 0 0 0 4 4h2l4 3v-4.5a4 4 0 0 0 0-7A4 4 0 0 0 16 9Z" />
+        </svg>
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm leading-tight font-semibold">Answer a few questions</span>
+        <span class="mt-1 block text-xs leading-snug text-stone-600">Get a tailored list after a short questionnaire.</span>
+      </span>
+      <%= selected_mark if guided %>
+    <% end %>
+    <% custom_choice = capture do %>
+      <span class="grid size-9 shrink-0 place-items-center rounded-lg bg-sage-100 text-sage-800" aria-hidden="true">
+        <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round">
+          <path d="M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01" />
+        </svg>
+      </span>
+      <span class="min-w-0 flex-1">
+        <span class="block text-sm leading-tight font-semibold">Build my own guide</span>
+        <span class="mt-1 block text-xs leading-snug text-stone-600">Choose resources, filters, and print settings.</span>
+      </span>
+      <%= selected_mark unless guided %>
+    <% end %>
+    <% if guided %>
+      <%= tag.div guided_choice, class: selected_classes, aria: {current: "page"} %>
+      <%= link_to custom_choice, new_flyer_path, class: link_classes %>
+    <% else %>
+      <%= link_to guided_choice, find_help_for_myself_path, class: link_classes %>
+      <%= tag.div custom_choice, class: selected_classes, aria: {current: "page"} %>
+    <% end %>
+  </nav>
+</header>

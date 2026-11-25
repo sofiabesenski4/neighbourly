@@ -1,0 +1,35 @@
+<% content_for :title, "Printout" %>
+<% content_for :head do %>
+  <meta name="turbo-cache-control" content="no-cache">
+<% end %>
+
+<div data-controller="flyer-builder" data-flyer-builder-guided-value="true"
+     data-action="turbo:before-cache@document->flyer-builder#beforeCache">
+  <%= render "flyers/view_chooser", guided: true %>
+
+  <% if @results.missing_distances? %>
+    <p class="mb-4 text-sm text-stone-700" role="status">We can't look up places right now, so these services aren't sorted by distance.</p>
+  <% end %>
+
+  <%= form_with model: @flyer, url: flyers_path, scope: :flyer,
+        data: {turbo: false, flyer_builder_target: "form", action: "submit->flyer-builder#generate"} do |form| %>
+    <%= form.hidden_field :sort %>
+    <%= hidden_field_tag "flyer[service_ids][]", "", id: nil %>
+    <% if @results.origin&.located? %>
+      <%= form.hidden_field :lat, value: @results.origin.point.lat, autocomplete: "off", data: {flyer_builder_target: "lat"} %>
+      <%= form.hidden_field :lng, value: @results.origin.point.lng, autocomplete: "off", data: {flyer_builder_target: "lng"} %>
+    <% end %>
+
+    <%= render layout: "flyers/preview", locals: {form: form, guided_count: @results.services.size} do %>
+      <% if @results.services.any? %>
+        <div class="grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2">
+          <% @results.services.each do |service| %>
+            <%= render "resource_card", card: ResourceCard.new(service, origin: @results.origin) %>
+          <% end %>
+        </div>
+      <% else %>
+        <p class="rounded-[10px] border border-dashed border-stone-300 px-5 py-12 text-center text-stone-600">No resources match your answers.</p>
+      <% end %>
+    <% end %>
+  <% end %>
+</div>

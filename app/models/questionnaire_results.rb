@@ -1,9 +1,8 @@
 # Everything the results page needs about a finished questionnaire.
 #
 # Architecture: Questionnaire#results builds one once the person has moved past the last
-# question, and QuestionnairesController hands it to the page as @results. The page is built
-# separately, so this is the agreement between the two. docs/questionnaire-results.md
-# explains it for whoever works on the page. Tell them before changing it.
+# question, and QuestionnairesController hands it to the guided printout as @results.
+# See docs/questionnaire-results.md for the contract.
 #
 # - `services`: matching Service records, in the order to show them, each once. Empty when
 #   nothing matches.
