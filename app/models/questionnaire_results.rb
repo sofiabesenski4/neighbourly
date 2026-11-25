@@ -21,11 +21,13 @@ QuestionnaireResults = Data.define(:services, :origin, :answers, :missing_distan
   end
 
   def category_groups(tree:)
-    matching_ids = tree.expand(category_ids).map(&:id).to_set
-    services.group_by do |service|
+    matching_categories = tree.expand(category_ids)
+    matching_ids = matching_categories.map(&:id).to_set
+    groups = services.group_by do |service|
       category = service.categories.find { |candidate| matching_ids.include?(candidate.id) }
       (category || service.categories.first)&.name || "Other resources"
     end
+    groups.slice(*matching_categories.map(&:name)).merge(groups)
   end
 end
 

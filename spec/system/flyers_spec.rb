@@ -16,9 +16,9 @@ RSpec.describe "Flyers", type: :system do
 
     expect(page).to have_css("h1", text: "Choose how to build your printout")
     within("header nav[aria-label='Printout view']") do
-      expect(page).to have_css('[aria-current="page"]', text: "Build my own guide")
+      expect(page).to have_css('[aria-current="page"]', text: "Build guide manually")
       expect(page).to have_text("Get a tailored list after a short questionnaire.")
-      expect(page).to have_text("Choose resources, filters, and print settings.")
+      expect(page).to have_text("Search, filter, and select resources yourself.")
       expect(page).to have_link("Answer a few questions", href: find_help_for_myself_path)
     end
   end

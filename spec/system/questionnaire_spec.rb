@@ -319,7 +319,7 @@ RSpec.describe "Questionnaire", type: :system do
       go_through_the_chain
 
       expect(result_names)
-        .to eq(["Our Place beds", "The Mustard Seed beds", "Our Place meals", "The Mustard Seed meals"])
+        .to eq(["Our Place meals", "The Mustard Seed meals", "Our Place beds", "The Mustard Seed beds"])
     end
 
     context "in Chrome" do

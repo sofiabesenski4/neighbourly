@@ -77,7 +77,7 @@ RSpec.describe "Questionnaires", type: :request do
       guided_link = document.at_css('nav[aria-label="Printout view"] a[aria-current="page"]')
       expect(guided_link.text).to include("Answer a few questions")
       expect(guided_link["href"]).to eq(find_help_for_myself_path)
-      expect(document.at_css('nav[aria-label="Printout view"] a[href="/printout"]').text).to include("Build my own guide")
+      expect(document.at_css('nav[aria-label="Printout view"] a[href="/printout"]').text).to include("Build guide manually")
       expect(document.at_css("aside[aria-label='Resource filters']")).to be_nil
       expect(document.at_css("dialog#flyer-filters")).to be_nil
       expect(document.at_css("input[type='checkbox'][name='flyer[service_ids][]'][checked]")).to be_present
@@ -90,26 +90,30 @@ RSpec.describe "Questionnaires", type: :request do
     it "lists services for several options" do
       answer(%w[food shelter])
 
-      expect(result_names).to eq(["Shelter", "Soup kitchen"])
+      expect(result_names).to eq(["Soup kitchen", "Shelter"])
     end
 
-    it "groups matches by category without listing a service twice" do
+    it "groups matches in the manual builder's category order without listing a service twice" do
       clothing = Category.create!(name: "Clothing")
       Service.find_by!(name: "Soup kitchen").update!(categories: [clothing, meals, shelters])
-      source.services.create!(name: "Breakfast club", categories: [meals])
+      source.services.create!(name: "Warm meal", categories: [meals])
 
       answer(%w[food shelter])
 
       sections = page_of(response).css("section.flyer-category-group")
       expect(sections.map { |section| section.at_css("h3").text.squish }).to eq(["Meals 2 cards", "Shelters 1 card"])
       expect(sections.first["data-category-colour"]).to eq(FlyerCategoryPalette::COLOURS.second)
-      expect(result_names).to eq(["Breakfast club", "Soup kitchen", "Shelter"])
+      expect(result_names).to eq(["Soup kitchen", "Warm meal", "Shelter"])
+
+      get preview_flyers_path(format: :json), params: {flyer: {categories: [meals.id.to_s, shelters.id.to_s]}}
+      categories = response.parsed_body.fetch("categories")
+      expect(categories.map { |category| category.fetch("name") }).to eq(["Meals", "Shelters"])
     end
 
     it "lists every service when nothing is chosen" do
       post find_help_for_myself_path, params: {questionnaire: {step: "location"}}
 
-      expect(result_names).to eq(["Shelter", "Soup kitchen"])
+      expect(result_names).to eq(["Soup kitchen", "Shelter"])
     end
 
     it "disables printing when there are no matching resources" do

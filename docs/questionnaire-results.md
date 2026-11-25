@@ -21,7 +21,7 @@ A location's label is the place that was typed, or "your location".
 
 ## What the page must do
 
-- **Keep the order of `services` within each category.** Sections follow the order of their first matching resource.
+- **Keep the order of `services` within each category.** Sections use the manual builder's category order.
 - **Build cards with `ResourceCard.new(service, origin: @results.origin)`,** so that distances
   agree with the order. Use `card.title`, because a service's name may be blank once PR #96
   merges. `card.distance_km` can be nil, and so can `service.description`.
