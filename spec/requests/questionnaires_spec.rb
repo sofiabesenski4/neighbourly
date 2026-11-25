@@ -32,7 +32,10 @@ RSpec.describe "Questionnaires", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(page_of(response).at_css("fieldset legend h1").text).to eq("What do you need help with?")
-      expect(page_of(response).css("fieldset label").map { |label| label.text.strip }).to eq(["Food", "A place to stay"])
+      groups = page_of(response).css("fieldset [role=group]")
+      expect(groups.map { |group| group["aria-label"] }).to eq(["Food and meals", "Housing Services"])
+      expect(groups[0].css("label").map { |label| label.text.strip }).to eq(["Food and meals", "Meals"])
+      expect(groups[1].css("label").map { |label| label.text.strip }).to eq(["Housing Services", "Shelters"])
     end
 
     it "sends answers in the body of a regular POST" do

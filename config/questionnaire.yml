@@ -17,35 +17,46 @@
 #   requires optional: something ResourceAttributes can read, like age_range. The question is
 #            hidden, and not counted as a step, until a visible service has it. At least one
 #            question must not have this.
-#   options  the choices, for any type but location. Each has a key, the label people
-#            read, and whatever its filter needs. CategoryFilter needs `categories`: the
-#            names of the service categories it stands for, exactly as in
-#            db/category_names.yml. Names are used because IDs differ between databases.
-#
-# The labels and groups are a first draft and are expected to change.
-#
-# "Health" lists only Health Care. If categories get parents (PR #85), Mental Health
-# Support is to sit under Health Care, so "Health" will then return mental health services
-# too. The team accepted that. See docs/questionnaire-notes.md.
+#   options  the choices, for any type but location. Each has a key, a label,
+#            and what its filter needs. CategoryFilter matches category names
+#            from db/category_names.yml because IDs differ between databases.
+#            A checkbox group can list children. Selecting the group includes
+#            all categories from its children, plus any categories on the group.
 questions:
   - key: categories
     title: What do you need help with?
-    hint: Choose as many as you like.
+    hint: Choose as many as you like. Selecting a group includes the options below it.
     type: checkboxes
     filter: CategoryFilter
     options:
-      - { key: food, label: Food, categories: [Meals, Food Banks] }
-      - { key: shelter, label: A place to stay, categories: [Shelters, Housing Services] }
-      - { key: health, label: Health, categories: [Health Care] }
-      - { key: mental_health, label: Mental health, categories: [Mental Health Support] }
+      - { key: clothing, label: Clothing, categories: [Clothing] }
+      - { key: computer_internet, label: Computer & Internet, categories: [Computer & Internet] }
+      - { key: employment, label: Employment Support, categories: [Employment Support] }
+      - key: food
+        label: Food and meals
+        children:
+          - { key: food_banks, label: Food Banks, categories: [Food Banks] }
+          - { key: meals, label: Meals, categories: [Meals] }
       - key: substance_use
-        label: Drug and alcohol support
-        categories: [Harm Reduction Resources, Supervised Consumption, Substance Use Support]
-      - { key: hygiene, label: Showers and clothing, categories: [Showers, Clothing] }
-      - { key: legal, label: Legal help, categories: [Legal Support] }
-      - { key: work, label: Jobs and computers, categories: [Employment Support, Computer & Internet] }
-      - { key: youth, label: Youth services, categories: [Youth Services] }
-      - { key: indigenous, label: Indigenous services, categories: [Indigenous Support] }
+        label: Harm Reduction Resources
+        categories: [Harm Reduction Resources]
+        children:
+          - { key: substance_use_support, label: Substance Use Support, categories: [Substance Use Support] }
+          - { key: supervised_consumption, label: Supervised Consumption, categories: [Supervised Consumption] }
+      - key: health
+        label: Health Care
+        categories: [Health Care]
+        children:
+          - { key: mental_health, label: Mental Health Support, categories: [Mental Health Support] }
+      - key: shelter
+        label: Housing Services
+        categories: [Housing Services]
+        children:
+          - { key: shelters, label: Shelters, categories: [Shelters] }
+      - { key: indigenous, label: Indigenous Support, categories: [Indigenous Support] }
+      - { key: legal, label: Legal Support, categories: [Legal Support] }
+      - { key: showers, label: Showers, categories: [Showers] }
+      - { key: youth, label: Youth Services, categories: [Youth Services] }
   - key: location
     title: Where are you?
     hint: We'll show the closest services first. This is optional, and it isn't saved.

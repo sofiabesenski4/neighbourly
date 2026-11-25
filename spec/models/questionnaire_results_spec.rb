@@ -98,7 +98,7 @@ RSpec.describe QuestionnaireResults do
   describe "#answers" do
     it "has each answered question in words, in the order they're asked" do
       expect(answers(results(location: place, categories: %w[shelter food]))).to eq([
-        ["categories", "What do you need help with?", ["Food", "A place to stay"]],
+        ["categories", "What do you need help with?", ["Food and meals", "Housing Services"]],
         ["location", "Where are you?", ["919 Pandora Ave"]]
       ])
     end

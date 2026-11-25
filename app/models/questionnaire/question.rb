@@ -18,7 +18,7 @@ class Questionnaire
         hint: entry["hint"],
         type: type,
         filter: FILTERS.fetch(entry.fetch("filter")),
-        all_options: ((type == "location") ? [] : entry.fetch("options")).map { |option| Option.from_config(option) },
+        all_options: ((type == "location") ? [] : entry.fetch("options")).flat_map { |option| Option.from_config(option) },
         requires: requires
       )
     end

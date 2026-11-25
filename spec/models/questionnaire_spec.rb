@@ -107,6 +107,14 @@ RSpec.describe Questionnaire do
       expect(names("categories" => ["food"])).to eq(["Food bank", "Soup kitchen"])
     end
 
+    it "lets a subcategory narrow the search to a single part of a group" do
+      service("Soup kitchen", meals)
+      service("Food bank", food_banks)
+
+      expect(names("categories" => ["meals"])).to eq(["Soup kitchen"])
+      expect(names("categories" => ["food_banks"])).to eq(["Food bank"])
+    end
+
     it "finds services matching any chosen option" do
       service("Soup kitchen", meals)
       service("Shelter", shelters)

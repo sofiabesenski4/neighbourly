@@ -37,7 +37,7 @@ RSpec.describe "Questionnaire", type: :system do
 
     it "finds services for the chosen need, closest first, keeping the answers out of the URL" do
       visit find_help_for_myself_path
-      check "Food"
+      check "Food and meals"
       click_button "Next"
       expect_question 2
       fill_in "Enter a place", with: "919 Pandora Ave"
@@ -54,7 +54,7 @@ RSpec.describe "Questionnaire", type: :system do
       click_link "For myself"
       expect_question 1
       expect(page).to have_css("h1:focus", text: "What do you need help with?")
-      check "Food"
+      check "Food and meals"
       click_button "Next"
       expect_question 2
       fill_in "Enter a place", with: "919 Pandora Ave"
@@ -80,7 +80,7 @@ RSpec.describe "Questionnaire", type: :system do
       expect(page).to have_css("h1:focus", text: "What do you need help with?")
 
       page.active_element.send_keys(:tab, :space)
-      expect(page).to have_checked_field("Food")
+      expect(page).to have_checked_field("Food and meals")
       page.active_element.send_keys(:enter)
       expect_question 2
       expect(page).to have_css("h1:focus", text: "Where are you?")
@@ -222,11 +222,11 @@ RSpec.describe "Questionnaire", type: :system do
     driven_by(:rack_test)
 
     visit find_help_for_myself_path
-    check "Food"
+    check "Food and meals"
     click_button "Next"
     fill_in "Enter a place", with: "919 Pandora Ave"
     click_button "Back"
-    check "A place to stay"
+    check "Housing Services"
     click_button "Next"
     expect(page).to have_field("Enter a place", with: "919 Pandora Ave")
     click_button "Next"
