@@ -47,7 +47,7 @@
       <%= render question.type, question: question, answer: @questionnaire.answer_to(question) %>
     </fieldset>
 
-    <%# Next comes first because Enter presses a form's first button. %>
+    <%# Next is the first submit button so Enter advances the question. %>
     <button type="submit" name="questionnaire[move]" value="next"
             class="mt-6 min-h-11 w-full cursor-pointer rounded-lg bg-sage-600 px-4 py-2.5 font-medium text-white hover:bg-sage-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600">Next</button>
     <div class="mt-2 flex flex-wrap gap-2">

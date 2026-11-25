@@ -505,7 +505,7 @@ export default class extends Controller {
   }
 
   resetDraft() {
-    this.draftCategoryTargets.forEach((input) => (input.checked = false));
+    this.draftCategoryTargets.forEach((input) => (input.checked = true));
     this.draftOrganizationTargets.forEach((input) => (input.checked = false));
     this.draftSortTarget.value = DEFAULT_SORT;
   }
@@ -559,9 +559,10 @@ export default class extends Controller {
         String(order === this.sortTarget.value),
       );
     });
+    const categoryCount = this.selectedCategories().length;
     const filtersActive =
       customOrder ||
-      this.selectedCategories().length > 0 ||
+      (categoryCount > 0 && categoryCount < this.categoryTargets.length) ||
       this.selectedOrganizations().length > 0;
     this.filterButtonTarget.dataset.active = String(filtersActive);
     this.filterButtonTarget.setAttribute(

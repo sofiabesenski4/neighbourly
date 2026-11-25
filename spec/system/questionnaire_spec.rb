@@ -40,12 +40,18 @@ RSpec.describe "Questionnaire", type: :system do
 
     after { page.current_window.resize_to(1280, 900) }
 
-    it "checks and clears the choices beneath a category group" do
+    it "starts with all categories selected and supports bulk and group changes" do
       Category.create!(name: "Food Banks")
       visit find_help_for_myself_path
 
+      expect(page).to have_checked_field("Housing Services")
+      expect(page).to have_checked_field("Food Banks")
+      find('button[aria-label="Clear categories"]').click
+      expect(page).to have_no_css("main input[type=checkbox]:checked")
+      find('button[aria-label="Select all categories"]').click
+      expect(page).to have_checked_field("Housing Services")
+
       within("[role='group'][aria-label='Food and meals']") do
-        check "Food and meals"
         expect(page).to have_checked_field("Food Banks")
         expect(page).to have_checked_field("Meals", exact: true)
 
@@ -58,14 +64,14 @@ RSpec.describe "Questionnaire", type: :system do
         expect(page).to have_unchecked_field("Food Banks")
         expect(page).to have_unchecked_field("Meals", exact: true)
       end
-      expect(page).to have_unchecked_field("Housing Services")
+      expect(page).to have_checked_field("Housing Services")
     end
 
     it "finds services for the chosen need, closest first, keeping the answers out of the URL" do
       visit new_flyer_path
       click_link "Answer a few questions"
       expect_question 1
-      check "Food and meals"
+      uncheck "Housing Services"
       click_button "Next"
       expect_question 2
       fill_in "Enter a place", with: "919 Pandora Ave"
@@ -90,7 +96,7 @@ RSpec.describe "Questionnaire", type: :system do
       click_link "For myself"
       expect_question 1
       expect(page).to have_css("h1:focus", text: "What do you need help with?")
-      check "Food and meals"
+      uncheck "Housing Services"
       click_button "Next"
       expect_question 2
       fill_in "Enter a place", with: "919 Pandora Ave"
@@ -115,6 +121,8 @@ RSpec.describe "Questionnaire", type: :system do
       visit find_help_for_myself_path
       expect(page).to have_css("h1:focus", text: "What do you need help with?")
 
+      page.active_element.send_keys(:tab, :tab, :space)
+      expect(page).to have_unchecked_field("Food and meals")
       page.active_element.send_keys(:tab, :space)
       expect(page).to have_checked_field("Food and meals")
       page.active_element.send_keys(:enter)
@@ -258,7 +266,7 @@ RSpec.describe "Questionnaire", type: :system do
     driven_by(:rack_test)
 
     visit find_help_for_myself_path
-    check "Food and meals"
+    uncheck "Housing Services"
     click_button "Next"
     fill_in "Enter a place", with: "919 Pandora Ave"
     click_button "Back"
@@ -282,7 +290,7 @@ RSpec.describe "Questionnaire", type: :system do
     expect(pdf.pages.last.text).to include("Map", "OpenStreetMap contributors")
 
     visit new_flyer_path
-    check "Meals"
+    uncheck "Shelters"
     click_button "Generate printout"
     custom_listings = PDF::Reader.new(StringIO.new(page.body)).pages.fetch(2)
     colour_commands = /(?:\d+(?:\.\d+)? ){3}(?:rg|scn)\b/
@@ -300,7 +308,7 @@ RSpec.describe "Questionnaire", type: :system do
 
     def go_through_the_chain
       visit find_help_for_myself_path
-      check "Food"
+      uncheck "A place to stay"
       click_button "Next"
       expect_question 2
       choose "Our Place"
@@ -335,7 +343,7 @@ RSpec.describe "Questionnaire", type: :system do
 
       it "presses Next when Enter is used on a later question, and starts at its heading" do
         visit find_help_for_myself_path
-        check "Food"
+        uncheck "A place to stay"
         click_button "Next"
         expect_question 2
         expect(page).to have_css("h1:focus", text: "Who would you like to go to?")
@@ -350,14 +358,15 @@ RSpec.describe "Questionnaire", type: :system do
 
       it "forgets every answer with Start over" do
         visit find_help_for_myself_path
-        check "Food"
+        uncheck "A place to stay"
         click_button "Next"
         expect_question 2
         choose "Our Place"
         click_link "Start over"
 
         expect_question 1
-        expect(page).to have_unchecked_field("Food")
+        expect(page).to have_checked_field("Food")
+        expect(page).to have_checked_field("A place to stay")
         click_button "Next"
         expect_question 2
         expect(page).to have_unchecked_field("Our Place")
@@ -365,7 +374,7 @@ RSpec.describe "Questionnaire", type: :system do
 
       it "keeps no answers in the browser's storage" do
         visit find_help_for_myself_path
-        check "Food"
+        uncheck "A place to stay"
         click_button "Next"
         expect_question 2
 
@@ -374,15 +383,16 @@ RSpec.describe "Questionnaire", type: :system do
       end
 
       # Turbo makes the browser's Back ask for a fresh page. See docs/questionnaire-notes.md.
-      it "returns to an unanswered first question with the browser's own Back button" do
+      it "restores the first question defaults with the browser's own Back button" do
         visit find_help_for_myself_path
-        check "Food"
+        uncheck "A place to stay"
         click_button "Next"
         expect_question 2
         page.go_back
 
         expect_question 1
-        expect(page).to have_unchecked_field("Food")
+        expect(page).to have_checked_field("Food")
+        expect(page).to have_checked_field("A place to stay")
       end
 
       it "fits a phone without sideways scrolling, with large touch targets" do

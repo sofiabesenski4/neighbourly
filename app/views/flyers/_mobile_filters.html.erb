@@ -58,13 +58,11 @@
         </fieldset>
       <% end %>
 
-      <fieldset class="mt-5 flex min-h-0 flex-1 flex-col">
+      <fieldset class="mt-5 flex min-h-0 flex-1 flex-col"
+                data-controller="category-selection" data-action="change->category-selection#update">
         <legend class="text-sm font-semibold">Categories</legend>
-        <p class="mt-1 mb-2.5 shrink-0 text-sm text-stone-600">
-          Leave unchecked to include all categories. Selecting a group includes its subcategories.
-        </p>
+        <%= render "shared/category_selection_actions" %>
         <div role="region" aria-label="Category list" tabindex="0"
-             data-controller="category-selection" data-action="change->category-selection#update"
              class="min-h-20 flex-1 overflow-y-auto overscroll-contain pr-1 [scrollbar-gutter:stable] focus-visible:outline-sage-600">
           <%= render "category_options", tree: category_tree, palette: category_palette, parent: nil, draft: true %>
         </div>

@@ -36,7 +36,7 @@ RSpec.describe "Questionnaires", type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(page_of(response).at_css("fieldset legend h1").text).to eq("What do you need help with?")
-      groups = page_of(response).css("fieldset [role=group]")
+      groups = page_of(response).css("fieldset [role=group]:has(label)")
       expect(groups.map { |group| group["aria-label"] }).to eq(["Food and meals", "Housing Services"])
       expect(groups[0].css("label").map { |label| label.text.strip }).to eq(["Food and meals", "Meals"])
       expect(groups[1].css("label").map { |label| label.text.strip }).to eq(["Housing Services", "Shelters"])
@@ -54,7 +54,7 @@ RSpec.describe "Questionnaires", type: :request do
     it "ignores answers in the URL" do
       get find_help_for_myself_path, params: {questionnaire: {answers: {categories: ["food"]}}}
 
-      expect(page_of(response).css("input[checked]")).to be_empty
+      expect(page_of(response).css("input[checked]").map { |box| box["value"] }).to eq(%w[food meals shelter shelters])
     end
 
     it "still loads when there are no categories" do
@@ -213,7 +213,7 @@ RSpec.describe "Questionnaires", type: :request do
     end
 
     def buttons
-      page_of(response).css("main form button").map { |button| button.text.strip }
+      page_of(response).css("main form button[type=submit]").map { |button| button.text.strip }
     end
 
     def carried
@@ -304,7 +304,7 @@ RSpec.describe "Questionnaires", type: :request do
 
     expect(page_of(response).at_css("title").text).to eq("Find help")
     expect(page_of(response).at_css("#question-progress")).to be_nil
-    expect(page_of(response).css("main form button").map(&:text)).to eq(%w[Next Skip])
+    expect(page_of(response).css("main form button[type=submit]").map(&:text)).to eq(%w[Next Skip])
   end
 
   describe "the location question" do

@@ -34,8 +34,7 @@ RSpec.describe "Flyers", type: :system do
       text_size_px: 15.5
     ).and_return(nil)
 
-    check "Meals"
-    check "Harm Reduction Resources"
+    uncheck "Shelters"
     click_button "Generate printout"
 
     expect(page).to have_content("No resources matched those categories")
@@ -43,8 +42,8 @@ RSpec.describe "Flyers", type: :system do
 
   it "lets a visitor print the complete guide without selecting filters" do
     visit new_flyer_path
-    expect(page).not_to have_checked_field("Meals")
-    expect(page).not_to have_checked_field("Shelters")
+    expect(page).to have_checked_field("Meals")
+    expect(page).to have_checked_field("Shelters")
 
     expect(FlyerGenerator).to receive(:call).with(
       categories: [],

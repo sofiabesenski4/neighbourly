@@ -1,16 +1,21 @@
 <%# A question where people can choose any number of options.
     Locals: question (Questionnaire::Question), answer (Questionnaire::Answer). %>
 <% options_by_parent = question.options.group_by(&:parent_key) %>
-<div class="mt-4 sm:columns-2 sm:gap-x-4" data-controller="category-selection" data-action="change->category-selection#update">
-  <% options_by_parent.fetch(nil, []).each do |option| %>
-    <% children = options_by_parent.fetch(option.key, []) %>
-    <%= tag.div class: "min-w-0 break-inside-avoid mb-1 last:mb-0", role: ("group" if children.any?), aria: {label: (option.label if children.any?)} do %>
-      <%= render "checkbox_option", question: question, answer: answer, choice: option %>
-      <% if children.any? %>
-        <div class="ml-4 space-y-1 border-l border-stone-200 pl-2">
-          <%= render partial: "checkbox_option", collection: children, as: :choice, locals: {question: question, answer: answer} %>
-        </div>
+<% categories = question.filter == Questionnaire::CategoryFilter %>
+<% selected = (categories && @select_all_categories) ? options_by_parent.values.flatten : answer.options %>
+<div class="mt-3" data-controller="category-selection" data-action="change->category-selection#update">
+  <%= render "shared/category_selection_actions" if categories %>
+  <div class="mt-1 sm:columns-2 sm:gap-x-4">
+    <% options_by_parent.fetch(nil, []).each do |option| %>
+      <% children = options_by_parent.fetch(option.key, []) %>
+      <%= tag.div class: "min-w-0 break-inside-avoid mb-1 last:mb-0", role: ("group" if children.any?), aria: {label: (option.label if children.any?)} do %>
+        <%= render "checkbox_option", question: question, selected: selected, choice: option %>
+        <% if children.any? %>
+          <div class="ml-4 space-y-1 border-l border-stone-200 pl-2">
+            <%= render partial: "checkbox_option", collection: children, as: :choice, locals: {question: question, selected: selected} %>
+          </div>
+        <% end %>
       <% end %>
     <% end %>
-  <% end %>
+  </div>
 </div>

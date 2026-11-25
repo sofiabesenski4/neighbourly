@@ -67,12 +67,17 @@ RSpec.describe "Flyers", type: :request do
       expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
     end
 
-    it "starts with no categories checked and explains the unfiltered view" do
+    it "starts with all categories selected and adds category controls on desktop and mobile" do
       get new_flyer_path
 
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]')).to be_empty
-      expect(response.body).to include("No selection shows all available resources.")
+      %w[category draftCategory].each do |target|
+        checked = document.css("input[data-flyer-builder-target='#{target}'][checked]").map { |box| box["value"] }
+        expect(checked).to match_array(Flyer.available_categories.keys)
+      end
+      expect(document.css("button[aria-label='Select all categories']").size).to eq(2)
+      expect(document.css("button[aria-label='Clear categories']").size).to eq(2)
+      expect(response.body).not_to include("No selection shows all available resources.")
     end
   end
 
@@ -89,7 +94,7 @@ RSpec.describe "Flyers", type: :request do
       expect(parent_input.parent.at_css("[data-category-colour]")["data-category-colour"]).to eq(FlyerCategoryPalette::COLOURS.first)
       expect(child_input.parent.at_css("[data-category-colour]")).to be_nil
       expect(child_input["data-flyer-builder-target"]).to eq(target)
-      expect(child_input.key?("checked")).to eq(target == "category")
+      expect(child_input.key?("checked")).to be true
     end
   end
 

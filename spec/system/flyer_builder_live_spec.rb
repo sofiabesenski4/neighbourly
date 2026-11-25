@@ -203,12 +203,13 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("#flyer-preview-heading", exact_text: "0 resources included")
     check "Include Alpha meals in printout", match: :first
     expect(all(:checkbox, "Include Alpha meals in printout").all?(&:checked?)).to be true
+    find('button[aria-label="Clear categories"]').click
     check "Health Care"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_unchecked_field("Include Beta clinic in printout")
     fill_in "Search resources", with: "Beta"
     expect(page).to have_no_field("Include Alpha meals in printout")
-    click_button "Select all"
+    within('[aria-label="Select resources in the current results"]') { click_button "Select all" }
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     fill_in "Search resources", with: ""
     expect(page).to have_css("#flyer-preview-heading", exact_text: "2 resources included")
@@ -221,6 +222,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     admin = User.create!(email: "printout-admin@example.com", password: "password123", admin: true)
     login_as(admin, scope: :user)
     visit_builder
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     click_button "Clear selection"
@@ -254,7 +256,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_link("Open printout")
     expect(printed_text).to include("Beta clinic")
     expect(printed_text).not_to include("Alpha meals", "Gamma noticeboard")
-    click_button "Select all"
+    within('[aria-label="Select resources in the current results"]') { click_button "Select all" }
     expect(page).to have_css("#flyer-preview-heading", exact_text: "3 resources included")
     expect(page).to have_no_link("Open printout")
     expect(page).to have_button("Generate printout", disabled: false)
@@ -341,6 +343,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
     find("#flyer-preview-heading").click
     expect(page).to have_no_field("Service")
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_no_css("article dt", text: "Services:")
@@ -385,6 +388,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       choose "Large", allow_label_click: true
     end
     find('summary[aria-label="Print settings"]').click
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
     find('summary[aria-label="Print settings"]').click
@@ -427,6 +431,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     uncheck "Include Gamma noticeboard in printout"
     expect(page).to have_css("#flyer-preview-heading", exact_text: "1 resource included")
 
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_no_css("article h4", text: "Beta clinic")
     expect(page).to have_unchecked_field("Include Alpha meals in printout")
@@ -505,6 +510,10 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_no_text("No matching resources in this category.")
     expect(page).to have_button("Generate printout", disabled: false)
 
+    expect(page).to have_checked_field("Meals")
+    expect(page).to have_checked_field("Health Care")
+    expect(page).to have_checked_field("Legal Support")
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_css('button[data-flyer-builder-target="generate"] svg[fill="none"][stroke="currentColor"]')
     expect(page).to have_css("article h4", text: "Alpha meals")
@@ -535,6 +544,11 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_button("Generate printout", disabled: true)
     expect(page).to have_css("h2#flyer-preview-heading", exact_text: "0 resources included")
     expect(page).to have_no_css("h3")
+
+    find('button[aria-label="Select all categories"]').click
+    expect(page).to have_checked_field("Meals")
+    expect(page).to have_checked_field("Health Care")
+    expect(page).to have_css("h2#flyer-preview-heading", exact_text: "3 resources included")
   end
 
   it "fills the final row when a category has an odd number of cards" do
@@ -598,6 +612,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       expect(footer_top - list_bottom).to be_between(0, 24)
       list.execute_script("this.scrollTop = this.scrollHeight")
       expect(list.evaluate_script("this.scrollTop")).to be > 0
+      find('button[aria-label="Clear categories"]').click
       check "Service category 24"
       click_button "Apply filters"
     end
@@ -617,6 +632,7 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(page).to have_css("h2#flyer-preview-heading", exact_text: "1 resource included")
     expect(page).to have_css("article h4", text: "Beta clinic")
     expect(page).to have_no_text("Alpha meals")
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_text("No resources match your search.")
     uncheck "Meals"
@@ -690,14 +706,20 @@ RSpec.describe "Live resource guide builder", type: :system do
     expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
     find("button[aria-label='Filters']").click
     within("#flyer-filters") do
-      check "Meals"
+      expect(page).to have_checked_field("Meals")
+      find('button[aria-label="Clear categories"]').click
+      expect(page).to have_unchecked_field("Meals")
+      find('button[aria-label="Select all categories"]').click
+      expect(page).to have_checked_field("Meals")
+      find('button[aria-label="Clear categories"]').click
       find("button[aria-label='Close filters']").click
     end
     expect(page).to have_css("article h4", text: "Beta clinic")
 
     find("button[aria-label='Filters']").click
     within("#flyer-filters") do
-      expect(page).to have_unchecked_field("Meals")
+      expect(page).to have_checked_field("Meals")
+      find('button[aria-label="Clear categories"]').click
       check "Meals"
       check "Health Care"
       select "Name (Z–A)", from: "Sort by"
@@ -746,6 +768,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       };
     JAVASCRIPT
 
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_css("#held-preview-ready", visible: :all)
 
@@ -770,6 +793,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       window.fetch = () => Promise.reject(new Error("Temporary connection failure"));
     JAVASCRIPT
 
+    find('button[aria-label="Clear categories"]').click
     check "Meals"
     expect(page).to have_text("We couldn't update your guide. Check your connection and try again.")
     expect(page).to have_button("Generate printout", disabled: true)
@@ -853,6 +877,7 @@ RSpec.describe "Live resource guide builder", type: :system do
       within("#flyer-filters") do
         expect(page).to have_select("Sort by", selected: "Distance")
         expect(page).to have_css("option[value='distance']:not([disabled])", visible: :all)
+        find('button[aria-label="Clear categories"]').click
         check "Meals"
         click_button "919 Pandora Ave", exact: true
       end
@@ -911,6 +936,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       expect(page).to have_button("919 Pandora Ave")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
+      find('button[aria-label="Clear categories"]').click
       check "Meals"
       expect(page).to have_text("1 resource included")
       expect(page).to have_css("article", text: /Distance:\s+1\.1 km straight-line, about 17 min walk/)
@@ -983,6 +1009,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       open_distances
       continue_with_place("919 Pandora Ave")
+      find('button[aria-label="Clear categories"]').click
       check "Meals"
       expect(page).to have_text("1 resource included")
       click_button "Generate printout"

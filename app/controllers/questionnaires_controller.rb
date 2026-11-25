@@ -1,6 +1,6 @@
 # The guided questionnaire for someone seeking services for themselves.
 #
-# Architecture: GET shows the first question, with no answers. Each POST submits the question
+# Architecture: GET shows the first question with the default choices. Each POST submits the question
 # shown, the button pressed and every answer so far. Questionnaire works out where that
 # leads: another question, or past the last one to the guided printout preview. See
 # docs/questionnaire-results.md.
@@ -30,6 +30,7 @@ class QuestionnairesController < ApplicationController
 
   def show
     @questionnaire = Questionnaire.new
+    @select_all_categories = true
   end
 
   def create

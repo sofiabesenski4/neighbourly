@@ -9,7 +9,7 @@
                   data-flyer-builder-target="categoryMarker" data-category-colour="<%= palette.colour_for(category.name) %>"></span>
           <% end %>
           <%= tag.input type: "checkbox", name: ("flyer[categories][]" unless draft),
-                value: category.id, checked: (!draft && @flyer.categories.include?(category.id.to_s)),
+                value: category.id, checked: @flyer.categories.include?(category.id.to_s),
                 class: "size-4 shrink-0 accent-sage-600",
                 data: {flyer_builder_target: draft ? "draftCategory" : "category",
                        category_selection_target: "option", category_selection_parent: parent&.id} %>

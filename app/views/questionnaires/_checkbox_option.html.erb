@@ -1,5 +1,5 @@
 <label class="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] p-2.5 text-base text-stone-800 hover:bg-sage-50 has-checked:bg-sage-100">
-  <%= check_box_tag "questionnaire[answers][#{question.key}][]", choice.key, answer.options.include?(choice),
+  <%= check_box_tag "questionnaire[answers][#{question.key}][]", choice.key, selected.include?(choice),
         id: "#{question.key}_#{choice.key}",
         data: {category_selection_target: "option", category_selection_parent: choice.parent_key},
         class: "h-5 w-5 shrink-0 rounded border-stone-400 accent-sage-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600" %>

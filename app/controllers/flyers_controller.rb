@@ -27,7 +27,9 @@ class FlyersController < ApplicationController
     only: :preview, if: -> { request.format.json? }
 
   def new
-    @flyer = Flyer.new(flyer_params)
+    selection = flyer_params
+    @flyer = Flyer.new(selection)
+    @flyer.categories = Flyer.available_categories.keys unless selection.key?(:categories)
     return if @flyer.valid?
 
     render :new, status: :unprocessable_content
@@ -65,7 +67,7 @@ class FlyersController < ApplicationController
     end
 
     origin = coordinates_origin
-    @sections = CategorySearch.call(**@flyer.filters, origin: origin, service_ids: @flyer.service_ids)
+    @sections = CategorySearch.call(**search_filters, origin: origin, service_ids: @flyer.service_ids)
     respond_to do |format|
       format.json do
         palette = FlyerCategoryPalette.new(@sections.reject(&:label).map(&:name))
@@ -126,7 +128,7 @@ class FlyersController < ApplicationController
       return
     end
 
-    filters = @flyer.filters
+    filters = search_filters
     filters[:service_ids] = @flyer.service_ids if @flyer.service_ids
     pdf = FlyerGenerator.call(**filters, **@flyer.pdf_options, origin: origin, site_url: root_url)
 
@@ -161,6 +163,16 @@ class FlyersController < ApplicationController
   end
 
   private
+
+  def search_filters
+    filters = @flyer.filters
+    # A complete manual selection is the full guide, including uncategorized resources.
+    if @flyer.sort != Flyer::SELECTION_SORT && @flyer.categories.any? &&
+        @flyer.categories.size == Flyer.available_categories.size
+      filters[:categories] = []
+    end
+    filters
+  end
 
   def prevent_preview_caching
     response.set_header("Cache-Control", "no-store")

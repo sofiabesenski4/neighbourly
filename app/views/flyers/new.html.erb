@@ -150,13 +150,11 @@
             </fieldset>
           <% end %>
         <% end %>
-        <fieldset class="min-w-0 sm:flex sm:min-h-0 sm:flex-1 sm:flex-col">
+        <fieldset class="min-w-0 sm:flex sm:min-h-0 sm:flex-1 sm:flex-col"
+                  data-controller="category-selection" data-action="change->category-selection#update change->flyer-builder#filter category-selection:selection-changed->flyer-builder#filter">
           <legend class="sr-only">Categories</legend>
-          <p class="mt-1 mb-4 shrink-0 text-sm text-stone-600">
-            No selection shows all available resources. Selecting a group includes its subcategories.
-          </p>
+          <%= render "shared/category_selection_actions" %>
           <div role="region" aria-label="Category list" tabindex="0"
-               data-controller="category-selection" data-action="change->category-selection#update change->flyer-builder#filter"
                class="max-h-[min(26rem,55dvh)] overflow-y-auto pr-1 [scrollbar-gutter:stable] focus-visible:outline-sage-600 sm:min-h-0 sm:max-h-none sm:flex-1">
             <%= render "category_options", tree: category_tree, palette: category_palette, parent: nil, draft: false %>
           </div>

@@ -1,0 +1,7 @@
+<div class="flex shrink-0 gap-3" role="group" aria-label="Category selection" hidden data-category-selection-target="actions">
+  <% button_classes = "min-h-11 cursor-pointer text-sm font-semibold text-sage-700 underline underline-offset-2 focus-visible:outline-sage-600" %>
+  <button type="button" class="<%= button_classes %>" aria-label="Select all categories"
+          data-action="category-selection#setAll" data-category-selection-checked-param="true">Select all</button>
+  <button type="button" class="<%= button_classes %>" aria-label="Clear categories"
+          data-action="category-selection#setAll" data-category-selection-checked-param="false">Clear</button>
+</div>

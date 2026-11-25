@@ -41,6 +41,7 @@ RSpec.describe "Mobile printouts", type: :system do
       if width < 640
         find("button[aria-label='Filters']").click
         within("#flyer-filters[open]") do
+          find('button[aria-label="Clear categories"]').click
           check "Meals"
           select "Name (Z–A)", from: "Sort by"
           click_button "Apply filters"
@@ -51,6 +52,7 @@ RSpec.describe "Mobile printouts", type: :system do
         tap(sort)
         expect(find_button("Name (Z–A)").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
         click_button "Name (Z–A)"
+        find('button[aria-label="Clear categories"]').click
         check "Meals"
       end
       expect(page).to have_css("article h4", count: 2)
