@@ -11,6 +11,23 @@ RSpec.describe "Flyers", type: :system do
     driven_by(:rack_test)
   end
 
+  it "shows both printout paths in the header and links to the questionnaire when available" do
+    visit new_flyer_path
+
+    expect(page).to have_css("h1", text: "Choose how to build your printout")
+    within("header nav[aria-label='Printout view']") do
+      expect(page).to have_css('[aria-current="page"]', text: "Build my own guide")
+      expect(page).to have_text("Get a tailored list after a short questionnaire.")
+      expect(page).to have_text("Choose resources, filters, and print settings.")
+      routes = Rails.application.routes.url_helpers
+      if routes.respond_to?(:new_questionnaire_path)
+        expect(page).to have_link("Answer a few questions", href: routes.new_questionnaire_path)
+      else
+        expect(page).to have_button("Answer a few questions", disabled: true)
+      end
+    end
+  end
+
   it "lets a visitor choose categories and request a flyer from the home page" do
     visit root_path
     click_link "Create printout"

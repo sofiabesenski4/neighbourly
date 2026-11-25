@@ -17,7 +17,6 @@ function locationController() {
   controller.confirmPlaceButtonTarget = stub({ textContent: "Continue" });
   controller.locationStepTarget = stub();
   controller.locationHeadingTarget = stub();
-  controller.subtitleTarget = stub();
   controller.builderStepTarget = stub({ hidden: true });
   controller.builderHeadingTarget = stub();
   controller.locationSummaryRowTarget = stub({ hidden: true });

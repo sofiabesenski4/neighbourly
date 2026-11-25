@@ -348,8 +348,8 @@ RSpec.describe "Live resource guide builder", type: :system do
       width: 320, height: 800, deviceScaleFactor: 1, mobile: true)
     visit_builder
 
-    title = find("h1", text: "Build your resource guide")
-    expect(page).to have_text("Print a contact list with names, addresses, and ways to get in touch.")
+    title = find("h1", text: "Choose how to build your printout")
+    expect(page).to have_css("nav[aria-label='Printout view']")
     expect(title.evaluate_script("getComputedStyle(this.closest('header')).position")).to eq("static")
     expect(page).to have_css("article h4", text: "Alpha meals")
     expect(find_field("Search resources").evaluate_script("getComputedStyle(this.closest('[role=search]')).position")).to eq("sticky")
@@ -559,7 +559,7 @@ RSpec.describe "Live resource guide builder", type: :system do
 
       expect(page).to have_css("article h4", text: "Alpha meals")
       expect(page).to have_field("Meals", type: "checkbox")
-      expect(page).to have_text("Print a contact list with names, addresses, and ways to get in touch.")
+      expect(page).to have_text("Choose how to build your printout")
       expect(page).to have_no_button("Use my location")
       expect(page).to have_no_field("Enter a place")
     end
