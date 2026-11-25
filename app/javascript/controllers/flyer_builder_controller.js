@@ -1,6 +1,9 @@
 import { Controller } from "@hotwired/stimulus";
+import { describeAccuracy, deviceLocationSupported, requestDeviceLocation } from "../lib/device_location.js";
 
 const DEFAULT_SORT = "default";
+const DISTANCE_SORT = "distance";
+const ADD_DISTANCES = "Add distances";
 
 export default class extends Controller {
   static targets = [
@@ -14,6 +17,8 @@ export default class extends Controller {
     "desktopSearch",
     "desktopSort",
     "desktopSortOption",
+    "advancedFilters",
+    "resourceDetail",
     "searchField",
     "search",
     "sort",
@@ -24,22 +29,41 @@ export default class extends Controller {
     "draftSort",
     "clearSearchOrder",
     "cards",
-    "includeResource",
     "count",
+    "resourceSelection",
+    "selectAll",
+    "deselectAll",
     "status",
     "generate",
     "generateLabel",
+    "printSettings",
     "previewError",
     "previewErrorMessage",
     "printError",
     "printout",
     "pdfLink",
+    "near",
     "lat",
     "lng",
+    "useLocation",
+    "locationStatus",
+    "locationNote",
+    "placeError",
+    "confirmPlaceButton",
+    "skipLocation",
+    "locationStep",
+    "locationHeading",
+    "locationSummary",
+    "desktopActions",
+    "previewActions",
+    "mobileDistances",
+    "distanceButton",
+    "distanceLabel",
+    "distanceWarning",
   ];
   static values = {
     previewUrl: String,
-    summaryLabels: Array,
+    locateUrl: String,
     fromQuestionnaire: Boolean,
     guided: Boolean,
   };
@@ -49,21 +73,41 @@ export default class extends Controller {
     this.hasResults = false;
     this.generating = false;
     this.excludedServiceIds = new Set();
+    this.previewReady = false;
+    this.locationRequest = 0;
+    this.locationBeforeEdit = null;
     if (this.guidedValue) {
       this.resourceIds = new Set(
-        this.includeResourceTargets.map((input) => input.value),
+        this.resourceSelectionTargets.map((input) => input.value),
       );
-      this.includeResourceTargets.forEach((input) => {
+      this.resourceSelectionTargets.forEach((input) => {
         if (!input.checked) this.excludedServiceIds.add(input.value);
       });
-      this.updateIncludedResources();
+      this.previewReady = true;
+      this.updateSelectionControls();
       return;
     }
+    const supported = deviceLocationSupported();
+    this.useLocationTarget.hidden = !supported;
+    this.locationNoteTarget.hidden = !supported;
+    this.confirmPlaceButtonTarget.hidden = false;
+    this.skipLocationTarget.hidden = false;
+    this.distanceButtonTarget.hidden = false;
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
+    this.updateResourceDetails();
+    if (this.latTarget.value && this.lngTarget.value) {
+      this.distanceLabelTarget.textContent = this.nearTarget.value || "Provided location";
+    }
     this.updateFilterControls();
     this.refresh();
+  }
+
+  closePrintSettingsOutside(event) {
+    const settings = this.printSettingsTarget;
+    if (settings.open && !settings.contains(event.target))
+      settings.open = false;
   }
 
   disconnect() {
@@ -95,7 +139,15 @@ export default class extends Controller {
     this.printRequest?.abort();
     if (this.hasFilterDialogTarget) this.closeFilters();
     this.clearPrintout();
-    if (this.hasLatTarget) {
+    if (this.hasLocationStepTarget) {
+      if (this.locationBeforeEdit) this.closeDistanceDialog();
+      this.locationBeforeEdit = null;
+      this.forgetLocationChoice();
+      this.nearTarget.value = "";
+      this.locationSummaryTarget.textContent = "";
+      this.distanceLabelTarget.textContent = ADD_DISTANCES;
+      this.distanceWarningTarget.textContent = "";
+    } else if (this.hasLatTarget) {
       this.latTarget.value = "";
       this.lngTarget.value = "";
     }
@@ -116,11 +168,185 @@ export default class extends Controller {
     this.debounce = setTimeout(() => this.refresh(), 300);
   }
 
-  // Resource selections and print settings change what belongs in the PDF.
+  applyLocation(summary = "", { warn = false, locationLabel = "" } = {}) {
+    const hasLocation = Boolean(this.latTarget.value && this.lngTarget.value);
+    this.locationSummaryTarget.textContent = summary;
+    this.locationSummaryTarget.hidden = !summary;
+    this.distanceWarningTarget.textContent = warn ? summary : "";
+    this.distanceWarningTarget.hidden = !warn;
+    this.distanceLabelTarget.textContent = hasLocation ? locationLabel : ADD_DISTANCES;
+    this.locationBeforeEdit = null;
+    this.closeDistanceDialog();
+    this.updateFilterControls();
+    this.distanceButtonTarget.focus();
+    this.refresh();
+  }
+
+  changeLocation() {
+    this.locationBeforeEdit = {
+      near: this.nearTarget.value,
+      lat: this.latTarget.value,
+      lng: this.lngTarget.value,
+    };
+    this.discardPrintout();
+    this.locationStepTarget.hidden = false;
+    this.locationStepTarget.showModal();
+    this.locationHeadingTarget.focus();
+  }
+
+  cancelLocation() {
+    if (!this.locationBeforeEdit) return;
+    const { near, lat, lng } = this.locationBeforeEdit;
+    this.forgetLocationChoice();
+    this.nearTarget.value = near;
+    this.latTarget.value = lat;
+    this.lngTarget.value = lng;
+    this.locationBeforeEdit = null;
+    this.closeDistanceDialog();
+    this.distanceButtonTarget.focus();
+  }
+
+  closeDistanceDialog() {
+    this.locationStepTarget.close();
+    this.locationStepTarget.hidden = true;
+  }
+
+  skipLocation() {
+    this.forgetLocationChoice();
+    this.nearTarget.value = "";
+    this.applyLocation();
+  }
+
+  // Typing a place replaces any device location, so only one is ever sent.
+  locationChanged() {
+    this.forgetLocationChoice();
+  }
+
+  // Keep the checked coordinates for both the preview and the printout.
+  async confirmPlace() {
+    const place = this.nearTarget.value.trim();
+    this.forgetLocationChoice();
+    if (!place) {
+      this.showPlaceError(
+        "Enter a street address or intersection, or choose another option.",
+      );
+      return;
+    }
+
+    const request = this.locationRequest;
+    this.placeCheck = new AbortController();
+    this.setCheckingPlace(true);
+    const body = new FormData();
+    body.append("flyer[near]", place);
+    try {
+      const response = await fetch(this.locateUrlValue, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "X-CSRF-Token":
+            document.querySelector('meta[name="csrf-token"]')?.content || "",
+        },
+        credentials: "same-origin",
+        body,
+        signal: this.placeCheck.signal,
+      });
+      const data = await response.json();
+      if (request !== this.locationRequest) return;
+      this.setCheckingPlace(false);
+      if (!response.ok) {
+        this.showPlaceError(data.errors.join(" "));
+      } else if (data.located) {
+        this.latTarget.value = data.lat;
+        this.lngTarget.value = data.lng;
+        this.applyLocation(`Distances from: ${place}.`, {
+          locationLabel: place,
+        });
+      } else {
+        // The geocoder is down. The guide can still print, so this shouldn't stop
+        // the person. The printout itself explains any missing distances.
+        this.applyLocation(
+          `We can't check ${place} right now, so your printout may not show distances.`,
+          { warn: true },
+        );
+      }
+    } catch (error) {
+      if (error.name === "AbortError" || request !== this.locationRequest)
+        return;
+      this.setCheckingPlace(false);
+      this.showPlaceError(
+        "We couldn't check that place. Check your connection and try again.",
+      );
+    }
+  }
+
+  setCheckingPlace(checking) {
+    this.confirmPlaceButtonTarget.disabled = checking;
+    this.confirmPlaceButtonTarget.textContent = checking
+      ? "Checking…"
+      : "Continue";
+  }
+
+  showPlaceError(message) {
+    this.placeErrorTarget.textContent = message;
+    this.placeErrorTarget.hidden = false;
+  }
+
+  // Remove any generated or pending printout when the builder's inputs change.
   discardPrintout() {
     this.printRequest?.abort();
     this.clearPrintout();
     this.printErrorTarget.hidden = true;
+  }
+
+  // Asks the browser where the device is. The browser shows its own permission prompt
+  // the first time, so the answer can take a while, or never come. Only a button press
+  // starts this: asking when the page loads would prompt people for no clear reason.
+  useMyLocation() {
+    this.forgetLocationChoice();
+    const request = this.locationRequest;
+    this.showLocationStatus("Finding your location…");
+    requestDeviceLocation(
+      (position) => {
+        if (request !== this.locationRequest) return;
+        this.applyDevicePosition(position);
+      },
+      (message) => {
+        if (request !== this.locationRequest) return;
+        this.showLocationStatus(message);
+      },
+    );
+  }
+
+  applyDevicePosition({ lat, lng, accuracy }) {
+    this.latTarget.value = lat;
+    this.lngTarget.value = lng;
+    this.nearTarget.value = "";
+    this.locationStatusTarget.hidden = true;
+    const { rough, text } = describeAccuracy(accuracy);
+    const summary = rough
+      ? "Distances from your location, which " + text + ". If that’s too far, change it to a nearby place."
+      : "Distances from your location (" + text + ").";
+    this.applyLocation(summary, { warn: rough, locationLabel: "Current location" });
+  }
+
+  // Clears whichever location was chosen, along with any messages about it. Moving on
+  // the request number also makes any answer still on its way get ignored, so a late
+  // answer can't bring back a location the person has moved on from.
+  forgetLocationChoice() {
+    this.locationRequest += 1;
+    this.placeCheck?.abort();
+    this.setCheckingPlace(false);
+    this.latTarget.value = "";
+    this.lngTarget.value = "";
+    this.locationStatusTarget.textContent = "";
+    this.locationStatusTarget.hidden = true;
+    this.placeErrorTarget.textContent = "";
+    this.placeErrorTarget.hidden = true;
+  }
+
+  showLocationStatus(message) {
+    this.locationStatusTarget.textContent = message;
+    this.locationStatusTarget.hidden = false;
   }
 
   // Keep questionnaire answers and locations in the POST body so they stay out
@@ -129,9 +355,10 @@ export default class extends Controller {
     const headers = { Accept: "application/json" };
     const query = this.searchTarget.value.trim();
     const sort = this.sortTarget.value;
-    const hasLocation =
-      this.hasLatTarget && this.latTarget.value && this.lngTarget.value;
-    if (!this.fromQuestionnaireValue) {
+    const lat =
+      this.locationBeforeEdit?.lat ??
+      (this.hasLatTarget ? this.latTarget.value : "");
+    if (!this.fromQuestionnaireValue && !lat) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
@@ -150,9 +377,12 @@ export default class extends Controller {
     );
     if (query) body.append("flyer[query]", query);
     if (sort !== DEFAULT_SORT) body.append("flyer[sort]", sort);
-    if (hasLocation) {
-      body.append("flyer[lat]", this.latTarget.value);
-      body.append("flyer[lng]", this.lngTarget.value);
+    if (lat) {
+      body.append("flyer[lat]", lat);
+      body.append(
+        "flyer[lng]",
+        this.locationBeforeEdit?.lng ?? this.lngTarget.value,
+      );
     }
     return {
       method: "POST",
@@ -199,10 +429,31 @@ export default class extends Controller {
   }
 
   layoutChanged() {
+    if (this.guidedValue) return;
     const desktop = window.matchMedia("(min-width: 40rem)").matches;
     const destination = desktop ? this.desktopSearchTarget : this.toolbarTarget;
     if (this.searchFieldTarget.parentElement !== destination)
       destination.prepend(this.searchFieldTarget);
+    const nextControl = desktop
+      ? this.desktopSortTarget
+      : this.filterButtonTarget;
+    const advanced = this.advancedFiltersTarget;
+    if (advanced.nextElementSibling !== nextControl) {
+      advanced.open = false;
+      nextControl.before(advanced);
+    }
+    const distanceDestination = desktop
+      ? this.desktopActionsTarget
+      : this.mobileDistancesTarget;
+    if (this.distanceButtonTarget.parentElement !== distanceDestination)
+      distanceDestination.prepend(this.distanceButtonTarget);
+    const generateDestination = desktop
+      ? this.desktopActionsTarget
+      : this.previewActionsTarget;
+    if (this.generateTarget.parentElement !== generateDestination) {
+      this.printSettingsTarget.open = false;
+      generateDestination.append(this.generateTarget, this.printSettingsTarget);
+    }
     this.desktopSearchTarget.hidden = !desktop;
     if (!desktop) this.desktopSortTarget.open = false;
     if (desktop && this.filterDialogTarget.open) this.closeFilters();
@@ -214,16 +465,37 @@ export default class extends Controller {
     this.desktopSortTarget.querySelector("summary").focus();
   }
 
-  hoverDesktopSort(event) {
-    if (event.pointerType === "mouse") this.desktopSortTarget.open = true;
+  closeDesktopSortOutside(event) {
+    const sort = this.desktopSortTarget;
+    if (sort.open && !sort.contains(event.target)) sort.open = false;
   }
 
-  leaveDesktopSort(event) {
-    if (
-      event.pointerType === "mouse" &&
-      !this.desktopSortTarget.contains(document.activeElement)
-    )
-      this.desktopSortTarget.open = false;
+  closeAdvancedFilters() {
+    const advanced = this.advancedFiltersTarget;
+    if (!advanced.open) return;
+
+    advanced.open = false;
+    advanced.querySelector("summary").focus();
+  }
+
+  closeAdvancedFiltersOutside(event) {
+    const advanced = this.advancedFiltersTarget;
+    if (advanced.open && !advanced.contains(event.target))
+      advanced.open = false;
+  }
+
+  updateResourceDetails(event) {
+    this.hiddenDetailLabels = new Set(
+      this.resourceDetailTargets
+        .filter((input) => !input.checked)
+        .flatMap((input) => input.dataset.fieldLabels.split(",")),
+    );
+    for (const row of this.cardsTarget.querySelectorAll(
+      "[data-detail-label]",
+    )) {
+      row.hidden = this.hiddenDetailLabels.has(row.dataset.detailLabel);
+    }
+    if (event) this.discardPrintout();
   }
 
   applyDesktopSort(event) {
@@ -267,9 +539,21 @@ export default class extends Controller {
   }
 
   updateFilterControls() {
+    const canSortByDistance =
+      this.latTarget.value !== "" && this.lngTarget.value !== "";
+    if (!canSortByDistance) {
+      if (this.sortTarget.value === DISTANCE_SORT)
+        this.sortTarget.value = DEFAULT_SORT;
+      if (this.draftSortTarget.value === DISTANCE_SORT)
+        this.draftSortTarget.value = DEFAULT_SORT;
+    }
+    this.draftSortTarget.querySelector(
+      `option[value="${DISTANCE_SORT}"]`,
+    ).disabled = !canSortByDistance;
     const customOrder = this.sortTarget.value !== DEFAULT_SORT;
     this.desktopSortOptionTargets.forEach((option) => {
       const order = option.dataset.flyerBuilderOrderParam;
+      option.disabled = order === DISTANCE_SORT && !canSortByDistance;
       option.setAttribute(
         "aria-pressed",
         String(order === this.sortTarget.value),
@@ -336,16 +620,89 @@ export default class extends Controller {
   }
 
   setLoading() {
+    this.previewReady = false;
+    this.selectAllTarget.disabled = true;
+    this.deselectAllTarget.disabled = true;
+    this.resourceSelectionTargets.forEach((input) => {
+      input.disabled = true;
+    });
     this.statusTarget.textContent = "Updating…";
     this.cardsTarget.setAttribute("aria-busy", "true");
     this.generateTarget.disabled = true;
   }
 
   render(categories) {
+    this.previewCategories = categories;
+    this.previewReady = true;
+    this.renderCards();
+  }
+
+  matchingResources() {
+    return new Map(
+      this.previewCategories.flatMap(({ resources }) =>
+        resources.map((resource) => [String(resource.id), resource]),
+      ),
+    );
+  }
+
+  toggleResource({ target }) {
+    if (!this.previewReady) return;
+    this.setResourceSelected(target.value, target.checked);
+    this.updateResourceSelection();
+  }
+
+  // Bulk actions affect only matching results, preserving choices outside the
+  // current search and category filters. A shared resource is selected once.
+  selectResources({ params: { selected } }) {
+    if (!this.previewReady) return;
+    for (const id of this.matchingResources().keys()) {
+      this.setResourceSelected(id, selected);
+    }
+    this.updateResourceSelection();
+  }
+
+  setResourceSelected(id, selected) {
+    if (selected) this.excludedServiceIds.delete(id);
+    else this.excludedServiceIds.add(id);
+  }
+
+  selectedServiceIds() {
+    const ids = this.guidedValue ? this.resourceIds : this.matchingResources().keys();
+    return [...ids].filter((id) => !this.excludedServiceIds.has(id));
+  }
+
+  updateResourceSelection() {
+    if (this.generating) {
+      this.revision += 1;
+      this.generating = false;
+      this.generateLabelTarget.textContent = "Generate printout";
+    }
+    this.discardPrintout();
+    this.updateSelectionControls();
+  }
+
+  updateSelectionControls() {
+    const included = this.selectedServiceIds().length;
+    // Update in place so keyboard focus stays on the checkbox the person changed.
+    this.resourceSelectionTargets.forEach((input) => {
+      input.checked = !this.excludedServiceIds.has(input.value);
+      input.disabled = !this.previewReady;
+    });
+    this.countTarget.textContent = `${included} ${included === 1 ? "resource" : "resources"} included`;
+    if (this.hasSelectAllTarget) {
+      this.selectAllTarget.disabled = !this.previewReady || included === this.matchingResources().size;
+      this.deselectAllTarget.disabled = !this.previewReady || included === 0;
+    }
+    this.hasResults = included > 0;
+    this.generateTarget.disabled =
+      !this.previewReady || !this.hasResults || this.generating;
+  }
+
+  renderCards() {
     const fragment = document.createDocumentFragment();
-    const ids = new Set();
-    categories.forEach((category) => {
-      if (category.resources.length === 0) return;
+    this.previewCategories.forEach((category) => {
+      const resources = category.resources;
+      if (resources.length === 0) return;
       const section = document.createElement("section");
       section.className = "mt-7 first:mt-0 sm:mt-9";
       const heading = document.createElement("h3");
@@ -359,20 +716,19 @@ export default class extends Controller {
       const count = document.createElement("span");
       count.className =
         "ml-2 text-xs font-normal text-stone-600 sm:ml-2.5 sm:text-sm";
-      count.textContent = `${category.resources.length} ${category.resources.length === 1 ? "card" : "cards"}`;
+      count.textContent = `${resources.length} ${resources.length === 1 ? "card" : "cards"}`;
       heading.append(count);
       section.append(heading);
       const grid = document.createElement("div");
       grid.className =
         "grid grid-cols-1 items-start gap-2.5 sm:gap-[18px] lg:grid-cols-2";
-      category.resources.forEach((resource) => {
-        ids.add(String(resource.id));
+      resources.forEach((resource) => {
         grid.append(this.card(resource));
       });
       section.append(grid);
       fragment.append(section);
     });
-    if (ids.size === 0) {
+    if (this.matchingResources().size === 0) {
       fragment.replaceChildren();
       const empty = document.createElement("div");
       empty.className =
@@ -389,105 +745,57 @@ export default class extends Controller {
       fragment.append(empty);
     }
     this.cardsTarget.replaceChildren(fragment);
-    this.resourceIds = ids;
+    this.updateSelectionControls();
     this.statusTarget.textContent = "";
     this.cardsTarget.setAttribute("aria-busy", "false");
-    this.updateIncludedResources();
-  }
-
-  selectedServiceIds() {
-    return [...this.resourceIds].filter(
-      (id) => !this.excludedServiceIds.has(id),
-    );
-  }
-
-  toggleResource(event) {
-    const { value, checked } = event.currentTarget;
-    if (checked) this.excludedServiceIds.delete(value);
-    else this.excludedServiceIds.add(value);
-    this.includeResourceTargets.forEach((input) => {
-      if (input.value === value) input.checked = checked;
-    });
-    this.discardPrintout();
-    this.updateIncludedResources();
-  }
-
-  updateIncludedResources() {
-    const count = this.selectedServiceIds().length;
-    this.countTarget.textContent = `${count} ${count === 1 ? "resource" : "resources"} included`;
-    this.hasResults = count > 0;
-    this.generateTarget.disabled =
-      !this.hasResults ||
-      this.generating ||
-      this.cardsTarget.getAttribute("aria-busy") === "true" ||
-      !this.previewErrorTarget.hidden;
   }
 
   card(resource) {
     const article = document.createElement("article");
     article.className =
-      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 sm:border-stone-300 sm:bg-white lg:last:odd:col-span-2";
-    const title = document.createElement("h4");
-    title.className =
-      "min-w-0 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
-    title.textContent = resource.title;
+      "min-w-0 overflow-hidden rounded-[10px] border border-stone-200 bg-stone-50 text-stone-800 has-[input:not(:checked)]:bg-stone-50/60 has-[input:not(:checked)]:text-stone-600 sm:border-stone-300 sm:bg-white sm:has-[input:not(:checked)]:bg-white/60 lg:last:odd:col-span-2";
     const header = document.createElement("header");
     header.className =
-      "flex items-center justify-between gap-2 px-3 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4";
-    const inclusion = document.createElement("label");
-    inclusion.className =
-      "flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 text-sm";
+      "flex items-start gap-2 px-3 py-1 sm:border-b sm:border-stone-200 sm:bg-stone-100 sm:px-4 sm:has-[input:not(:checked)]:bg-stone-100/60";
+    const title = document.createElement("h4");
+    title.className =
+      "min-w-0 flex-1 py-2.5 text-sm font-semibold [overflow-wrap:anywhere] sm:text-base";
+    title.textContent = resource.title;
+    const selection = document.createElement("label");
+    selection.className =
+      "flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg hover:bg-sage-50";
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
     checkbox.value = String(resource.id);
     checkbox.checked = !this.excludedServiceIds.has(checkbox.value);
-    checkbox.className = "size-4 accent-sage-700";
+    checkbox.className =
+      "size-4 cursor-pointer accent-sage-600 focus-visible:outline-sage-600";
     checkbox.setAttribute(
       "aria-label",
       `Include ${resource.title} in printout`,
     );
-    checkbox.dataset.flyerBuilderTarget = "includeResource";
+    checkbox.dataset.flyerBuilderTarget = "resourceSelection";
     checkbox.dataset.action = "change->flyer-builder#toggleResource";
-    inclusion.append(checkbox, "Include");
-    header.append(title, inclusion);
-    const summaryFields = resource.fields.filter((field) =>
-      this.summaryLabelsValue.includes(field.label),
-    );
-    const detailFields = resource.fields.filter(
-      (field) => !this.summaryLabelsValue.includes(field.label),
-    );
+    const selectionLabel = document.createElement("span");
+    selectionLabel.className = "sr-only";
+    selectionLabel.textContent = `Include ${resource.title} in printout`;
+    selection.append(checkbox, selectionLabel);
+    header.append(title, selection);
     article.append(header);
-    if (summaryFields.length) {
-      const summary = this.fieldList(summaryFields);
-      summary.className += " px-3 pt-2 sm:px-4";
-      article.append(summary);
+    if (resource.fields.length) {
+      article.append(this.fieldList(resource.fields));
     }
-
-    const disclosure = document.createElement("details");
-    disclosure.className = "px-3 pb-2 sm:px-4";
-    const toggle = document.createElement("summary");
-    toggle.className =
-      "min-h-11 cursor-pointer py-3 text-sm font-medium text-sage-700 focus-visible:outline-sage-600";
-    toggle.textContent = "See details";
-    disclosure.append(toggle);
-    if (detailFields.length) {
-      disclosure.append(this.fieldList(detailFields));
-    } else {
-      const empty = document.createElement("p");
-      empty.className = "text-sm text-stone-600";
-      empty.textContent = "No additional details available.";
-      disclosure.append(empty);
-    }
-    article.append(disclosure);
     return article;
   }
 
   fieldList(fields) {
     const list = document.createElement("dl");
-    list.className = "grid gap-1 text-sm";
+    list.className = "grid gap-1 px-3 py-2 text-sm sm:px-4";
     fields.forEach((field) => {
       const row = document.createElement("div");
       row.className = "[overflow-wrap:anywhere]";
+      row.setAttribute("data-detail-label", field.label);
+      row.hidden = this.hiddenDetailLabels?.has(field.label) ?? false;
       const label = document.createElement("dt");
       label.className = "inline font-semibold";
       label.textContent = `${field.label}: `;
@@ -573,9 +881,9 @@ export default class extends Controller {
       this.printErrorTarget.hidden = false;
     } finally {
       if (this.pendingPrintoutTab === tab) this.closePreparingTab();
-      if (revision === this.revision) {
+      if (revision === this.revision && signal === this.printRequest?.signal) {
         this.generating = false;
-        this.updateIncludedResources();
+        this.updateSelectionControls();
         this.generateLabelTarget.textContent = "Generate printout";
       }
     }

@@ -1,0 +1,47 @@
+<details class="relative shrink-0" data-flyer-builder-target="printSettings"
+         data-action="click@window->flyer-builder#closePrintSettingsOutside">
+  <summary aria-label="Print settings" title="Print settings"
+           class="grid size-11 cursor-pointer list-none place-items-center rounded-lg border border-stone-200 bg-white text-stone-700 hover:bg-sage-50 focus-visible:outline-sage-600 [&::-webkit-details-marker]:hidden">
+    <svg class="size-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+      <path d="M12 8.25a3.75 3.75 0 1 0 0 7.5 3.75 3.75 0 0 0 0-7.5Z" />
+      <path d="M10.4 2.75h3.2l.55 2.36c.44.14.87.32 1.28.53l2.06-1.28 2.26 2.26-1.28 2.06c.21.41.39.84.53 1.28l2.35.55v3.2l-2.35.55c-.14.45-.32.87-.53 1.28l1.28 2.06-2.26 2.26-2.06-1.28c-.41.21-.84.39-1.28.53l-.55 2.35h-3.2l-.55-2.35a7.5 7.5 0 0 1-1.28-.53l-2.06 1.28-2.26-2.26 1.28-2.06c-.21-.41-.39-.83-.53-1.28l-2.36-.55v-3.2l2.36-.55c.14-.44.32-.87.53-1.28L4.25 6.62l2.26-2.26 2.06 1.28c.41-.21.84-.39 1.28-.53l.55-2.36Z" />
+    </svg>
+  </summary>
+
+  <div class="absolute right-0 bottom-full z-20 mb-2 max-h-[min(28rem,60dvh)] w-[min(26rem,calc(100vw_-_2rem))] overflow-y-auto overscroll-contain rounded-lg border border-stone-200 bg-white p-4 shadow-lg sm:top-full sm:bottom-auto sm:mt-2 sm:mb-0">
+    <p class="mb-3 font-semibold text-stone-900">Print settings</p>
+    <div class="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+      <fieldset class="min-w-0">
+        <legend class="text-sm font-medium text-stone-900">Include map</legend>
+        <% include_map = @flyer.include_map == "no" ? "no" : Flyer::DEFAULT_INCLUDE_MAP %>
+        <div class="flex flex-wrap gap-x-4">
+          <% %w[yes no].each do |value| %>
+            <label class="inline-flex min-h-11 items-center gap-2 text-sm text-stone-800">
+              <%= radio_button_tag "print_settings[include_map]", value, value == include_map,
+                    class: "size-4 accent-sage-600 focus-visible:outline-sage-600",
+                    data: { action: "change->flyer-builder#discardPrintout" } %>
+              <span><%= value.capitalize %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+
+      <fieldset class="min-w-0">
+        <legend class="text-sm font-medium text-stone-900">Text size</legend>
+        <% text_size = Flyer::TEXT_SIZE_PRESETS.value?(@flyer.text_size) ? @flyer.text_size : Flyer::DEFAULT_TEXT_SIZE %>
+        <div class="relative grid grid-cols-3">
+          <span aria-hidden="true" class="pointer-events-none absolute inset-x-[16.667%] top-4 h-0.5 -translate-y-1/2 rounded-full bg-stone-300"></span>
+          <% Flyer::TEXT_SIZE_PRESETS.each do |label, value| %>
+            <label class="flex min-h-12 cursor-pointer flex-col items-center gap-1 pt-2 text-sm text-stone-700">
+              <%= radio_button_tag "print_settings[text_size]", value, value == text_size,
+                    class: "peer sr-only", data: { action: "change->flyer-builder#discardPrintout" } %>
+              <span aria-hidden="true" class="relative size-4 rounded-full border-2 border-stone-400 bg-white peer-checked:border-sage-700 peer-checked:bg-sage-700 peer-focus-visible:ring-2 peer-focus-visible:ring-sage-700 peer-focus-visible:ring-offset-2"></span>
+              <span class="peer-checked:font-semibold peer-checked:text-sage-900"><%= label %></span>
+            </label>
+          <% end %>
+        </div>
+      </fieldset>
+
+    </div>
+  </div>
+</details>

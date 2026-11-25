@@ -5,7 +5,7 @@
     <label class="flex min-h-11 shrink-0 cursor-pointer items-center gap-1.5 text-sm">
       <%= check_box_tag "flyer[service_ids][]", card.service.id, true, id: nil, class: "size-4 accent-sage-700",
             aria: {label: "Include #{card.title} in printout"},
-            data: {flyer_builder_target: "includeResource", action: "change->flyer-builder#toggleResource"} %>
+            data: {flyer_builder_target: "resourceSelection", action: "change->flyer-builder#toggleResource"} %>
       Include
     </label>
   </header>

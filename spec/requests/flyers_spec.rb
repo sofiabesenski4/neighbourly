@@ -55,7 +55,7 @@ RSpec.describe "Flyers", type: :request do
 
       expect(response).to have_http_status(:ok)
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
     end
 
     it "renders an error for unknown categories while preserving recognized selections" do
@@ -64,14 +64,14 @@ RSpec.describe "Flyers", type: :request do
       expect(response).to have_http_status(:unprocessable_content)
       document = Nokogiri::HTML(response.body)
       expect(document.at_css('[role="alert"]').text).to include("Categories include unknown options: unknown")
-      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([health.id.to_s])
     end
 
     it "starts with no categories checked and explains the unfiltered view" do
       get new_flyer_path
 
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[type="checkbox"][checked]')).to be_empty
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]')).to be_empty
       expect(response.body).to include("No selection shows all available resources.")
     end
   end
@@ -149,7 +149,7 @@ RSpec.describe "Flyers", type: :request do
       end
     end
 
-    it "prints only the contact fields in a summary printout" do
+    it "prints resource details even when an older form sends a summary setting" do
       source = Source.create!(name: "Local guide", source_type: "csv")
       source.services.create!(name: "Community meals", phone: "250-555-0100",
         hours: "Mondays at noon", description: "Free hot meals",
@@ -161,11 +161,134 @@ RSpec.describe "Flyers", type: :request do
       expect(response).to have_http_status(:ok)
       text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(2).text
       expect(text).to include("Community meals", "250-555-0100", "123 Example Street")
-      expect(text).not_to include("Mondays at noon", "Free hot meals", "volunteer coordinator")
+      expect(text).to include("Mondays at noon", "Free hot meals", "volunteer coordinator")
+    end
+
+    it "omits phone numbers while retaining other ways to contact the resource" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "csv")
+      meal = source.services.create!(name: "Community meal", categories: [food],
+        phone: "250-555-0101", email: "help@example.com", website: "https://example.com/meals")
+      meal.create_address!(street_address: "919 Pandora Ave")
+
+      post flyers_path, params: {print_settings: {include_map: "no", details: Flyer::DETAIL_FIELDS.keys - ["phone"]}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(2).text
+      expect(text).to include("Community meal", "919 Pandora Ave", "help@example.com", "https://example.com/meals")
+      expect(text).not_to include("Phone:", "250-555-0101")
+    end
+
+    it "omits service, address, and distance rows independently while preserving the map" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "csv")
+      meal = source.services.create!(name: "Community meal", phone: "250-555-0101", categories: [food])
+      meal.create_address!(street_address: "919 Pandora Ave", city: "Victoria", lat: 48.43, lng: -123.36)
+      clinic = source.services.create!(name: "Community clinic", categories: [health])
+      clinic.create_address!(city: "Victoria")
+      visible_rows = {
+        "service" => ["Services:"],
+        "address" => ["Address:", "City:"],
+        "distance" => ["Distance:"]
+      }
+      expect(FlyerMapPage).to receive(:new).exactly(4).times.and_wrap_original do |build_map, pdf, items:, **options|
+        expect(items.find { |item| item.title == meal.name }.point).to eq(meal.coordinates)
+        build_map.call(pdf, items: items, **options)
+      end
+
+      [nil, *visible_rows.keys].each do |hidden|
+        settings = hidden ? {print_settings: {details: Flyer::DETAIL_FIELDS.keys - [hidden]}} : {}
+        post flyers_path, params: settings.merge(flyer: {lat: "48.42", lng: "-123.36"})
+
+        expect(response).to have_http_status(:ok)
+        pages = PDF::Reader.new(StringIO.new(response.body)).pages
+        cards = pages[2...-1].map(&:text).join("\n")
+        expect(cards).to include("Community meal", "Community clinic", "Phone:")
+        expect(cards).to include(*visible_rows.except(hidden).values.flatten)
+        visible_rows.fetch(hidden, []).each { |label| expect(cards).not_to include(label) }
+        expect(pages.last.text).to include("You are here")
+      end
+    end
+
+    it "rejects malformed detail selections" do
+      [["unknown"], "notes", [{"notes" => true}]].each do |details|
+        post flyers_path, params: {print_settings: {details: details}}, headers: {"Accept" => "application/pdf"}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body.fetch("errors").join(" ")).to include("Details must be a list of supported resource details")
+      end
+    end
+
+    it "prints larger card text at the selected pixel size" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Community meal", categories: [food],
+        additional_details: {"notes" => "Ask at the front desk"})
+
+      post flyers_path, params: {print_settings: {include_map: "no", text_size: "25"}}
+
+      expect(response).to have_http_status(:ok)
+      content = PDF::Reader.new(StringIO.new(response.body)).pages.fetch(2).raw_content
+      expect(content).to match(/18\.75\s+Tf/)
+    end
+
+    it "rejects unsupported text sizes" do
+      ["7.5", "25.5", "14.25"].each do |size|
+        post flyers_path, params: {print_settings: {text_size: size}}, headers: {"Accept" => "application/pdf"}
+
+        expect(response).to have_http_status(:unprocessable_content)
+        expect(response.parsed_body.fetch("errors")).to include("Text size must be between 8 and 25 pixels in 0.5 pixel increments")
+      end
+    end
+
+    it "includes the map by default and can generate the same cards without it" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "csv")
+      source.services.create!(name: "Community meal", categories: [food])
+
+      post flyers_path
+      expect(response).to have_http_status(:ok)
+      default_pages = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text)
+      expect(default_pages.last).to include("OpenStreetMap")
+
+      post flyers_path, params: {print_settings: {include_map: "no"}}
+      expect(response).to have_http_status(:ok)
+      custom_pages = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text)
+      expect(custom_pages.drop(2)).to contain_exactly(a_string_including("Community meal"))
+    end
+
+    it "rejects an invalid map setting for PDF requests" do
+      post flyers_path, params: {print_settings: {include_map: ["no"]}}, headers: {"Accept" => "application/pdf"}
+
+      expect(response).to have_http_status(:unprocessable_content)
+      expect(response.parsed_body.fetch("errors")).to include("Include map must be yes or no")
+    end
+
+    it "omits an unchecked resource from every category and the map pins" do
+      allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
+      source = Source.create!(name: "Local", source_type: "csv")
+      removed = source.services.create!(name: "Excluded service",
+        categories: [food, shelter])
+      removed.create_address!(lat: 48.42, lng: -123.36)
+      kept = source.services.create!(name: "Included service",
+        categories: [food, shelter])
+      kept.create_address!(lat: 48.43, lng: -123.36)
+      expect(FlyerMapPage).to receive(:new).and_wrap_original do |build_map, pdf, items:, **options|
+        expect(items.map(&:title)).to eq([kept.name])
+        expect(items.first.point).to eq(kept.coordinates)
+        build_map.call(pdf, items: items, **options)
+      end
+
+      post flyers_path, params: {flyer: {categories: [food.id.to_s, shelter.id.to_s], service_ids: [kept.id.to_s]}}
+
+      expect(response).to have_http_status(:ok)
+      text = PDF::Reader.new(StringIO.new(response.body)).pages.map(&:text).join("\n")
+      expect(text.scan(kept.name).length).to eq(2)
+      expect(text).not_to include(removed.name)
     end
 
     it "hands the selected categories to the generator" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
+      expect(FlyerGenerator).to receive(:call).with(categories: [food.id.to_s, harm_reduction.id.to_s], origin: nil, site_url: root_url).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: ["", food.id.to_s, harm_reduction.id.to_s]}}
 
@@ -232,7 +355,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when nothing is selected" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, site_url: root_url).and_return("%PDF-all")
 
       post flyers_path, params: {flyer: {categories: [""]}}
 
@@ -241,7 +364,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "generates the unfiltered guide when no flyer params are sent" do
-      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return("%PDF-all")
+      expect(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, site_url: root_url).and_return("%PDF-all")
 
       post flyers_path
 
@@ -337,7 +460,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "explains when the complete guide has no available resources" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, site_url: root_url).and_return(nil)
 
       post flyers_path, headers: {"Accept" => "application/pdf"}
 
@@ -346,7 +469,7 @@ RSpec.describe "Flyers", type: :request do
     end
 
     it "shows the same complete-guide message after a standard form submission" do
-      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, detail_level: "detailed", site_url: root_url).and_return(nil)
+      allow(FlyerGenerator).to receive(:call).with(categories: [], origin: nil, site_url: root_url).and_return(nil)
 
       post flyers_path, params: {flyer: {categories: [""]}}
       expect(response).to redirect_to(new_flyer_path)
@@ -419,7 +542,7 @@ RSpec.describe "Flyers", type: :request do
         expect(response).to have_http_status(:unprocessable_content)
         document = Nokogiri::HTML(response.body)
         expect(document.at_css('[role="alert"]').text).to include("couldn't find that location")
-        expect(document.at_css('input[name="flyer[near]"]')).to be_nil
+        expect(document.at_css('dialog#flyer-distances[hidden]:not([open]) input[name="flyer[near]"]')).to be_present
       end
 
       it "still prints, without distances, when the geocoder is down" do
@@ -662,7 +785,7 @@ RSpec.describe "Flyers", type: :request do
       follow_redirect!
 
       document = Nokogiri::HTML(response.body)
-      expect(document.css('input[type="checkbox"][checked]').map { |input| input["value"] }).to eq([food.id.to_s])
+      expect(document.css('input[name="flyer[categories][]"][type="checkbox"][checked]').map { |input| input["value"] }).to eq([food.id.to_s])
     end
 
     it "redirects an unfiltered HTML preview to the complete builder" do

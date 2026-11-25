@@ -27,14 +27,14 @@ class FlyersController < ApplicationController
     only: :preview, if: -> { request.format.json? }
 
   def new
-    @flyer = Flyer.new({detail_level: "summary"}.merge(flyer_params.to_h.symbolize_keys))
+    @flyer = Flyer.new(flyer_params)
     return if @flyer.valid?
 
     render :new, status: :unprocessable_content
   end
 
   def from_questionnaire
-    @flyer = Flyer.new(flyer_params.slice(:categories, :query, :sort, :lat, :lng).merge(detail_level: "summary"))
+    @flyer = Flyer.new(flyer_params.slice(:categories, :query, :sort, :lat, :lng))
     unless @flyer.valid?
       render :new, status: :unprocessable_content
       return
@@ -44,7 +44,6 @@ class FlyersController < ApplicationController
       @flyer.lat = point.lat
       @flyer.lng = point.lng
     end
-    @from_questionnaire = true
     render :new
   end
 
@@ -91,7 +90,7 @@ class FlyersController < ApplicationController
     end
   end
 
-  # Checks a typed place on the first screen, before the person chooses categories.
+  # Checks a typed place when someone adds distances to their guide.
   # `located` is false when the geocoder is down: the place might be fine, and the page
   # lets the person carry on, because the guide can still print. Otherwise the page
   # keeps the coordinates for the preview and printout, so it needn't look up again.
@@ -113,7 +112,7 @@ class FlyersController < ApplicationController
   end
 
   def create
-    @flyer = Flyer.new(flyer_params)
+    @flyer = Flyer.new(flyer_params.to_h.merge(print_settings))
 
     unless @flyer.valid?
       render_invalid_flyer
@@ -129,7 +128,7 @@ class FlyersController < ApplicationController
 
     filters = @flyer.filters
     filters[:service_ids] = @flyer.service_ids if @flyer.service_ids
-    pdf = FlyerGenerator.call(**filters, origin: origin, detail_level: @flyer.detail_level, site_url: root_url)
+    pdf = FlyerGenerator.call(**filters, **@flyer.pdf_options, origin: origin, site_url: root_url)
 
     if pdf.present?
       send_data pdf, filename: "neighbourly-flyer.pdf", type: "application/pdf", disposition: "inline"
@@ -175,7 +174,7 @@ class FlyersController < ApplicationController
 
   # Where the printout measures distances from, if anywhere. Coordinates are used when
   # the page has them. A typed place alone is looked up here: that's the form without
-  # JavaScript, or a place the first screen couldn't check during an outage.
+  # JavaScript, or a place the builder couldn't check during an outage.
   def printout_origin
     coordinates_origin || (@flyer.near && FlyerOrigin.locate(@flyer.near))
   end
@@ -231,5 +230,19 @@ class FlyersController < ApplicationController
   def flyer_params
     flyer = params.fetch(:flyer, {})
     flyer.is_a?(ActionController::Parameters) ? flyer.permit(:query, :sort, :near, :lat, :lng, :detail_level, categories: [], organizations: [], service_ids: []) : {}
+  end
+
+  def print_settings
+    return {} unless params.key?(:print_settings)
+
+    settings = params[:print_settings]
+    return {include_map: nil} unless settings.is_a?(ActionController::Parameters)
+
+    %i[include_map text_size].each_with_object({}) do |key, options|
+      next unless settings.key?(key)
+
+      value = settings[key]
+      options[key] = value.is_a?(String) ? value : ""
+    end.tap { |options| options[:details] = settings[:details] if settings.key?(:details) }
   end
 end
