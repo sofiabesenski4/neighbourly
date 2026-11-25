@@ -12,7 +12,7 @@
                 value: category.id, checked: (!draft && @flyer.categories.include?(category.id.to_s)),
                 class: "size-4 shrink-0 accent-sage-600",
                 data: {flyer_builder_target: draft ? "draftCategory" : "category",
-                       action: ("change->flyer-builder#filter" unless draft)} %>
+                       category_selection_target: "option", category_selection_parent: parent&.id} %>
           <span class="[overflow-wrap:anywhere]"><%= category.name %></span>
         </label>
         <%= render "category_options", tree: tree, palette: palette, parent: category, draft: draft %>

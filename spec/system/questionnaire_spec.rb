@@ -35,6 +35,27 @@ RSpec.describe "Questionnaire", type: :system do
 
     after { page.current_window.resize_to(1280, 900) }
 
+    it "checks and clears the choices beneath a category group" do
+      Category.create!(name: "Food Banks")
+      visit find_help_for_myself_path
+
+      within("[role='group'][aria-label='Food and meals']") do
+        check "Food and meals"
+        expect(page).to have_checked_field("Food Banks")
+        expect(page).to have_checked_field("Meals", exact: true)
+
+        uncheck "Meals", exact: true
+        expect(page).to have_unchecked_field("Food and meals")
+        expect(page).to have_checked_field("Food Banks")
+
+        check "Food and meals"
+        uncheck "Food and meals"
+        expect(page).to have_unchecked_field("Food Banks")
+        expect(page).to have_unchecked_field("Meals", exact: true)
+      end
+      expect(page).to have_unchecked_field("Housing Services")
+    end
+
     it "finds services for the chosen need, closest first, keeping the answers out of the URL" do
       visit find_help_for_myself_path
       check "Food and meals"

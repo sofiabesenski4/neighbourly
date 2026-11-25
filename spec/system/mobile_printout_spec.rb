@@ -9,7 +9,6 @@ RSpec.describe "Mobile printouts", type: :system do
     driven_by(:selenium_chrome_headless)
     page.driver.browser.execute_cdp("Emulation.setTouchEmulationEnabled", enabled: true)
     allow(ContentPipeline::Embedder).to receive(:embed).and_return([1.0] + Array.new(1535, 0.0))
-    allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
     source = Source.create!(name: "Victoria Community Directory", source_type: "csv")
     source.services.create!(name: "Farther kitchen", categories: [meals], address_attributes: {lat: 48.44, lng: -123.36})
     source.services.create!(name: "Nearby kitchen", categories: [meals], address_attributes: {lat: 48.421, lng: -123.36})
@@ -36,24 +35,22 @@ RSpec.describe "Mobile printouts", type: :system do
     it "filters, sorts, rotates, and opens a mapped PDF at #{width} by #{height}" do
       page.driver.browser.execute_cdp("Emulation.setDeviceMetricsOverride", width: width, height: height, deviceScaleFactor: 1, mobile: true)
       visit new_flyer_path
-      expect(find_field("Enter a place").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
-      fill_in "Enter a place", with: "919 Pandora Ave"
-      click_button "Continue"
+      expect(page).to have_no_field("Enter a place")
       expect(page).to have_css("article h4", count: 3)
 
       if width < 640
         find("button[aria-label='Filters']").click
         within("#flyer-filters[open]") do
           check "Meals"
-          select "Distance", from: "Sort by"
+          select "Name (Z–A)", from: "Sort by"
           click_button "Apply filters"
         end
       else
         sort = find("summary[aria-label='Sort resources']")
         expect(sort.evaluate_script("this.getBoundingClientRect().height")).to be >= 44
         tap(sort)
-        expect(find_button("Distance").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
-        click_button "Distance"
+        expect(find_button("Name (Z–A)").evaluate_script("this.getBoundingClientRect().height")).to be >= 44
+        click_button "Name (Z–A)"
         check "Meals"
       end
       expect(page).to have_css("article h4", count: 2)

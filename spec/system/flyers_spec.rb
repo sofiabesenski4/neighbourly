@@ -64,31 +64,21 @@ RSpec.describe "Flyers", type: :system do
     expect(page.body).to eq("%PDF-all-resources")
   end
 
-  # Uses the real form without JavaScript. The builder's JavaScript sends the same
-  # form fields, and flyer_builder_controller.test.js covers its own behaviour.
-  it "lets a visitor enter a location and get distances on the printout" do
+  it "prints selected detail fields without opening a distance screen" do
     allow(ContentPipeline::Embedder).to receive(:embed).and_return(Array.new(1536, 0.0))
-    Source.create!(name: "Local", source_type: "csv").services.create!(name: "Community meal", address_attributes: {lat: 48.43, lng: -123.36})
-    allow(Geocoder).to receive(:locate).and_return(GeoPoint.new(lat: 48.42, lng: -123.36))
+    Source.create!(name: "Local", source_type: "csv").services.create!(name: "Community meal", hours: "Weekdays",
+      address_attributes: {lat: 48.43, lng: -123.36})
 
     visit new_flyer_path
-    fill_in "Enter a place", with: "Douglas St and Yates St"
+    expect(page).to have_no_text("Where should we measure distances from?")
+    expect(page).to have_no_text("Distances won't be shown on your printout.")
+    expect(page).to have_no_field("Enter a place")
     check "Include extra details in printout"
     click_button "Generate printout"
 
     text = PDF::Reader.new(StringIO.new(page.body)).pages.map(&:text).join("\n").gsub(/\s+/, " ")
-    expect(text).to include("Distances are from Douglas St and Yates St", "Distance: 1.1 km")
-  end
-
-  it "lets a visitor correct a location that can't be found" do
-    allow(Geocoder).to receive(:locate).and_return(nil)
-
-    visit new_flyer_path
-    fill_in "Enter a place", with: "Central Library"
-    click_button "Generate printout"
-
-    expect(page).to have_content("We couldn't find that location")
-    expect(page).to have_field("Enter a place", with: "Central Library")
+    expect(text).to include("Hours: Weekdays")
+    expect(text).not_to include("Distances are from", "Distance:")
   end
 
   it "shows responsive Tailwind filter controls without the builder stylesheet" do

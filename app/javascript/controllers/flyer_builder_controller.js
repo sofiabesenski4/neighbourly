@@ -1,12 +1,6 @@
 import { Controller } from "@hotwired/stimulus";
-import {
-  deviceLocationSupported,
-  describeAccuracy,
-  requestDeviceLocation,
-} from "../lib/device_location.js";
 
 const DEFAULT_SORT = "default";
-const DISTANCE_SORT = "distance";
 
 export default class extends Controller {
   static targets = [
@@ -39,25 +33,11 @@ export default class extends Controller {
     "printError",
     "printout",
     "pdfLink",
-    "near",
     "lat",
     "lng",
-    "useLocation",
-    "locationStatus",
-    "locationNote",
-    "placeError",
-    "confirmPlaceButton",
-    "skipLocation",
-    "locationStep",
-    "locationHeading",
-    "builderStep",
-    "builderHeading",
-    "locationSummaryRow",
-    "locationSummary",
   ];
   static values = {
     previewUrl: String,
-    locateUrl: String,
     summaryLabels: Array,
     fromQuestionnaire: Boolean,
   };
@@ -67,29 +47,11 @@ export default class extends Controller {
     this.hasResults = false;
     this.generating = false;
     this.excludedServiceIds = new Set();
-    this.locationRequest = 0;
-    // Only the questionnaire handoff should retain the submitted coordinates.
-    if (!this.fromQuestionnaireValue) this.forgetLocationChoice();
-    const supported = deviceLocationSupported();
-    this.useLocationTarget.hidden = !supported;
-    this.locationNoteTarget.hidden = !supported;
-    this.confirmPlaceButtonTarget.hidden = false;
-    this.skipLocationTarget.hidden = false;
     this.toolbarTarget.hidden = false;
     this.sidebarTarget.classList.add("hidden");
     this.layoutChanged();
-    if (this.fromQuestionnaireValue) {
-      this.showBuilderStep(
-        this.latTarget.value
-          ? "Distances from the location you provided."
-          : "Distances won't be shown on your printout.",
-      );
-    } else {
-      this.showLocationStep();
-      // Load the guide behind the location screen so it's ready when the person continues.
-      this.updateFilterControls();
-      this.refresh();
-    }
+    this.updateFilterControls();
+    this.refresh();
   }
 
   disconnect() {
@@ -107,7 +69,10 @@ export default class extends Controller {
     this.printRequest?.abort();
     this.closeFilters();
     this.clearPrintout();
-    this.forgetLocationChoice();
+    if (this.hasLatTarget) {
+      this.latTarget.value = "";
+      this.lngTarget.value = "";
+    }
     this.generateLabelTarget.textContent = "Generate printout";
   }
 
@@ -125,174 +90,11 @@ export default class extends Controller {
     this.debounce = setTimeout(() => this.refresh(), 300);
   }
 
-  // The first screen: where distances are measured from. The person has to make a
-  // choice here, even if that choice is to skip, before seeing the second screen.
-  showLocationStep() {
-    this.locationStepTarget.hidden = false;
-    this.builderStepTarget.hidden = true;
-    this.locationSummaryRowTarget.hidden = true;
-  }
-
-  // The second screen: categories and preview, with a line saying what was chosen.
-  // Focus moves to its heading so keyboard and screen reader users follow the change.
-  // The preview reloads because its distances depend on the choice just made.
-  showBuilderStep(summary) {
-    this.locationSummaryTarget.textContent = summary;
-    this.locationSummaryRowTarget.hidden = false;
-    this.locationStepTarget.hidden = true;
-    this.builderStepTarget.hidden = false;
-    this.updateFilterControls();
-    this.builderHeadingTarget.focus();
-    this.refresh();
-  }
-
-  // Back to the first screen. Any printout is discarded, because its distances are
-  // for the choice being changed. Selected categories and the preview are kept.
-  changeLocation() {
-    this.discardPrintout();
-    this.showLocationStep();
-    this.locationHeadingTarget.focus();
-  }
-
-  skipLocation() {
-    this.forgetLocationChoice();
-    this.nearTarget.value = "";
-    this.showBuilderStep("Distances won't be shown on your printout.");
-  }
-
-  // Typing a place replaces any device location, so only one is ever sent.
-  locationChanged() {
-    this.forgetLocationChoice();
-  }
-
-  // Checks a typed place before moving on, so a place we can't find is corrected here
-  // rather than discovered after choosing categories. The coordinates it returns are
-  // kept for the preview and printout, so the place is only looked up this once.
-  async confirmPlace() {
-    const place = this.nearTarget.value.trim();
-    this.forgetLocationChoice();
-    if (!place) {
-      this.showPlaceError(
-        "Enter a street address or intersection, or choose another option.",
-      );
-      return;
-    }
-
-    const request = this.locationRequest;
-    this.placeCheck = new AbortController();
-    this.setCheckingPlace(true);
-    const body = new FormData();
-    body.append("flyer[near]", place);
-    try {
-      const response = await fetch(this.locateUrlValue, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "X-CSRF-Token":
-            document.querySelector('meta[name="csrf-token"]')?.content || "",
-        },
-        credentials: "same-origin",
-        body,
-        signal: this.placeCheck.signal,
-      });
-      const data = await response.json();
-      if (request !== this.locationRequest) return;
-      this.setCheckingPlace(false);
-      if (!response.ok) {
-        this.showPlaceError(data.errors.join(" "));
-      } else if (data.located) {
-        this.latTarget.value = data.lat;
-        this.lngTarget.value = data.lng;
-        this.showBuilderStep(`Distances from: ${place}.`);
-      } else {
-        // The geocoder is down. The guide can still print, so this shouldn't stop
-        // the person. The printout itself explains any missing distances.
-        this.showBuilderStep(
-          `We can't check ${place} right now, so your printout may not show distances.`,
-        );
-      }
-    } catch (error) {
-      if (error.name === "AbortError" || request !== this.locationRequest)
-        return;
-      this.setCheckingPlace(false);
-      this.showPlaceError(
-        "We couldn't check that place. Check your connection and try again.",
-      );
-    }
-  }
-
-  setCheckingPlace(checking) {
-    this.confirmPlaceButtonTarget.disabled = checking;
-    this.confirmPlaceButtonTarget.textContent = checking
-      ? "Checking…"
-      : "Continue";
-  }
-
-  showPlaceError(message) {
-    this.placeErrorTarget.textContent = message;
-    this.placeErrorTarget.hidden = false;
-  }
-
-  // A printout made for the previous location would show the wrong distances, so
-  // it's discarded as soon as the location changes. The preview stays as it is,
-  // because the location only affects the printout.
+  // Resource selections and print settings change what belongs in the PDF.
   discardPrintout() {
     this.printRequest?.abort();
     this.clearPrintout();
     this.printErrorTarget.hidden = true;
-  }
-
-  // Asks the browser where the device is, and moves on once it's known.
-  useMyLocation() {
-    this.forgetLocationChoice();
-    const request = this.locationRequest;
-    this.showLocationStatus("Finding your location…");
-    requestDeviceLocation(
-      (position) => {
-        // The person typed a place or cleared this while the browser was working.
-        if (request !== this.locationRequest) return;
-        this.applyDevicePosition(position);
-      },
-      (message) => {
-        if (request !== this.locationRequest) return;
-        this.showLocationStatus(message);
-      },
-    );
-  }
-
-  applyDevicePosition({ lat, lng, accuracy }) {
-    this.latTarget.value = lat;
-    this.lngTarget.value = lng;
-    this.nearTarget.value = "";
-    this.locationStatusTarget.hidden = true;
-    this.showBuilderStep(this.deviceLocationMessage(accuracy));
-  }
-
-  deviceLocationMessage(accuracy) {
-    const { rough, text } = describeAccuracy(accuracy);
-    return rough
-      ? `Distances from your location, which ${text}. If that's too far, change it to a nearby place.`
-      : `Distances from your location (${text}).`;
-  }
-
-  // Clears whichever location was chosen, along with any messages about it. Moving on
-  // the request number also makes any answer still on its way get ignored, so a late
-  // answer can't bring back a location the person has moved on from.
-  forgetLocationChoice() {
-    this.locationRequest += 1;
-    this.placeCheck?.abort();
-    this.setCheckingPlace(false);
-    this.latTarget.value = "";
-    this.lngTarget.value = "";
-    this.locationStatusTarget.textContent = "";
-    this.locationStatusTarget.hidden = true;
-    this.placeErrorTarget.textContent = "";
-    this.placeErrorTarget.hidden = true;
-  }
-
-  showLocationStatus(message) {
-    this.locationStatusTarget.textContent = message;
-    this.locationStatusTarget.hidden = false;
   }
 
   // Keep questionnaire answers and locations in the POST body so they stay out
@@ -301,8 +103,9 @@ export default class extends Controller {
     const headers = { Accept: "application/json" };
     const query = this.searchTarget.value.trim();
     const sort = this.sortTarget.value;
-    const hasLocation = this.hasLatTarget && this.latTarget.value;
-    if (!this.fromQuestionnaireValue && !hasLocation) {
+    const hasLocation =
+      this.hasLatTarget && this.latTarget.value && this.lngTarget.value;
+    if (!this.fromQuestionnaireValue) {
       categories.forEach((key) =>
         url.searchParams.append("flyer[categories][]", key),
       );
@@ -438,22 +241,9 @@ export default class extends Controller {
   }
 
   updateFilterControls() {
-    const canSortByDistance =
-      this.latTarget.value !== "" && this.lngTarget.value !== "";
-    if (!canSortByDistance && this.sortTarget.value === DISTANCE_SORT)
-      this.sortTarget.value = DEFAULT_SORT;
-    this.draftSortTarget.querySelector(
-      `option[value="${DISTANCE_SORT}"]`,
-    ).disabled = !canSortByDistance;
     const customOrder = this.sortTarget.value !== DEFAULT_SORT;
     this.desktopSortOptionTargets.forEach((option) => {
       const order = option.dataset.flyerBuilderOrderParam;
-      if (order === DISTANCE_SORT) {
-        option.disabled = !canSortByDistance;
-        option.title = canSortByDistance
-          ? ""
-          : "Choose a starting location to sort by distance";
-      }
       option.setAttribute(
         "aria-pressed",
         String(order === this.sortTarget.value),

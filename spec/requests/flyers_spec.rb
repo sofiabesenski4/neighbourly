@@ -411,7 +411,7 @@ RSpec.describe "Flyers", type: :request do
         expect(response.parsed_body["errors"].join).to include("couldn't find that location", "Douglas St and Yates St")
       end
 
-      it "shows the form again with the typed text when submitted without JavaScript" do
+      it "shows a validation error for an invalid place submitted by an older form" do
         allow(Geocoder).to receive(:locate).and_return(nil)
 
         post flyers_path, params: {flyer: {near: "Central Library"}}
@@ -419,7 +419,7 @@ RSpec.describe "Flyers", type: :request do
         expect(response).to have_http_status(:unprocessable_content)
         document = Nokogiri::HTML(response.body)
         expect(document.at_css('[role="alert"]').text).to include("couldn't find that location")
-        expect(document.at_css('input[name="flyer[near]"]')["value"]).to eq("Central Library")
+        expect(document.at_css('input[name="flyer[near]"]')).to be_nil
       end
 
       it "still prints, without distances, when the geocoder is down" do
