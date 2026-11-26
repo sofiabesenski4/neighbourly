@@ -283,15 +283,19 @@ RSpec.describe ContentPipeline::Ingester do
           expect { described_class.new(source).ingest(csv) }.not_to change(Service, :count)
         end
 
-        it "sets a changed row's service again, clearing what the row no longer says" do
+        it "holds details a changed row would replace or clear, keeping the service's current values" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
           service.address.update_columns(city: "Victoria", lat: 48.43, lng: -123.37)
 
           described_class.new(source).ingest(csv.sub("100 Harbour St,250-555-0101,All ages", "200 Harbour St,,All ages"))
 
-          expect(service.reload.phone).to be_nil
-          expect(service.address).to have_attributes(street_address: "200 Harbour St", city: nil, coordinates: nil)
+          expect(service.reload.phone).to eq("250-555-0101")
+          expect(service.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria",
+            coordinates: GeoPoint.new(lat: 48.43, lng: -123.37))
+          expect(service.import_conflicts.pending.pluck(:field, :incoming_value)).to contain_exactly(
+            ["phone", nil], ["address", {"street_address" => "200 Harbour St"}]
+          )
         end
 
         # A member renames their organization, and someone else later adds one
@@ -305,7 +309,8 @@ RSpec.describe ContentPipeline::Ingester do
 
           described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
 
-          expect(service.reload).to have_attributes(phone: "250-555-0199", organization: renamed)
+          expect(service.reload).to have_attributes(phone: "250-555-0101", organization: renamed)
+          expect(service.import_conflicts.pending.pluck(:field)).to eq(["phone"])
         end
 
         it "gives a new row naming the old name to the renamed organization its source already uses" do
@@ -329,17 +334,30 @@ RSpec.describe ContentPipeline::Ingester do
           service = source.documents.find_by!(external_id: "1").service
           service.confirm!(by: User.create!(email: "checker@example.com", password: "password123"), method: "phone")
 
-          travel_to(1.day.from_now) { described_class.new(source, confirmed_by: uploader).ingest(csv.sub("Bike Repair", "Bike Shop")) }
+          travel_to(1.day.from_now) { described_class.new(source, confirmed_by: uploader).ingest(csv.sub("5 Cook St,,", "5 Cook St,250-555-0103,")) }
 
           expect(source.services.reload).to all(have_attributes(confirmed_by: uploader, confirmation_method: "upload"))
           expect(service.reload.confirmed_at).to be > 12.hours.from_now
         end
 
-        # Nobody has checked what a changed row now says.
-        it "clears a service's confirmation when a detail it vouched for changes, and keeps it otherwise" do
+        # The details it vouched for are still the ones it shows.
+        it "leaves the earlier confirmation on a service whose details wait for review" do
+          uploader = User.create!(email: "uploader@example.com", password: "password123")
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
           service.confirm!(by: User.create!(email: "checker@example.com", password: "password123"), method: "phone")
+
+          described_class.new(source, confirmed_by: uploader).ingest(csv.sub("250-555-0101", "250-555-0199"))
+
+          expect(service.reload).to have_attributes(phone: "250-555-0101", confirmation_method: "phone")
+        end
+
+        # Nobody has checked what a changed row now says.
+        it "clears a service's confirmation when a detail it vouched for changes, and keeps it otherwise" do
+          ingester.ingest(csv)
+          checker = User.create!(email: "checker@example.com", password: "password123")
+          service = source.documents.find_by!(external_id: "1").service
+          service.confirm!(by: checker, method: "phone")
 
           described_class.new(source).ingest(csv)
           expect(service.reload.confirmation_method).to eq("phone")
@@ -348,18 +366,54 @@ RSpec.describe ContentPipeline::Ingester do
           described_class.new(source).ingest(csv.sub("Meals,Harbourside Society", "Meals,harbourside  SOCIETY"))
           expect(service.reload.confirmation_method).to eq("phone")
 
-          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
-          expect(service.reload).to have_attributes(confirmed_at: nil, confirmed_by: nil, confirmation_method: nil)
+          # A detail the service had no value for is written straight away.
+          bikes = source.documents.find_by!(external_id: "3").service
+          bikes.confirm!(by: checker, method: "phone")
+          described_class.new(source).ingest(csv.sub("5 Cook St,,", "5 Cook St,250-555-0103,"))
+          expect(bikes.reload).to have_attributes(confirmed_at: nil, confirmed_by: nil, confirmation_method: nil)
         end
 
-        it "keeps a service's coordinates when its row changes elsewhere" do
+        it "writes straight away what the service had no value for" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "3").service
+
+          described_class.new(source).ingest(csv.sub("5 Cook St,,", "5 Cook St,250-555-0103,"))
+
+          expect(service.reload.phone).to eq("250-555-0103")
+          expect(service.import_conflicts).to be_empty
+        end
+
+        it "replaces a waiting value when the row changes again" do
           ingester.ingest(csv)
           service = source.documents.find_by!(external_id: "1").service
-          service.address.update_columns(lat: 48.43, lng: -123.37)
 
           described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
+          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0177"))
 
-          expect(service.reload).to have_attributes(phone: "250-555-0199", coordinates: GeoPoint.new(lat: 48.43, lng: -123.37))
+          expect(service.import_conflicts.pending.pluck(:field, :incoming_value)).to eq([["phone", "250-555-0177"]])
+        end
+
+        it "drops a waiting value when the row goes back to what the service holds" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+
+          described_class.new(source).ingest(csv.sub("250-555-0101", "250-555-0199"))
+          described_class.new(source).ingest(csv)
+
+          expect(service.import_conflicts.pending).to be_empty
+        end
+
+        it "holds a change of organization and a closed service reopening" do
+          ingester.ingest(csv)
+          service = source.documents.find_by!(external_id: "1").service
+          service.update!(closed: true)
+
+          described_class.new(source).ingest(csv.sub("1,Harbour Meals,Harbourside Society", "1,Harbour Meals,Our Place Society"))
+
+          expect(service.reload).to have_attributes(closed: true, organization: have_attributes(name: "Harbourside Society"))
+          expect(service.import_conflicts.pending.pluck(:field, :incoming_value)).to contain_exactly(
+            ["organization", "Our Place Society"], ["closed", false]
+          )
         end
 
         it "keeps admin edits to a service when its row comes in unchanged" do

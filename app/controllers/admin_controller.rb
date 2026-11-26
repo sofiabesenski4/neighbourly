@@ -12,6 +12,7 @@ class AdminController < ApplicationController
     @source_count = source_scope.where.not(source_type: "form").count
     @resource_count = Document.where(source_id: source_scope.select(:id)).count
     @pending_report_count = policy_scope(Report).pending.count
+    @pending_import_conflict_count = policy_scope(ImportConflict).pending.count
     @model_count = available_chat_models.size
   end
 end

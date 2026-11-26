@@ -22,6 +22,8 @@ class Service < ApplicationRecord
   has_and_belongs_to_many :categories, -> { order(:name) }
   # Where it is, coordinates included, lives on its address.
   has_one :address, as: :addressable, dependent: :destroy, autosave: true
+  # Details a changed import row would replace, waiting for an admin.
+  has_many :import_conflicts, dependent: :delete_all
   # Blank location fields add no address, but can clear one already there.
   accepts_nested_attributes_for :address,
     reject_if: ->(fields) { fields["id"].blank? && fields.except("id").values.all?(&:blank?) }
@@ -96,6 +98,22 @@ class Service < ApplicationRecord
 
   def category_names
     categories.map(&:name)
+  end
+
+  # Takes a changed import row's values, keyed by ImportConflict::FIELDS. A
+  # detail that already has a different value keeps it, and the row's value
+  # waits for an admin to approve or reject it. Values still waiting from an
+  # earlier version of the row are dropped, since the row no longer says them.
+  # Nothing is saved.
+  def take_import(values)
+    import_conflicts.pending.delete_all if persisted?
+    values.each do |field, value|
+      if new_record? || ImportConflict.writable?(self, field, value)
+        ImportConflict.assign(self, field, value)
+      else
+        import_conflicts.build(field: field.to_s, incoming_value: value)
+      end
+    end
   end
 
   # A GeoPoint, or nil when there is no address or its location isn't known.

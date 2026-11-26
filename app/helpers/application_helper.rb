@@ -12,7 +12,7 @@ module ApplicationHelper
   def administration_page?
     return false unless current_user
 
-    pages = current_user.admin? ? %w[admin users organizations services sources documents reports models] : []
+    pages = current_user.admin? ? %w[admin users organizations services sources documents reports import_conflicts models] : []
     pages += %w[organizations services] if current_user.member?
     pages.include?(controller_name)
   end

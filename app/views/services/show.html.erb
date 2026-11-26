@@ -16,6 +16,14 @@
 
 <%= render "admin/page_header", title: @service.name, description: "Review the information held for this service." %>
 
+<% waiting = policy(ImportConflict).index? ? @service.import_conflicts.pending.count : 0 %>
+<% if waiting.positive? %>
+  <p class="mb-6 max-w-4xl rounded-xl border border-amber-200 bg-amber-50 px-5 py-3 text-sm leading-6 text-amber-900">
+    A re-import would change <%= pluralize(waiting, "detail") %> of this service. They keep their current values until you
+    <%= link_to "review them", import_conflicts_path(anchor: dom_id(@service, :import_review)), class: "admin-link" %>.
+  </p>
+<% end %>
+
 <% location = @service.address&.one_line %>
 <dl class="admin-panel max-w-4xl divide-y divide-stone-100">
   <div class="px-5 py-4 sm:px-6">
