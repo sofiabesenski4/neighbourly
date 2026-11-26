@@ -76,7 +76,7 @@ GEM
       securerandom (>= 0.3)
       tzinfo (~> 2.0, >= 2.0.5)
       uri (>= 0.13.1)
-    addressable (2.9.2)
+    addressable (2.10.0)
       public_suffix (>= 2.0.2, < 8.0)
     afm (1.0.0)
     ast (2.4.3)
@@ -167,7 +167,7 @@ GEM
       raabro (~> 1.4)
     globalid (1.4.0)
       activesupport (>= 6.1)
-    hashdiff (1.2.1)
+    hashdiff (1.3.0)
     hashery (2.1.2)
     herb (0.11.2)
     herb (0.11.2-aarch64-linux-gnu)
@@ -213,6 +213,7 @@ GEM
     mini_magick (5.3.1)
       logger
     mini_mime (1.1.5)
+    mini_portile2 (2.8.9)
     minitest (6.0.6)
       drb (~> 2.0)
       prism (~> 1.5)
@@ -233,6 +234,9 @@ GEM
     net-smtp (0.5.2)
       net-protocol
     nio4r (2.7.5)
+    nokogiri (1.19.7)
+      mini_portile2 (~> 2.8.2)
+      racc (~> 1.4)
     nokogiri (1.19.7-aarch64-linux-gnu)
       racc (~> 1.4)
     nokogiri (1.19.7-aarch64-linux-musl)
@@ -484,7 +488,7 @@ GEM
       actionview (>= 8.0.0)
       bindex (>= 0.4.0)
       railties (>= 8.0.0)
-    webmock (3.34.0)
+    webmock (3.39.0)
       addressable (>= 2.8.0)
       crack (>= 0.3.2)
       hashdiff (>= 0.4.0, < 2.0.0)
@@ -564,7 +568,7 @@ CHECKSUMS
   activerecord (8.1.4.1) sha256=bd65599ca0b5d210937f835d42c7aff69d271741c75aab022730be6cbce67e87
   activestorage (8.1.4.1) sha256=0f4e2f114f3584723a80a2c089aacc6170e765a0b2c385c9782e26ed78f05c66
   activesupport (8.1.4.1) sha256=16ac4f341ca65c85a1fcdb8ac73f68891aae9e3c4a6f9c3a27daed8b00017ed7
-  addressable (2.9.2) sha256=9117c7e7d6ee07230e75ce41fb9401ae55354dc654fcd0e862ba41d539e9a610
+  addressable (2.10.0) sha256=5e13b9c001adf01dd65ad6e0d2a91d2bc07885c0ff2b83f48cbcd95e08d9de62
   afm (1.0.0) sha256=5bd4d6f6241e7014ef090985ec6f4c3e9745f6de0828ddd58bc1efdd138f4545
   ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   base64 (0.3.0) sha256=27337aeabad6ffae05c265c450490628ef3ebd4b67be58257393227588f5a97b
@@ -609,7 +613,7 @@ CHECKSUMS
   ffi (1.17.4-x86_64-linux-musl) sha256=3fdf9888483de005f8ef8d1cf2d3b20d86626af206cbf780f6a6a12439a9c49e
   fugit (1.14.0) sha256=e311a9cc85a54bb67649df45060e721282a1e2c8ebad40e41874a3a7d576f37e
   globalid (1.4.0) sha256=037f12fbf1d9d7a014d501c2d5c77356fd4ddd96d7a7991d6700bba96706f427
-  hashdiff (1.2.1) sha256=9c079dbc513dfc8833ab59c0c2d8f230fa28499cc5efb4b8dd276cf931457cd1
+  hashdiff (1.3.0) sha256=0b6724b8f3fef3961acc09489b175698ce0b7fd22c9cc5aa559d280cc6b65649
   hashery (2.1.2) sha256=d239cc2310401903f6b79d458c2bbef5bf74c46f3f974ae9c1061fb74a404862
   herb (0.11.2) sha256=926f16b6c552a077755f686d30f795db049a5596814a0dfd8133cbe36be787ba
   herb (0.11.2-aarch64-linux-gnu) sha256=b8015cba548ff79f04c69dd9ccf92a8dc8900fca8a0fc23b000f92fdf7219842
@@ -637,6 +641,7 @@ CHECKSUMS
   method_source (1.1.0) sha256=181301c9c45b731b4769bc81e8860e72f9161ad7d66dd99103c9ab84f560f5c5
   mini_magick (5.3.1) sha256=29395dfd76badcabb6403ee5aff6f681e867074f8f28ce08d78661e9e4a351c4
   mini_mime (1.1.5) sha256=8681b7e2e4215f2a159f9400b5816d85e9d8c6c6b491e96a12797e798f8bccef
+  mini_portile2 (2.8.9) sha256=0cd7c7f824e010c072e33f68bc02d85a00aeb6fce05bb4819c03dfd3c140c289
   minitest (6.0.6) sha256=153ea36d1d987a62942382b61075745042a2b3123b1cd48f4c3675af9cc7d6f1
   msgpack (1.8.7) sha256=dfefec761b5f9047e6e8d95d2c7f8af4b3725d984a01942adc533aa819a2df33
   multipart-post (2.4.1) sha256=9872d03a8e552020ca096adadbf5e3cb1cd1cdd6acd3c161136b8a5737cdb4a8
@@ -647,6 +652,7 @@ CHECKSUMS
   net-protocol (0.4.0) sha256=f9f90c8c6f64794a45160bf422177a336db12809de3beeeaa26b88fcd2e8c853
   net-smtp (0.5.2) sha256=35103cc04d6b2d94632f9928ede07483c24b70b9c0db1f231fea43909b678f3c
   nio4r (2.7.5) sha256=6c90168e48fb5f8e768419c93abb94ba2b892a1d0602cb06eef16d8b7df1dca1
+  nokogiri (1.19.7) sha256=abe94507c54cb18f872777b16bdca4aad32b1abdc4c52fe843f1c80fbdf992b8
   nokogiri (1.19.7-aarch64-linux-gnu) sha256=8f5e15d299602456406e1f03a9f3456cceb33a0722811e818d2ee2214eb4c84a
   nokogiri (1.19.7-aarch64-linux-musl) sha256=efe0c3602e6e54521bc21c681930ce5568e2d11203de17400710b2b3ca2e4cb4
   nokogiri (1.19.7-arm-linux-gnu) sha256=7fd1907125691aa89e838cc91161761c758b4e17bb32f0dd9b5515a82cc759af
@@ -747,7 +753,7 @@ CHECKSUMS
   useragent (0.16.11) sha256=700e6413ad4bb954bb63547fa098dddf7b0ebe75b40cc6f93b8d54255b173844
   warden (1.2.9) sha256=46684f885d35a69dbb883deabf85a222c8e427a957804719e143005df7a1efd0
   web-console (4.3.0) sha256=e13b71301cdfc2093f155b5aa3a622db80b4672d1f2f713119cc7ec7ac6a6da4
-  webmock (3.34.0) sha256=72eed29dc8c00148d592acaedaaa6b869e2e397de57dfc8602b84aa834f46b33
+  webmock (3.39.0) sha256=c74366b69b681ae2bb691f23643a73476157c1acdc56f674a8dece1b0fa0fd12
   websocket (1.2.11) sha256=b7e7a74e2410b5e85c25858b26b3322f29161e300935f70a0e0d3c35e0462737
   websocket-driver (0.8.2) sha256=97c556b019bf3410b4961002ac501621e9322d3f8a7bc02161a09301cc4c4146
   websocket-extensions (0.1.5) sha256=1c6ba63092cda343eb53fc657110c71c754c56484aad42578495227d717a8241
