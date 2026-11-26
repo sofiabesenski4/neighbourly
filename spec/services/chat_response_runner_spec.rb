@@ -122,6 +122,17 @@ RSpec.describe ChatResponseRunner do
     expect(Rails.error).not_to have_received(:report)
   end
 
+  it "fails the reply instead of completing it empty while another process still holds the conversation" do
+    chat.update_columns(claim_token: SecureRandom.uuid, claimed_until: 1.minute.from_now)
+    provider_complete { raise "The provider must not run" }
+
+    described_class.new(response.id).call
+
+    expect(response.reload).to be_failed
+    expect(response.error_message).to eq(ChatResponse::FAILED_MESSAGE)
+    expect(chat.messages.where(role: "assistant")).to be_empty
+  end
+
   context "with retrieved documents" do
     let(:source) { Source.create!(name: "Community directory", url: "https://example.com", source_type: "html") }
     let(:documents) do

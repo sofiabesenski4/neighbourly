@@ -1,4 +1,6 @@
 class ChatResponseRunner
+  class ChatBusy < StandardError; end
+
   def initialize(response_id, attempt_token: nil)
     @response_id = response_id
     @attempt_token = attempt_token
@@ -11,7 +13,6 @@ class ChatResponseRunner
 
     @chat = @response.chat
     @chat.with_model(@response.model_id, provider: @response.provider)
-    @chat.to_llm.cancellation_checker = -> { @response.cancellation_requested? }
     checkpoint!
     result = RagContext.new.augment(@response.user_message.content)
     @documents = result.documents
@@ -27,6 +28,7 @@ class ChatResponseRunner
       raise "The assistant placeholder was not created" unless @assistant&.role == "assistant"
 
       @assistant.chat_response_run = @response
+      @assistant.shown_content = ""
       @response.while_running { @response.update!(assistant_message: @assistant) }
     end
 
@@ -35,10 +37,17 @@ class ChatResponseRunner
 
       @response.while_running do
         @assistant.content = @assistant.content.to_s + chunk.content
+        @assistant.shown_content = @assistant.content
         @assistant.broadcast_append_chunk(chunk.content)
         @response.heartbeat!
       end
+    rescue RubyLLM::CancelledError
+      # End the run as a stop. Raising here would read as a broken stream,
+      # which discards the reply record RubyLLM still means to save.
+      @chat.cancel
     end
+    # RubyLLM returns without replying while another process holds the chat.
+    raise ChatBusy, "Another process is still answering this conversation" unless @assistant
 
     checkpoint!
     @response.while_running { link_documents }
@@ -53,7 +62,7 @@ class ChatResponseRunner
       record_failure(error)
       raise
     end
-  rescue RubyLLM::Error, Faraday::Error => error
+  rescue RubyLLM::Error, Faraday::Error, ChatBusy => error
     record_failure(error)
   rescue => error
     record_failure(error)

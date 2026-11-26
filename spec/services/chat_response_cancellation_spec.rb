@@ -109,6 +109,26 @@ RSpec.describe ChatResponseRunner, "cancellation" do
     expect(Rails.error).not_to have_received(:report)
   end
 
+  it "does not let a Stop left over from an earlier reply stop the next question" do
+    allow(context).to receive(:augment) do
+      ChatResponse.find(response.id).cancel!
+      result
+    end
+    described_class.new(response.id).call
+    expect(response.reload).to be_cancelled
+
+    next_response = ChatResponse.enqueue!(chat: chat, content: "Another question", model: chat.model_id, provider: chat.provider)
+    allow(context).to receive(:augment).and_return(result)
+    provider_complete do |_provider, _messages, **_options, &stream|
+      stream.call(chunk("A new answer"))
+      answer("A new answer")
+    end
+    described_class.new(next_response.id).call
+
+    expect(next_response.reload).to be_completed
+    expect(next_response.assistant_message.content).to eq("A new answer")
+  end
+
   it "does not recreate a partial record deleted with the conversation" do
     provider_complete do |_provider, _messages, **_options, &stream|
       stream.call(chunk("A partial answer"))

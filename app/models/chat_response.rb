@@ -30,6 +30,7 @@ class ChatResponse < ApplicationRecord
       ChatResponseRecovery.call(chat)
       raise Busy, "The assistant is already replying to this conversation." if active.where(chat_id: chat.id).exists?
 
+      chat.forget_stop_request
       user_message = chat.messages.create!(role: "user", content: content)
       create!(chat: chat, user_message: user_message, model_id: model, provider: provider.to_s)
     end
@@ -47,6 +48,7 @@ class ChatResponse < ApplicationRecord
         return :conflict if chat.chat_responses.active.exists?
         return :unavailable unless ChatModelAvailability.new.find(model_id, provider: provider)
 
+        chat.forget_stop_request
         # A failed partial answer must not become history for its replacement.
         assistant_message&.destroy!
         self.assistant_message = nil
@@ -77,16 +79,21 @@ class ChatResponse < ApplicationRecord
   end
 
   def cancel!(expected_token: nil)
-    with_lock do
+    stopping = with_lock do
       return false if expected_token && expected_token != attempt_token
       if queued?
         update!(status: "cancelled", error_message: nil, finished_at: Time.current, heartbeat_at: Time.current)
+        false
       elsif RUNNING_STATUSES.include?(status)
         # Keep the chat occupied until its worker has saved any partial reply.
         update!(status: "cancelling", error_message: nil, heartbeat_at: Time.current)
+        true
       end
-      true
     end
+    # Also stops a reply that is still waiting on the model, before any text.
+    # Outside the response lock, since other paths lock the chat first.
+    chat.cancel if stopping
+    true
   end
 
   def acknowledge_cancellation!

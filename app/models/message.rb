@@ -1,12 +1,11 @@
 class Message < ApplicationRecord
   acts_as_message
-  has_many_attached :attachments
   has_many :document_messages, dependent: :destroy
   has_many :rag_documents, through: :document_messages, source: :document
 
   CONVERSATION_ROLES = %w[user assistant].freeze
 
-  attr_accessor :chat_response_run
+  attr_accessor :chat_response_run, :shown_content
 
   around_save :persist_for_current_response
 
@@ -46,7 +45,12 @@ class Message < ApplicationRecord
 
   def persist_for_current_response(&block)
     if chat_response_run
-      chat_response_run.while_persistable(&block)
+      chat_response_run.while_persistable do
+        # A stopped reply keeps only the text the person saw. RubyLLM would
+        # also keep a chunk that reached it after Stop and was never shown.
+        self.content = shown_content if chat_response_run.cancelling? && !shown_content.nil?
+        yield
+      end
     else
       yield
     end

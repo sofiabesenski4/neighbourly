@@ -41,6 +41,12 @@ class Chat < ApplicationRecord
     chat_responses.order(:id).last
   end
 
+  # A Stop that arrived after its reply ended must not stop the next reply.
+  # RubyLLM clears it only for messages it records itself.
+  def forget_stop_request
+    update_column(:cancelled, false) if self[:cancelled] && !running?
+  end
+
   def broadcast_title
     broadcast_update_to stream_name,
       targets: "[data-chat-title='#{id}'], head title",
