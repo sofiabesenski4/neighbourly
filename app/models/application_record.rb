@@ -13,4 +13,16 @@ class ApplicationRecord < ActiveRecord::Base
   rescue URI::InvalidURIError
     false
   end
+
+  # A website as a link, adding https:// to a bare domain like "example.org".
+  # Nil for anything that isn't a web address, so a value kept this way never
+  # stops a record with a website from saving.
+  def self.web_address(value)
+    text = value.to_s.strip
+    return if text.empty?
+    return text if web_address?(text)
+
+    link = "https://#{text}"
+    link if text.match?(/\A[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?\z/i) && web_address?(link)
+  end
 end

@@ -19,22 +19,6 @@ module ContentPipeline
       def parse(raw_content)
         raise NotImplementedError, "#{self.class}#parse must be implemented"
       end
-
-      private
-
-      # A website as a link, adding https:// to a bare domain like
-      # "example.org". Nil for anything that isn't a web address, which the
-      # caller keeps in the service's additional details instead.
-      def web_address(value)
-        text = value.to_s.strip
-        return if text.empty?
-        # The same check services and organizations validate with, so a value
-        # kept here never stops the service from saving.
-        return text if ApplicationRecord.web_address?(text)
-
-        link = "https://#{text}"
-        link if text.match?(/\A[a-z0-9-]+(\.[a-z0-9-]+)+(\/\S*)?\z/i) && ApplicationRecord.web_address?(link)
-      end
     end
   end
 end

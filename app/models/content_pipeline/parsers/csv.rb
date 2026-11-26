@@ -172,7 +172,7 @@ module ContentPipeline
           next if header.nil?
 
           # A website that isn't a web address stays in the details as written.
-          value = web_address(value) if attribute == :website
+          value = ApplicationRecord.web_address(value) if attribute == :website
           next if value.nil?
 
           service[attribute] = value

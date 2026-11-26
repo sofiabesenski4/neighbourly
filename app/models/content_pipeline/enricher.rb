@@ -17,6 +17,9 @@ module ContentPipeline
       address: the street address where people go, such as "919 Pandora Ave", or a corner such as "Douglas St and Yates St", exactly as the row gives it. Leave it empty if the row has no street address.
       city: the city or town of that address. Leave it empty if the row does not say.
       phone: the phone number to call, exactly as the row gives it. Leave it empty if the row has none.
+      hours: when the service is open, exactly as the row gives it. Leave it empty if the row does not say.
+      email: the email address to write to, exactly as the row gives it. Leave it empty if the row has none.
+      website: the web address of the service or its organization, exactly as the row gives it. Leave it empty if the row has none.
       organization: the name of the organization that runs the service, exactly as the row gives it. Leave it empty if the row does not say.
     TEXT
 
@@ -101,6 +104,9 @@ module ContentPipeline
       service.name = result[:title] if result[:title]
       service.description ||= result[:summary]
       service.phone ||= result[:address][:phone]
+      service.hours ||= result[:hours]
+      service.email ||= result[:email]
+      service.website ||= result[:website]
       found = result[:address].slice(:street_address, :city).compact
       address = service.address
       blanks = found.select { |field, _value| address.nil? || address.public_send(field).blank? }
@@ -138,9 +144,12 @@ module ContentPipeline
             address: {type: "string"},
             city: {type: "string"},
             phone: {type: "string"},
+            hours: {type: "string"},
+            email: {type: "string"},
+            website: {type: "string"},
             organization: {type: "string"}
           },
-          required: %w[title summary categories address city phone organization],
+          required: %w[title summary categories address city phone hours email website organization],
           additionalProperties: false
         }
       }
@@ -159,6 +168,10 @@ module ContentPipeline
         title: title&.truncate(Parsers::Csv::MAX_TITLE_LENGTH),
         address: {street_address: text_in(data["address"]), city: text_in(data["city"]), phone: text_in(data["phone"])},
         summary: summary.truncate(MAX_SUMMARY_LENGTH),
+        hours: text_in(data["hours"]),
+        email: text_in(data["email"]),
+        # Anything that isn't a web address is dropped, as an import does.
+        website: ApplicationRecord.web_address(text_in(data["website"])),
         organization: text_in(data["organization"]),
         categories: Array(data["categories"]).filter_map { |name| by_name[name.to_s.strip.downcase] }.uniq
       }

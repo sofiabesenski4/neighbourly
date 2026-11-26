@@ -244,6 +244,7 @@ RSpec.describe ContentPipeline::Enricher do
       service
       reply.replace({title: "Harbour Community Meals", summary: "Free hot lunches on weekdays.", categories: ["Meals"],
                      address: "999 Other St", city: "Victoria", phone: "250-555-0100",
+                     hours: "Mon-Fri 11am-1pm", email: "meals@harbour.example", website: "harbour.example",
                      organization: "Harbourside Society"}.to_json)
     end
 
@@ -255,6 +256,32 @@ RSpec.describe ContentPipeline::Enricher do
       )
       expect(service.address).to have_attributes(street_address: "100 Harbour St", city: "Victoria")
       expect(service.category_names).to eq(["Meals"])
+    end
+
+    it "fills in the hours, email and website the row's columns left blank" do
+      described_class.new(document).enrich!
+
+      expect(service.reload).to have_attributes(
+        hours: "Mon-Fri 11am-1pm", email: "meals@harbour.example", website: "https://harbour.example"
+      )
+    end
+
+    it "keeps the hours, email and website the row's columns gave" do
+      service.update!(hours: "Daily noon", email: "hello@column.example", website: "https://column.example")
+
+      described_class.new(document).enrich!
+
+      expect(service.reload).to have_attributes(
+        hours: "Daily noon", email: "hello@column.example", website: "https://column.example"
+      )
+    end
+
+    it "leaves the website blank when the model's answer is not a web address" do
+      reply.replace({title: "Harbour Meals", summary: "Lunches.", categories: [], website: "ask at the front desk"}.to_json)
+
+      described_class.new(document).enrich!
+
+      expect(service.reload.website).to be_nil
     end
 
     it "links the organization the model found when the row named none" do
