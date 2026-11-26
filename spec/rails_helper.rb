@@ -11,6 +11,7 @@ require "rspec/rails"
 # Add additional requires below this line. Rails is not loaded until this point!
 require "capybara/rspec"
 require "webmock/rspec"
+require_relative "support/chrome_storage_reset"
 
 # Allow localhost connections for system tests, block all other external HTTP
 WebMock.disable_net_connect!(allow_localhost: true)
