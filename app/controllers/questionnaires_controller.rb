@@ -40,7 +40,7 @@ class QuestionnairesController < ApplicationController
     return render :show unless @questionnaire.finished?
 
     @results = @questionnaire.results
-    @flyer = Flyer.new(categories: @results.category_ids, sort: Flyer::SELECTION_SORT, detail_level: "summary")
+    @flyer = Flyer.new(categories: @results.category_ids, sort: Flyer::SELECTION_SORT)
     render :results
   end
 

@@ -286,7 +286,7 @@ RSpec.describe "Questionnaire", type: :system do
     listings = pdf.pages.fetch(2)
     expect(listings.text.scan(/\d+\.\s+(Near kitchen|Far kitchen|Shelter)\b/).flatten).to eq(["Near kitchen", "Far kitchen"])
     expect(listings.text).to include("Meals")
-    expect(listings.text).not_to include("Distance:")
+    expect(listings.text).to include("Distance:")
     expect(pdf.pages.last.text).to include("Map", "OpenStreetMap contributors")
 
     visit new_flyer_path

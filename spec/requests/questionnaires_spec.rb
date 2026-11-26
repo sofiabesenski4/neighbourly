@@ -82,7 +82,7 @@ RSpec.describe "Questionnaires", type: :request do
       expect(document.at_css("dialog#flyer-filters")).to be_nil
       expect(document.at_css("input[type='checkbox'][name='flyer[service_ids][]'][checked]")).to be_present
       expect(document.at_css("input[type='checkbox'][name='flyer[detail_level]']")).to be_nil
-      expect(document.at_css("input[type='hidden'][name='flyer[detail_level]']")["value"]).to eq("summary")
+      expect(document.at_css("input[type='hidden'][name='flyer[detail_level]']")["value"]).to eq("detailed")
       expect(document.css("input[type='hidden'][name='flyer[categories][]']").map { |input| input["value"] }).to eq([meals.id.to_s])
       expect(document.at_css("button[type='submit'][data-flyer-builder-target='generate']").text).to include("Generate printout")
     end
