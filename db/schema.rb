@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_25_000100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "vector"
@@ -136,6 +136,21 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
     t.datetime "enriched_at"
     t.index ["source_id", "external_id"], name: "index_documents_on_source_id_and_external_id", unique: true
     t.index ["source_id"], name: "index_documents_on_source_id"
+  end
+
+  create_table "import_conflicts", force: :cascade do |t|
+    t.bigint "service_id", null: false
+    t.string "field", null: false
+    t.jsonb "incoming_value"
+    t.string "status", default: "pending", null: false
+    t.bigint "decided_by_id"
+    t.datetime "decided_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["decided_by_id"], name: "index_import_conflicts_on_decided_by_id"
+    t.index ["service_id", "field"], name: "index_import_conflicts_on_pending_service_field", unique: true, where: "((status)::text = 'pending'::text)"
+    t.index ["service_id"], name: "index_import_conflicts_on_service_id"
+    t.index ["status"], name: "index_import_conflicts_on_status"
   end
 
   create_table "messages", force: :cascade do |t|
@@ -487,6 +502,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_20_062624) do
   add_foreign_key "document_messages", "documents", on_delete: :cascade
   add_foreign_key "document_messages", "messages"
   add_foreign_key "documents", "sources", on_delete: :cascade
+  add_foreign_key "import_conflicts", "services", on_delete: :cascade
+  add_foreign_key "import_conflicts", "users", column: "decided_by_id", on_delete: :nullify
   add_foreign_key "messages", "chats"
   add_foreign_key "organizations", "sources", on_delete: :nullify
   add_foreign_key "reports", "documents"

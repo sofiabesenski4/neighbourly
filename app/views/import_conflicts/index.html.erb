@@ -1,0 +1,65 @@
+<% content_for :title, "Import review" %>
+
+<%= render "admin/page_header", title: "Import review", description: "A re-imported row would replace these service details. Each one keeps its current value until you choose." %>
+
+<% if @conflicts_by_service.any? %>
+  <div class="space-y-6">
+    <% @conflicts_by_service.each do |service, conflicts| %>
+      <section class="admin-panel overflow-hidden" aria-labelledby="<%= dom_id(service, :import_review) %>">
+        <div class="flex flex-col gap-3 border-b border-stone-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-6">
+          <div class="min-w-0">
+            <h2 id="<%= dom_id(service, :import_review) %>" class="break-words text-base font-semibold text-stone-900">
+              <%= link_to service.name, service, class: "admin-link" %>
+            </h2>
+            <p class="mt-1 text-xs text-stone-600">
+              From <%= link_to service.source.name, service.source, class: "admin-link" %>
+              <% if service.document %>
+                · <%= link_to "imported row", service.document, class: "admin-link" %>
+              <% end %>
+            </p>
+          </div>
+          <% if conflicts.size > 1 %>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <%= button_to "Use all from import", approve_all_import_conflicts_path(service_id: service.id), method: :patch,
+                  class: "admin-button-primary", data: { turbo_confirm: "Replace #{conflicts.size} details of '#{service.name}' with the import's values?" } %>
+              <%= button_to "Keep all current", reject_all_import_conflicts_path(service_id: service.id), method: :patch,
+                  class: "admin-button-secondary" %>
+            </div>
+          <% end %>
+        </div>
+        <div class="admin-table-container rounded-none border-0 shadow-none" role="region" aria-label="Changes to <%= service.name %>" tabindex="0">
+          <table class="admin-table">
+            <caption class="sr-only">Details of <%= service.name %> the import would change</caption>
+            <thead>
+              <tr>
+                <th scope="col">Detail</th>
+                <th scope="col">Current</th>
+                <th scope="col">From import</th>
+                <th scope="col"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <% conflicts.each do |conflict| %>
+                <tr id="<%= dom_id(conflict) %>">
+                  <th scope="row" class="border-stone-100 bg-white py-4 align-top text-sm font-medium tracking-normal text-stone-900"><%= conflict.label %></th>
+                  <td class="max-w-xs whitespace-pre-line break-words"><%= import_conflict_value(conflict.field, conflict.current_value) %></td>
+                  <td class="max-w-xs whitespace-pre-line break-words"><%= import_conflict_value(conflict.field, conflict.incoming_value) %></td>
+                  <td>
+                    <div class="flex justify-end gap-2 whitespace-nowrap">
+                      <%= button_to "Use import", approve_import_conflict_path(conflict), method: :patch,
+                          class: "admin-button-primary", aria: { label: "Use the import's #{conflict.label.downcase} for #{service.name}" } %>
+                      <%= button_to "Keep current", reject_import_conflict_path(conflict), method: :patch,
+                          class: "admin-button-secondary", aria: { label: "Keep the current #{conflict.label.downcase} for #{service.name}" } %>
+                    </div>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    <% end %>
+  </div>
+<% else %>
+  <p class="admin-empty-state">No imported changes are waiting for review.</p>
+<% end %>

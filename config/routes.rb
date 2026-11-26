@@ -30,6 +30,16 @@ Rails.application.routes.draw do
   end
   resources :sources, only: [:index, :show, :new, :create, :destroy]
   resources :documents, except: [:index]
+  resources :import_conflicts, path: "import-review", only: [:index] do
+    member do
+      patch :approve
+      patch :reject
+    end
+    collection do
+      patch :approve_all
+      patch :reject_all
+    end
+  end
   resources :reports, only: [:index, :create] do
     member do
       patch :dismiss

@@ -99,9 +99,9 @@ module ContentPipeline
 
     # The row's own columns come first here too. The model's answer only fills
     # in what they left blank, and only links an organization when the row
-    # named none.
+    # named none. A name waiting for an admin to choose is left alone.
     def fill_in_service(service, result)
-      service.name = result[:title] if result[:title]
+      service.name = result[:title] if result[:title] && !service.import_conflicts.pending.exists?(field: "name")
       service.description ||= result[:summary]
       service.phone ||= result[:address][:phone]
       service.hours ||= result[:hours]

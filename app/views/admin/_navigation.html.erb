@@ -2,7 +2,7 @@
   <p class="px-3 py-2 text-xs font-semibold tracking-wide text-stone-500"><%= current_user.admin? ? "Admin console" : "Your organization" %></p>
   <div class="mt-1 space-y-1">
     <% links = if current_user.admin?
-         [["Overview", admin_path, %w[admin]], ["Users", users_path, %w[users]], ["Organizations", organizations_path, %w[organizations]], ["Services", services_path, %w[services]], ["Sources", sources_path, %w[sources documents]], ["Moderation", reports_path, %w[reports]], ["Models", models_path, %w[models]]]
+         [["Overview", admin_path, %w[admin]], ["Users", users_path, %w[users]], ["Organizations", organizations_path, %w[organizations]], ["Services", services_path, %w[services]], ["Sources", sources_path, %w[sources documents]], ["Moderation", reports_path, %w[reports]], ["Import review", import_conflicts_path, %w[import_conflicts]], ["Models", models_path, %w[models]]]
        else
          [["Details", organization_path(current_user.organization), %w[organizations]], ["Services", services_path, %w[services]]]
        end %>

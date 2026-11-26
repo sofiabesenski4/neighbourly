@@ -284,6 +284,14 @@ RSpec.describe ContentPipeline::Enricher do
       expect(service.reload.website).to be_nil
     end
 
+    it "leaves a name alone while it waits for an admin to choose" do
+      service.import_conflicts.create!(field: "name", incoming_value: "Harbour Lunches")
+
+      described_class.new(document).enrich!
+
+      expect(service.reload.name).to eq("Harbour Meals")
+    end
+
     it "links the organization the model found when the row named none" do
       described_class.new(document).enrich!
 

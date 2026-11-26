@@ -6,12 +6,12 @@ module ContentPipeline
   #   Ingester.new(source).call           — fetches content from source URL
   #   Ingester.new(source).ingest(string) — ingests raw content directly (file upload)
   class Ingester
-    # What a changed row no longer says is cleared from its service. The
+    # What a changed row no longer says is cleared from its service, once an
+    # admin approves clearing a detail the service has a value for. The
     # service forgets an earlier confirmation itself, only if a detail it
     # vouched for now reads differently.
     CLEARED_SERVICE_FIELDS = %i[description hours phone email website]
       .index_with(nil).merge(closed: false, additional_details: {}).freeze
-    CLEARED_ADDRESS_FIELDS = %i[street_address city province postal_code country].index_with(nil).freeze
 
     # confirmed_by is the person uploading the content. Everything their
     # upload brings in counts as confirmed by them, changed or not.
@@ -64,10 +64,13 @@ module ContentPipeline
 
     private
 
+    # A service with details waiting for an admin still shows values the
+    # upload didn't give, so it keeps the confirmation it had for them.
     def confirm_uploaded(external_ids)
       return if @confirmed_by.nil? || external_ids.empty?
 
       @source.services.where(document: @source.documents.where(external_id: external_ids))
+        .where.not(id: ImportConflict.pending.select(:service_id))
         .update_all(confirmed_at: Time.current, confirmed_by_id: @confirmed_by.id, confirmation_method: "upload")
     end
 
@@ -130,32 +133,19 @@ module ContentPipeline
       document
     end
 
-    # The service this row describes, linked to the organization it names.
-    # Like the resource, it is set again from a changed row, clearing what
-    # enrichment filled in.
+    # The service this row describes, linked to the organization it names and
+    # at the address it gives, the same as the resource's. A detail the
+    # service already has a different value for waits for an admin to choose
+    # which to keep (see ImportConflict).
     def write_service(document, chunk)
       return unless chunk[:service]
 
       service = document.service || @source.services.build(document: document)
-      service.assign_attributes(CLEARED_SERVICE_FIELDS.merge(chunk[:service]))
-      write_service_address(service, chunk[:address] || {})
-      # A service stays with its organization while the row names it by any
-      # name it has had, even if another organization now uses an old one.
-      name = chunk.dig(:organization, :name)
-      service.organization = Organization.for_name(name, source: @source) unless service.organization&.goes_by?(name)
+      address = (chunk[:address] || {}).stringify_keys.slice(*ImportConflict::LOCATION_FIELDS, "lat", "lng").compact_blank
+      service.take_import(CLEARED_SERVICE_FIELDS.merge(chunk[:service])
+        .merge(organization: chunk.dig(:organization, :name), address: address))
       service.categories = document.categories
       service.save!
-    end
-
-    # The service's address is where the row says, the same as the resource's.
-    # Coordinates are only replaced when the row gives them, so a lookup
-    # already made for the same address is kept.
-    def write_service_address(service, row_address)
-      location = row_address.slice(*CLEARED_ADDRESS_FIELDS.keys).compact_blank
-      coordinates = row_address.slice(:lat, :lng).compact_blank
-      return if service.address.nil? && location.empty? && coordinates.empty?
-
-      (service.address || service.build_address).assign_attributes(CLEARED_ADDRESS_FIELDS.merge(location).merge(coordinates))
     end
   end
 end
