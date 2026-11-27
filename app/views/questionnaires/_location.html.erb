@@ -1,0 +1,30 @@
+<%# A question answered by typing a place, or with the device's location.
+    Locals: question (Questionnaire::Question), answer (Questionnaire::LocationAnswer).
+
+    The hidden fields say where the place is if that's known, so that pressing Next again
+    without changing it doesn't repeat a lookup. device_location_controller.js fills them in
+    for a device location. Its button needs JavaScript, so the controller shows it. %>
+<% name = "questionnaire[answers][#{question.key}]" %>
+<% field_id = "#{question.key}_near" %>
+<div class="mt-4" data-controller="device-location">
+  <div data-device-location-target="offer" hidden>
+    <button type="button" data-action="device-location#use"
+            class="min-h-11 w-full cursor-pointer rounded-lg border border-sage-600 px-4 py-2.5 font-medium text-sage-800 hover:bg-sage-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sage-600">Use my location</button>
+    <p class="mt-2 mb-4 text-xs text-stone-600">
+      Your browser may use a location service, such as Google's or Apple's, to find you. We only use the result to work out distances.
+    </p>
+  </div>
+  <%= tag.p(("Using your location." if answer.device), role: "status", hidden: !answer.device,
+        data: {device_location_target: "status"}, class: "mb-4 rounded-lg bg-sage-100 px-4 py-3 text-stone-800") %>
+
+  <%= label_tag field_id, "Enter a place", class: "font-medium text-stone-900" %>
+  <p id="<%= field_id %>_hint" class="mt-1 mb-2 text-sm text-stone-600">A street address or intersection, like 919 Pandora Ave or Douglas St and Yates St.</p>
+  <%= text_field_tag "#{name}[near]", answer.text, id: field_id, maxlength: Questionnaire::LocationAnswer::LIMIT, autocomplete: "off",
+        aria: {describedby: ["#{field_id}_hint", ("question-message" if @message)].compact.join(" ")},
+        data: {device_location_target: "near", action: "input->device-location#forget"},
+        class: "block min-h-11 w-full rounded-[7px] border border-stone-400 px-3 py-2 text-base text-stone-900 focus:outline-sage-600" %>
+  <%# A lookup that failed leaves these empty, so pressing Next tries it again. %>
+  <% {device: ("1" if answer.device), checked: (answer.text if answer.located?), lat: answer.point&.lat, lng: answer.point&.lng}.each do |field, value| %>
+    <%= hidden_field_tag "#{name}[#{field}]", value, id: nil, autocomplete: "off", data: {device_location_target: field} %>
+  <% end %>
+</div>

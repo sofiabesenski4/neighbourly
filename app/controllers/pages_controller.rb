@@ -6,4 +6,8 @@ class PagesController < ApplicationController
       LandingQuestion.new
     end
   end
+
+  # A page saying this isn't ready yet, until there's a flow for it.
+  def find_help_for_someone_else
+  end
 end

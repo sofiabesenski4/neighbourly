@@ -11,7 +11,10 @@ class CategorySearch
     end
   end
 
-  def self.call(categories:, organizations: [], query: "", sort: Flyer::DEFAULT_SORT, origin: nil)
+  # Each of `filters` responds to keep?(service) and rank(service), as Questionnaire::Filter
+  # does. They choose services by details that aren't in columns, so they run here in Ruby
+  # instead of in the query. Printouts pass none, which changes nothing.
+  def self.call(categories:, organizations: [], query: "", sort: Flyer::DEFAULT_SORT, origin: nil, filters: [])
     selection = Flyer.new(categories: categories, organizations: organizations, query: query, sort: sort)
     raise ArgumentError, selection.errors.full_messages.to_sentence unless selection.valid?
 
@@ -37,6 +40,8 @@ class CategorySearch
       end
     end
 
+    resources.select! { |resource| filters.all? { |filter| filter.keep?(resource) } }
+
     by_distance = selection.sort == Flyer::DISTANCE_SORT
     if selection.sort != Flyer::DEFAULT_SORT && (!by_distance || origin&.located?)
       resources.sort_by! do |resource|
@@ -45,9 +50,11 @@ class CategorySearch
         by_distance ? [card.distance_km || Float::INFINITY, *name_order] : name_order
       end
       resources.reverse! if selection.sort == "desc"
+      resources = ranked(resources, filters)
       return [Section.new(category: nil, resources: resources, label: "Resources")]
     end
 
+    resources = ranked(resources, filters)
     sections = selected.map do |category|
       Section.new(category: category, resources: resources.select { |resource|
         resource.categories.include?(category)
@@ -63,4 +70,13 @@ class CategorySearch
 
     sections
   end
+
+  # Better matches first, otherwise in the order they were in. Ranks add up, so a service
+  # that suits two answers comes before one that suits only one of them.
+  def self.ranked(resources, filters)
+    return resources if filters.empty?
+
+    resources.sort_by.with_index { |resource, index| [filters.sum { |filter| filter.rank(resource) }, index] }
+  end
+  private_class_method :ranked
 end
